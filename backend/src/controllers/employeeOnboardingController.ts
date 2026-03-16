@@ -12,6 +12,7 @@ import { addToPasswordHistory } from '../utils/passwordHistory'
 
 // Create complete employee with user account
 export const onboardEmployee = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   const {
     // Personal Information
     first_name,
@@ -80,8 +81,8 @@ export const onboardEmployee = async (req: Request, res: Response) => {
 
     // Check if email already exists in users or employees
     const existingUserCheck = await client.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
+      'SELECT id FROM users WHERE email = $1 AND tenant_id = $2',
+      [email, tenantId]
     )
     
     if (existingUserCheck.rows.length > 0) {
@@ -93,8 +94,8 @@ export const onboardEmployee = async (req: Request, res: Response) => {
     }
 
     const existingEmployeeCheck = await client.query(
-      'SELECT id FROM employees WHERE email = $1',
-      [email]
+      'SELECT id FROM employees WHERE email = $1 AND tenant_id = $2',
+      [email, tenantId]
     )
     
     if (existingEmployeeCheck.rows.length > 0) {
@@ -107,22 +108,50 @@ export const onboardEmployee = async (req: Request, res: Response) => {
 
     // Check if employee number already exists
     const existingEmployeeNumberCheck = await client.query(
-      'SELECT id FROM employees WHERE employee_number = $1',
-      [employee_number]
+      'SELECT id FROM employees WHERE employee_number = $1 AND tenant_id = $2',
+      [employee_number, tenantId]
     )
-    
+
     if (existingEmployeeNumberCheck.rows.length > 0) {
       await client.query('ROLLBACK')
-      return res.status(409).json({ 
-        error: 'conflict', 
-        message: 'Employee number already exists' 
+      return res.status(409).json({
+        error: 'conflict',
+        message: 'Employee number already exists'
       })
+    }
+
+    // Enforce plan user limit
+    const planResult = await client.query(
+      `SELECT no_of_users FROM public.users
+       WHERE tenant_id = $1 AND no_of_users IS NOT NULL
+       LIMIT 1`,
+      [tenantId]
+    )
+
+    if (planResult.rows.length > 0 && planResult.rows[0].no_of_users !== null) {
+      const userLimit: number = planResult.rows[0].no_of_users
+      const countResult = await client.query(
+        `SELECT COUNT(*) AS total FROM public.users
+         WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`,
+        [tenantId]
+      )
+      const currentCount = parseInt(countResult.rows[0].total, 10)
+
+      if (currentCount >= userLimit) {
+        await client.query('ROLLBACK')
+        return res.status(403).json({
+          error: 'user_limit_reached',
+          message: `Your plan allows a maximum of ${userLimit} user${userLimit === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
+          limit: userLimit,
+          current: currentCount
+        })
+      }
     }
 
     // Verify all roles exist
     const rolesResult = await client.query(
-      'SELECT id, name FROM roles WHERE id = ANY($1::int[])',
-      [roleIds]
+      'SELECT id, name FROM roles WHERE id = ANY($1::int[]) AND tenant_id = $2',
+      [roleIds, tenantId]
     )
     
     if (rolesResult.rows.length !== roleIds.length) {
@@ -139,10 +168,10 @@ export const onboardEmployee = async (req: Request, res: Response) => {
 
     // 1. Create user account
     const userResult = await client.query(
-      `INSERT INTO users (name, email, password_hash, password_must_change, created_at)
-       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)
+      `INSERT INTO users (name, email, password_hash, password_must_change, created_at, tenant_id)
+       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP, $4)
        RETURNING id, name, email, created_at`,
-      [`${first_name} ${last_name}`, email, passwordHash]
+      [`${first_name} ${last_name}`, email, passwordHash, tenantId]
     )
     
     const newUser = userResult.rows[0]
@@ -164,9 +193,9 @@ export const onboardEmployee = async (req: Request, res: Response) => {
         employee_number, first_name, last_name, name, email, phone, 
         dob, nic, address, designation, employee_department, role,
         hire_date, base_salary, epf_enabled, epf_contribution_rate, 
-        etf_enabled, allowances, pto_allowance, user_id, is_active, created_at
+        etf_enabled, allowances, pto_allowance, user_id, is_active, created_at, tenant_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, CURRENT_TIMESTAMP, $21)
       RETURNING id, employee_number, first_name, last_name, email, designation, employee_department, created_at`,
       [
         employee_number,
@@ -188,7 +217,8 @@ export const onboardEmployee = async (req: Request, res: Response) => {
         etf_enabled !== undefined ? etf_enabled : false,
         JSON.stringify(allowances || {}),
         pto_allowance || 20,
-        userId
+        userId,
+        tenantId
       ]
     )
 
@@ -271,6 +301,7 @@ export const onboardEmployee = async (req: Request, res: Response) => {
 
 // Get all employees with their user account status and roles
 export const getAllEmployeesWithUserStatus = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   try {
     const query = `
       SELECT 
@@ -310,11 +341,12 @@ export const getAllEmployeesWithUserStatus = async (req: Request, res: Response)
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
+      WHERE e.tenant_id = $1
       GROUP BY e.id, u.id, u.name, u.email, u.account_status
       ORDER BY e.created_at DESC
     `
     
-    const result = await pool.query(query)
+    const result = await pool.query(query, [tenantId])
     
     return res.json({ 
       employees: result.rows,
