@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { pool } from './db'
+import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
 import { requireAuth } from './middleware/auth'
@@ -71,7 +71,10 @@ logger.system('🔐 CORS Configuration:', {
 })
 
 app.use(cors(corsOptions))
+import { tenantSchemaMiddleware } from './middleware/tenant-schema';
+import { dbClientMiddleware } from './middleware/db-client';
 app.use(express.json())
+app.use(dbClientMiddleware);
 
 // Root endpoint for Railway health checks
 app.get('/', (req, res) => {
@@ -112,44 +115,80 @@ app.use('/documents', documentsRoutes)
 app.use('/quotes', quotesRoutes)
 app.use('/purchase-orders', purchaseOrdersRoutes)
 app.use('/payroll', requireAuth, payrollRoutes)
-app.use('/api/employee-portal', requireAuth, employeePortalRoutes)
+app.use('/api/employee-portal', requireAuth, tenantSchemaMiddleware, employeePortalRoutes)
 app.use('/api/employee-onboarding', employeeOnboardingRoutes)
 app.use('/loans', loansRoutes)
 
 app.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body as { email?: string; password?: string }
+  const { email, password, force } = req.body as { email?: string; password?: string; force?: boolean }
   if (!email || !password) return res.status(400).json({ error: 'missing_fields' })
   try {
     // Get user
-    const r = await pool.query(`
-      SELECT u.id, u.name, u.email, u.password_hash, 
-             COALESCE(u.password_must_change, FALSE) as password_must_change
+    const r = await query(`
+      SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id,
+             COALESCE(u.password_must_change, FALSE) as password_must_change,
+             COALESCE(u.source, '') as source
       FROM users u
       WHERE u.email = $1 OR u.name = $1
       LIMIT 1
-    `, [email])
-    
+    `, [email], req.dbClient)
+
     if (!r.rows.length) return res.status(401).json({ error: 'invalid_credentials' })
-    
-    const u = r.rows[0] as { 
+
+    const u = r.rows[0] as {
       id: number
+      tenant_id: number
       name: string
       email: string
       password_hash: string
       password_must_change: boolean
+      source: string
     }
     
     const ok = await bcrypt.compare(password, u.password_hash)
     if (!ok) return res.status(401).json({ error: 'invalid_credentials' })
-    
+
+    // Enforce single active session — block if already logged in elsewhere
+    await query(
+      `DELETE FROM public.active_sessions WHERE user_id = $1 AND expires_at <= NOW()`,
+      [u.id], req.dbClient
+    )
+    const existingSession = await query(
+      `SELECT id FROM public.active_sessions WHERE user_id = $1 AND expires_at > NOW() LIMIT 1`,
+      [u.id], req.dbClient
+    )
+    if (existingSession.rows.length > 0) {
+      if (!force) {
+        return res.status(409).json({
+          error: 'already_logged_in',
+          message: 'This account is already active in another session. Sign in anyway to end that session.'
+        })
+      }
+      // Force flag set — clear the existing session and continue
+      await query(
+        `DELETE FROM public.active_sessions WHERE user_id = $1`,
+        [u.id], req.dbClient
+      )
+    }
+
+    // Create a new session (expires with the refresh token — 7 days)
+    const sessionResult = await query(
+      `INSERT INTO public.active_sessions (user_id, expires_at, ip_address, user_agent)
+       VALUES ($1, NOW() + INTERVAL '7 days', $2, $3)
+       RETURNING session_token`,
+      [u.id, req.ip, req.headers['user-agent'] || null],
+      req.dbClient
+    )
+    const sessionToken: string = sessionResult.rows[0].session_token
+
     // Get user's roles
-    const rolesResult = await pool.query(`
+    const rolesResult = await query(`
       SELECT r.id, r.name
       FROM roles r
       INNER JOIN user_roles ur ON r.id = ur.role_id
       WHERE ur.user_id = $1
       ORDER BY r.name
-    `, [u.id])
+    `, [u.id], req.dbClient)
     
     const roleIds = rolesResult.rows.map((r: any) => r.id)
     const roleNames = rolesResult.rows.map((r: any) => r.name)
@@ -157,23 +196,25 @@ app.post('/auth/login', async (req, res) => {
     // Get union of all permissions from all roles
     const permissions: string[] = []
     if (roleIds.length > 0) {
-      const permResult = await pool.query(`
+      const permResult = await query(`
         SELECT DISTINCT p.resource, p.action
         FROM permissions p
         INNER JOIN role_permissions rp ON p.id = rp.permission_id
         WHERE rp.role_id = ANY($1::int[])
-      `, [roleIds])
+      `, [roleIds], req.dbClient)
       
       permissions.push(...permResult.rows.map((p: any) => `${p.resource}:${p.action}`))
     }
     
-    // Generate JWT tokens
+    // Generate JWT tokens (session token embedded so middleware can validate it)
     const payload = {
       userId: u.id,
+      tenantId: u.tenant_id,
       email: u.email,
       roleIds,
       roleNames,
-      permissions
+      permissions,
+      sessionToken
     }
     
     console.log('🔐 LOGIN DEBUG - User:', u.email)
@@ -183,7 +224,7 @@ app.post('/auth/login', async (req, res) => {
     const accessToken = generateAccessToken(payload)
     const refreshToken = generateRefreshToken(payload)
     
-    return res.json({ 
+    return res.json({
       user: {
         id: u.id,
         name: u.name,
@@ -191,13 +232,30 @@ app.post('/auth/login', async (req, res) => {
         roleIds,
         roleNames,
         permissions,
-        password_must_change: u.password_must_change
+        password_must_change: u.password_must_change,
+        source: u.source || null,
+        is_super_user: u.source === 'marketing_site'
       },
       accessToken,
       refreshToken
     })
   } catch (e) {
     logger.error('/auth/login error', e)
+    return res.status(500).json({ error: 'server_error' })
+  }
+})
+
+// Logout — invalidates the active session
+app.post('/auth/logout', requireAuth, async (req, res) => {
+  try {
+    const { userId, sessionToken } = req.user!
+    await pool.query(
+      `DELETE FROM public.active_sessions WHERE user_id = $1 AND session_token = $2`,
+      [userId, sessionToken]
+    )
+    return res.json({ success: true, message: 'Logged out successfully' })
+  } catch (e) {
+    logger.error('/auth/logout error', e)
     return res.status(500).json({ error: 'server_error' })
   }
 })
@@ -273,14 +331,29 @@ app.post('/auth/refresh', async (req, res) => {
   
   try {
     const decoded = verifyToken(refreshToken)
-    
+
     if (!decoded) {
       return res.status(401).json({ error: 'invalid_refresh_token' })
     }
-    
+
+    // Validate session is still active
+    if (decoded.sessionToken) {
+      const sessionCheck = await pool.query(
+        `SELECT id FROM public.active_sessions
+         WHERE user_id = $1 AND session_token = $2 AND expires_at > NOW()`,
+        [decoded.userId, decoded.sessionToken]
+      )
+      if (sessionCheck.rows.length === 0) {
+        return res.status(401).json({
+          error: 'session_invalidated',
+          message: 'Your session is no longer valid. Please log in again.'
+        })
+      }
+    }
+
     // Generate new access token with current permissions
     const r = await pool.query(`
-      SELECT u.id, u.name, u.email
+      SELECT u.id, u.name, u.email, u.tenant_id
       FROM users u
       WHERE u.id = $1
     `, [decoded.userId])
@@ -318,14 +391,16 @@ app.post('/auth/refresh', async (req, res) => {
     
     const payload = {
       userId: u.id,
+      tenantId: u.tenant_id,
       email: u.email,
       roleIds,
       roleNames,
-      permissions
+      permissions,
+      sessionToken: decoded.sessionToken
     }
-    
+
     const newAccessToken = generateAccessToken(payload)
-    
+
     return res.json({ accessToken: newAccessToken })
   } catch (e) {
     logger.error('/auth/refresh error', e)

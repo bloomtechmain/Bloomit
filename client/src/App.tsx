@@ -108,6 +108,14 @@ export default function App() {
 
   const handleLogout = () => {
     console.log('🚪 Logging out user')
+    // Call backend to delete the active session row (fire-and-forget)
+    const token = authState.accessToken
+    if (token) {
+      fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {/* ignore network errors — local state is cleared regardless */})
+    }
     setAuthState({ user: null, accessToken: null, refreshToken: null })
     localStorage.removeItem('authState')
     localStorage.removeItem('token')

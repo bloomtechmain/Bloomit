@@ -16,13 +16,15 @@ type EmployeePayload = {
 }
 
 export const getAllEmployees = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   try {
     const query = `
       SELECT id as employee_id, employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax, created_at
       FROM employees
+      WHERE tenant_id = $1
       ORDER BY created_at DESC
     `
-    const result = await pool.query(query)
+    const result = await pool.query(query, [tenantId])
     return res.status(200).json({ employees: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -31,14 +33,15 @@ export const getAllEmployees = async (req: Request, res: Response) => {
 }
 
 export const getEmployeeById = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   const { id } = req.params
   try {
     const query = `
       SELECT id as employee_id, employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax, created_at
       FROM employees
-      WHERE id = $1
+      WHERE id = $1 AND tenant_id = $2
     `
-    const result = await pool.query(query, [id])
+    const result = await pool.query(query, [id, tenantId])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
     }
@@ -50,6 +53,7 @@ export const getEmployeeById = async (req: Request, res: Response) => {
 }
 
 export const createEmployee = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   const { employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax }: EmployeePayload = req.body ?? {}
 
   if (!employee_number || !first_name || !last_name || !email || !phone || !role) {
@@ -58,11 +62,11 @@ export const createEmployee = async (req: Request, res: Response) => {
 
   try {
     const query = `
-      INSERT INTO employees (employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      INSERT INTO employees (employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax, tenant_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING id as employee_id, employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax, created_at
     `
-    const values = [employee_number, first_name, last_name, email, phone, dob || null, nic || null, address || null, role, designation || null, tax || null]
+    const values = [employee_number, first_name, last_name, email, phone, dob || null, nic || null, address || null, role, designation || null, tax || null, tenantId]
     const result = await pool.query(query, values)
     return res.status(201).json({ employee: result.rows[0] })
   } catch (err: unknown) {
@@ -72,6 +76,7 @@ export const createEmployee = async (req: Request, res: Response) => {
 }
 
 export const updateEmployee = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   const { id } = req.params
   const { employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax }: EmployeePayload = req.body ?? {}
 
@@ -83,10 +88,10 @@ export const updateEmployee = async (req: Request, res: Response) => {
     const query = `
       UPDATE employees
       SET employee_number = $1, first_name = $2, last_name = $3, email = $4, phone = $5, dob = $6, nic = $7, address = $8, role = $9, designation = $10, tax = $11
-      WHERE id = $12
+      WHERE id = $12 AND tenant_id = $13
       RETURNING id as employee_id, employee_number, first_name, last_name, email, phone, dob, nic, address, role, designation, tax, created_at
     `
-    const values = [employee_number, first_name, last_name, email, phone, dob || null, nic || null, address || null, role, designation || null, tax || null, id]
+    const values = [employee_number, first_name, last_name, email, phone, dob || null, nic || null, address || null, role, designation || null, tax || null, id, tenantId]
     const result = await pool.query(query, values)
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
@@ -99,14 +104,15 @@ export const updateEmployee = async (req: Request, res: Response) => {
 }
 
 export const deleteEmployee = async (req: Request, res: Response) => {
+  const { tenantId } = req.user!;
   const { id } = req.params
   try {
     const query = `
       DELETE FROM employees
-      WHERE id = $1
+      WHERE id = $1 AND tenant_id = $2
       RETURNING id as employee_id
     `
-    const result = await pool.query(query, [id])
+    const result = await pool.query(query, [id, tenantId])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
     }

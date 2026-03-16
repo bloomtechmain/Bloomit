@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
+import { query } from '../db';
 import { logEmployeeActionFromRequest, EmployeeAuditActions } from '../utils/employeeAuditLog'
 
 /**
@@ -30,7 +30,7 @@ export async function getMyEmployeeRecord(req: Request, res: Response) {
     const userId = req.user.userId
 
     // Get employee record by user_id
-    const query = `
+    const sqlQuery = `
       SELECT 
         id,
         employee_number,
@@ -46,7 +46,7 @@ export async function getMyEmployeeRecord(req: Request, res: Response) {
       FROM employees
       WHERE user_id = $1
     `
-    const result = await pool.query(query, [userId])
+    const result = await query(sqlQuery, [userId], req.dbClient);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ 
@@ -125,7 +125,7 @@ export async function getDashboard(req: Request, res: Response) {
       FROM employees
       WHERE id = $1
     `
-    const employeeResult = await pool.query(employeeQuery, [employeeId])
+    const employeeResult = await query(employeeQuery, [employeeId], req.dbClient)
 
     if (employeeResult.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
@@ -150,12 +150,12 @@ export async function getDashboard(req: Request, res: Response) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `
-    const ptoResult = await pool.query(ptoBalanceQuery, [employeeId])
+    const ptoResult = await query(ptoBalanceQuery, [employeeId], req.dbClient)
     const ptoData = ptoResult.rows[0]
     
     // Get employee's PTO allowance from their record
     const ptoAllowanceQuery = 'SELECT pto_allowance FROM employees WHERE id = $1'
-    const ptoAllowanceResult = await pool.query(ptoAllowanceQuery, [employeeId])
+    const ptoAllowanceResult = await query(ptoAllowanceQuery, [employeeId], req.dbClient)
     const totalPtoAllowance = ptoAllowanceResult.rows[0]?.pto_allowance || 20
     const ptoBalance = totalPtoAllowance - parseInt(ptoData.days_used)
 
@@ -169,7 +169,7 @@ export async function getDashboard(req: Request, res: Response) {
         AND date >= date_trunc('week', CURRENT_DATE)
         AND date < date_trunc('week', CURRENT_DATE) + interval '1 week'
     `
-    const timeResult = await pool.query(timeEntriesQuery, [employeeId])
+    const timeResult = await query(timeEntriesQuery, [employeeId], req.dbClient)
     const timeData = timeResult.rows[0]
 
     // Get pending time entries (not yet approved)
@@ -179,7 +179,7 @@ export async function getDashboard(req: Request, res: Response) {
       WHERE employee_id = $1
         AND status = 'pending'
     `
-    const pendingTimeResult = await pool.query(pendingTimeQuery, [employeeId])
+    const pendingTimeResult = await query(pendingTimeQuery, [employeeId], req.dbClient)
     const pendingTimeCount = parseInt(pendingTimeResult.rows[0].pending_count)
 
     // Get recent announcements (last 5, active only)
@@ -199,7 +199,7 @@ export async function getDashboard(req: Request, res: Response) {
       ORDER BY priority DESC, created_at DESC
       LIMIT 5
     `
-    const announcementsResult = await pool.query(announcementsQuery)
+    const announcementsResult = await query(announcementsQuery, [], req.dbClient)
 
     // Get recent notifications (last 10, unread first)
     const notificationsQuery = `
@@ -219,7 +219,7 @@ export async function getDashboard(req: Request, res: Response) {
       ORDER BY is_read ASC, created_at DESC
       LIMIT 10
     `
-    const notificationsResult = await pool.query(notificationsQuery, [employeeId])
+    const notificationsResult = await query(notificationsQuery, [employeeId], req.dbClient)
 
     // Count unread notifications
     const unreadNotificationsQuery = `
@@ -230,7 +230,7 @@ export async function getDashboard(req: Request, res: Response) {
         AND is_archived = false
         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
     `
-    const unreadResult = await pool.query(unreadNotificationsQuery, [employeeId])
+    const unreadResult = await query(unreadNotificationsQuery, [employeeId], req.dbClient)
     const unreadCount = parseInt(unreadResult.rows[0].unread_count)
 
     // Compile dashboard response
@@ -302,7 +302,7 @@ export async function getStats(req: Request, res: Response) {
 
     // Get employee's PTO allowance
     const employeeQuery = 'SELECT pto_allowance FROM employees WHERE id = $1'
-    const employeeResult = await pool.query(employeeQuery, [employeeId])
+    const employeeResult = await query(employeeQuery, [employeeId], req.dbClient)
     const totalPtoAllowance = employeeResult.rows[0]?.pto_allowance || 20
 
     // PTO Statistics
@@ -323,7 +323,7 @@ export async function getStats(req: Request, res: Response) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `
-    const ptoStatsResult = await pool.query(ptoStatsQuery, [employeeId])
+    const ptoStatsResult = await query(ptoStatsQuery, [employeeId], req.dbClient)
     const ptoStats = ptoStatsResult.rows[0]
 
     const ptoBalance = totalPtoAllowance - parseInt(ptoStats.days_used_this_year)
@@ -341,7 +341,7 @@ export async function getStats(req: Request, res: Response) {
         AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
         AND EXTRACT(YEAR FROM date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `
-    const timeStatsResult = await pool.query(timeStatsQuery, [employeeId])
+    const timeStatsResult = await query(timeStatsQuery, [employeeId], req.dbClient)
     const timeStats = timeStatsResult.rows[0]
 
     // Time entries this week
@@ -352,7 +352,7 @@ export async function getStats(req: Request, res: Response) {
         AND date >= date_trunc('week', CURRENT_DATE)
         AND date < date_trunc('week', CURRENT_DATE) + interval '1 week'
     `
-    const weekTimeResult = await pool.query(weekTimeQuery, [employeeId])
+    const weekTimeResult = await query(weekTimeQuery, [employeeId], req.dbClient)
     const hoursThisWeek = parseFloat(weekTimeResult.rows[0].hours_this_week)
 
     // Notification Statistics
@@ -366,7 +366,7 @@ export async function getStats(req: Request, res: Response) {
         AND is_archived = false
         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
     `
-    const notificationStatsResult = await pool.query(notificationStatsQuery, [employeeId])
+    const notificationStatsResult = await query(notificationStatsQuery, [employeeId], req.dbClient)
     const notificationStats = notificationStatsResult.rows[0]
 
     // Compile stats response
@@ -448,7 +448,7 @@ export async function updateProfile(req: Request, res: Response) {
       FROM employees
       WHERE id = $1
     `
-    const currentProfileResult = await pool.query(currentProfileQuery, [employeeId])
+    const currentProfileResult = await query(currentProfileQuery, [employeeId], req.dbClient)
     
     if (currentProfileResult.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
@@ -515,7 +515,7 @@ export async function updateProfile(req: Request, res: Response) {
       RETURNING id
     `
     
-    await pool.query(updateQuery, values)
+    await query(updateQuery, values, req.dbClient)
 
     // Build new values object for audit log
     const newValues = {
@@ -540,7 +540,7 @@ export async function updateProfile(req: Request, res: Response) {
     )
 
     // Fetch and return updated profile
-    const updatedProfile = await getProfileData(employeeId)
+    const updatedProfile = await getProfileData(employeeId, req.dbClient)
 
     return res.status(200).json({
       message: 'Profile updated successfully',
@@ -571,8 +571,8 @@ export async function updateProfile(req: Request, res: Response) {
  * Helper function to get profile data
  * Extracted for reuse in getProfile and updateProfile
  */
-async function getProfileData(employeeId: number) {
-  const query = `
+async function getProfileData(employeeId: number, dbClient: any) {
+  const profileQuery = `
     SELECT 
       e.id,
       e.employee_number,
@@ -602,7 +602,7 @@ async function getProfileData(employeeId: number) {
     LEFT JOIN employees m ON e.manager_id = m.id
     WHERE e.id = $1
   `
-  const result = await pool.query(query, [employeeId])
+  const result = await query(profileQuery, [employeeId], dbClient)
   
   if (result.rows.length === 0) {
     return null
@@ -682,8 +682,7 @@ export async function getProfile(req: Request, res: Response) {
       { resourceType: 'profile', resourceId: employeeId }
     )
 
-    // Use helper function to get profile data
-    const profileData = await getProfileData(employeeId)
+    const profileData = await getProfileData(employeeId, req.dbClient)
 
     if (!profileData) {
       return res.status(404).json({ error: 'employee_not_found' })
@@ -693,23 +692,10 @@ export async function getProfile(req: Request, res: Response) {
 
   } catch (error) {
     console.error('Error fetching profile:', error)
-    
-    // Log the error
-    await logEmployeeActionFromRequest(
-      employeeId,
-      EmployeeAuditActions.PROFILE_VIEWED,
-      req,
-      {
-        resourceType: 'profile',
-        resourceId: employeeId,
-        status: 'failure',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error'
-      }
-    )
-
     return res.status(500).json({ error: 'server_error', message: 'Failed to fetch profile' })
   }
 }
+
 
 /**
  * GET /api/employee-portal/pto-balance/:employeeId
@@ -735,7 +721,7 @@ export async function getPtoBalance(req: Request, res: Response) {
 
     // Get employee's PTO allowance
     const employeeQuery = 'SELECT pto_allowance FROM employees WHERE id = $1'
-    const employeeResult = await pool.query(employeeQuery, [employeeId])
+    const employeeResult = await query(employeeQuery, [employeeId], req.dbClient)
     
     if (employeeResult.rows.length === 0) {
       return res.status(404).json({ error: 'employee_not_found' })
@@ -788,7 +774,7 @@ export async function getPtoBalance(req: Request, res: Response) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `
-    const ptoResult = await pool.query(ptoQuery, [employeeId])
+    const ptoResult = await query(ptoQuery, [employeeId], req.dbClient)
     const ptoData = ptoResult.rows[0]
 
     const daysUsed = parseInt(ptoData.days_used)
@@ -929,7 +915,7 @@ export async function createPtoRequest(req: Request, res: Response) {
           (from_date >= $2 AND to_date <= $3)
         )
     `
-    const overlapResult = await pool.query(overlapQuery, [employeeId, fromDate, toDate])
+    const overlapResult = await query(overlapQuery, [employeeId, fromDate, toDate], req.dbClient)
 
     if (overlapResult.rows.length > 0) {
       return res.status(400).json({
@@ -943,7 +929,7 @@ export async function createPtoRequest(req: Request, res: Response) {
     const balanceQuery = `
       SELECT pto_allowance FROM employees WHERE id = $1
     `
-    const balanceResult = await pool.query(balanceQuery, [employeeId])
+    const balanceResult = await query(balanceQuery, [employeeId], req.dbClient)
     const totalAllowance = balanceResult.rows[0]?.pto_allowance || 20
 
     const usedQuery = `
@@ -953,7 +939,7 @@ export async function createPtoRequest(req: Request, res: Response) {
         AND status = 'approved'
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM $2::date)
     `
-    const usedResult = await pool.query(usedQuery, [employeeId, fromDate])
+    const usedResult = await query(usedQuery, [employeeId, fromDate], req.dbClient)
     const daysUsed = parseInt(usedResult.rows[0].days_used)
     const daysRemaining = totalAllowance - daysUsed
 
@@ -966,7 +952,7 @@ export async function createPtoRequest(req: Request, res: Response) {
     const managerQuery = `
       SELECT manager_id FROM employees WHERE id = $1
     `
-    const managerResult = await pool.query(managerQuery, [employeeId])
+    const managerResult = await query(managerQuery, [employeeId], req.dbClient)
     const managerId = managerResult.rows[0]?.manager_id
 
     if (!managerId) {
@@ -991,14 +977,14 @@ export async function createPtoRequest(req: Request, res: Response) {
       ) VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW(), NOW())
       RETURNING *
     `
-    const insertResult = await pool.query(insertQuery, [
+    const insertResult = await query(insertQuery, [
       employeeId,
       managerId,
       absenceType,
       fromDate,
       toDate,
       description
-    ])
+    ], req.dbClient)
 
     const newRequest = insertResult.rows[0]
 
@@ -1030,7 +1016,7 @@ export async function createPtoRequest(req: Request, res: Response) {
       JOIN employees emp ON emp.id = $1
       WHERE e.id = $2
     `
-    const managerDetailsResult = await pool.query(managerDetailsQuery, [employeeId, managerId])
+    const managerDetailsResult = await query(managerDetailsQuery, [employeeId, managerId], req.dbClient)
     
     if (managerDetailsResult.rows.length > 0) {
       const { manager_email, manager_name, employee_name } = managerDetailsResult.rows[0]
@@ -1118,7 +1104,7 @@ export async function getPtoRequests(req: Request, res: Response) {
     )
 
     // Build query with filters
-    let query = `
+    let ptoQuery = `
       SELECT 
         pr.id,
         pr.employee_id,
@@ -1150,26 +1136,26 @@ export async function getPtoRequests(req: Request, res: Response) {
     // Apply status filter
     if (status && status !== 'all') {
       paramCount++
-      query += ` AND pr.status = $${paramCount}`
+      ptoQuery += ` AND pr.status = $${paramCount}`
       params.push(status)
     }
 
     // Apply date range filter
     if (startDate) {
       paramCount++
-      query += ` AND pr.from_date >= $${paramCount}`
+      ptoQuery += ` AND pr.from_date >= $${paramCount}`
       params.push(startDate)
     }
 
     if (endDate) {
       paramCount++
-      query += ` AND pr.to_date <= $${paramCount}`
+      ptoQuery += ` AND pr.to_date <= $${paramCount}`
       params.push(endDate)
     }
 
-    query += ' ORDER BY pr.created_at DESC'
+    ptoQuery += ' ORDER BY pr.created_at DESC'
 
-    const result = await pool.query(query, params)
+    const result = await query(ptoQuery, params, req.dbClient)
 
     return res.status(200).json({ 
       ptoRequests: result.rows,
@@ -1231,7 +1217,7 @@ export async function cancelPtoRequest(req: Request, res: Response) {
       LEFT JOIN employees m ON pr.manager_id = m.id
       WHERE pr.id = $1 AND pr.employee_id = $2
     `
-    const verifyResult = await pool.query(verifyQuery, [requestId, employeeId])
+    const verifyResult = await query(verifyQuery, [requestId, employeeId], req.dbClient)
 
     if (verifyResult.rows.length === 0) {
       return res.status(404).json({
@@ -1257,7 +1243,7 @@ export async function cancelPtoRequest(req: Request, res: Response) {
       SET status = 'cancelled', updated_at = NOW()
       WHERE id = $1
     `
-    await pool.query(cancelQuery, [requestId])
+    await query(cancelQuery, [requestId], req.dbClient)
 
     // Log the cancellation
     await logEmployeeActionFromRequest(
@@ -1352,7 +1338,7 @@ export async function getTimeEntries(req: Request, res: Response) {
     )
 
     // Build query with filters
-    let query = `
+    let timeEntriesQuery = `
       SELECT 
         te.id,
         te.employee_id,
@@ -1386,31 +1372,31 @@ export async function getTimeEntries(req: Request, res: Response) {
     // Apply filters
     if (start_date) {
       paramCount++
-      query += ` AND te.date >= $${paramCount}`
+      timeEntriesQuery += ` AND te.date >= $${paramCount}`
       params.push(start_date)
     }
 
     if (end_date) {
       paramCount++
-      query += ` AND te.date <= $${paramCount}`
+      timeEntriesQuery += ` AND te.date <= $${paramCount}`
       params.push(end_date)
     }
 
     if (project_id) {
       paramCount++
-      query += ` AND te.project_id = $${paramCount}`
+      timeEntriesQuery += ` AND te.project_id = $${paramCount}`
       params.push(project_id)
     }
 
     if (status) {
       paramCount++
-      query += ` AND te.status = $${paramCount}`
+      timeEntriesQuery += ` AND te.status = $${paramCount}`
       params.push(status)
     }
 
-    query += ' ORDER BY te.date DESC, te.created_at DESC'
+    timeEntriesQuery += ' ORDER BY te.date DESC, te.created_at DESC'
 
-    const result = await pool.query(query, params)
+    const result = await query(timeEntriesQuery, params, req.dbClient)
 
     return res.status(200).json({ 
       timeEntries: result.rows,
@@ -1463,7 +1449,7 @@ export async function createTimeEntry(req: Request, res: Response) {
   }
 
   try {
-    const query = `
+    const insertQuery = `
       INSERT INTO time_entries (
         employee_id, 
         project_id, 
@@ -1488,7 +1474,7 @@ export async function createTimeEntry(req: Request, res: Response) {
       description || null
     ]
 
-    const result = await pool.query(query, values)
+    const result = await query(insertQuery, values, req.dbClient)
     const timeEntry = result.rows[0]
 
     // Log the action
@@ -1578,7 +1564,7 @@ export async function getTimeReport(req: Request, res: Response) {
       FROM time_entries te
       ${whereClause}
     `
-    const overallResult = await pool.query(overallQuery, params)
+    const overallResult = await query(overallQuery, params, req.dbClient)
 
     // Weekly summary (last 8 weeks)
     const weeklyQuery = `
@@ -1592,7 +1578,7 @@ export async function getTimeReport(req: Request, res: Response) {
       ORDER BY week_start DESC
       LIMIT 8
     `
-    const weeklyResult = await pool.query(weeklyQuery, params)
+    const weeklyResult = await query(weeklyQuery, params, req.dbClient)
 
     // Monthly summary (last 6 months)
     const monthlyQuery = `
@@ -1606,7 +1592,7 @@ export async function getTimeReport(req: Request, res: Response) {
       ORDER BY month_start DESC
       LIMIT 6
     `
-    const monthlyResult = await pool.query(monthlyQuery, params)
+    const monthlyResult = await query(monthlyQuery, params, req.dbClient)
 
     // Project breakdown
     const projectQuery = `
@@ -1622,7 +1608,7 @@ export async function getTimeReport(req: Request, res: Response) {
       GROUP BY p.project_id, p.project_name
       ORDER BY total_hours DESC
     `
-    const projectResult = await pool.query(projectQuery, params)
+    const projectResult = await query(projectQuery, params, req.dbClient)
 
     // Daily breakdown (last 30 days)
     const dailyQuery = `
@@ -1636,7 +1622,7 @@ export async function getTimeReport(req: Request, res: Response) {
       ORDER BY te.date DESC
       LIMIT 30
     `
-    const dailyResult = await pool.query(dailyQuery, params)
+    const dailyResult = await query(dailyQuery, params, req.dbClient)
 
     // Pending hours (not yet approved)
     const pendingQuery = `
@@ -1646,7 +1632,7 @@ export async function getTimeReport(req: Request, res: Response) {
       FROM time_entries
       WHERE employee_id = $1 AND status = 'pending'
     `
-    const pendingResult = await pool.query(pendingQuery, [employeeId])
+    const pendingResult = await query(pendingQuery, [employeeId], req.dbClient)
 
     // Compile report
     const report = {
@@ -1720,7 +1706,7 @@ export async function getActiveTimer(req: Request, res: Response) {
   const employeeId = parseInt(req.params.employeeId)
 
   try {
-    const query = `
+    const activeTimerQuery = `
       SELECT 
         at.*,
         te.project_id,
@@ -1735,7 +1721,7 @@ export async function getActiveTimer(req: Request, res: Response) {
       LEFT JOIN contracts c ON te.contract_id = c.contract_id
       WHERE at.employee_id = $1
     `
-    const result = await pool.query(query, [employeeId])
+    const result = await query(activeTimerQuery, [employeeId], req.dbClient)
 
     if (result.rows.length === 0) {
       return res.status(200).json({ activeTimer: null })
@@ -1770,7 +1756,7 @@ export async function getPayslips(req: Request, res: Response) {
     )
 
     // Build query
-    let query = `
+    let payslipsQuery = `
       SELECT 
         p.payslip_id,
         p.employee_id,
@@ -1793,13 +1779,13 @@ export async function getPayslips(req: Request, res: Response) {
     // Filter by year if provided
     if (year) {
       paramCount++
-      query += ` AND p.payslip_year = $${paramCount}`
+      payslipsQuery += ` AND p.payslip_year = $${paramCount}`
       params.push(year)
     }
 
-    query += ' ORDER BY p.payslip_year DESC, p.payslip_month DESC'
+    payslipsQuery += ' ORDER BY p.payslip_year DESC, p.payslip_month DESC'
 
-    const result = await pool.query(query, params)
+    const result = await query(payslipsQuery, params, req.dbClient)
 
     return res.status(200).json({ 
       payslips: result.rows,
@@ -1851,7 +1837,7 @@ export async function getPayslipDetails(req: Request, res: Response) {
         AND p.employee_id = $2
         AND p.status IN ('PENDING_EMPLOYEE_SIGNATURE', 'COMPLETED')
     `
-    const payslipResult = await pool.query(payslipQuery, [payslipId, employeeId])
+    const payslipResult = await query(payslipQuery, [payslipId, employeeId], req.dbClient)
     
     if (payslipResult.rows.length === 0) {
       return res.status(404).json({ error: 'payslip_not_found' })
@@ -1871,7 +1857,7 @@ export async function getPayslipDetails(req: Request, res: Response) {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `
-    const signaturesResult = await pool.query(signaturesQuery, [payslipId])
+    const signaturesResult = await query(signaturesQuery, [payslipId], req.dbClient)
 
     // Log the view
     await logEmployeeActionFromRequest(
@@ -1924,7 +1910,7 @@ export async function downloadPayslip(req: Request, res: Response) {
         AND p.employee_id = $2
         AND p.status IN ('PENDING_EMPLOYEE_SIGNATURE', 'COMPLETED')
     `
-    const verifyResult = await pool.query(verifyQuery, [payslipId, employeeId])
+    const verifyResult = await query(verifyQuery, [payslipId, employeeId], req.dbClient)
     
     if (verifyResult.rows.length === 0) {
       return res.status(404).json({ error: 'payslip_not_found' })
@@ -1946,7 +1932,7 @@ export async function downloadPayslip(req: Request, res: Response) {
       JOIN employees e ON p.employee_id = e.id
       WHERE p.payslip_id = $1
     `
-    const payslipResult = await pool.query(payslipQuery, [payslipId])
+    const payslipResult = await query(payslipQuery, [payslipId], req.dbClient)
 
     // Get signatures
     const signaturesQuery = `
@@ -1958,7 +1944,7 @@ export async function downloadPayslip(req: Request, res: Response) {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `
-    const signaturesResult = await pool.query(signaturesQuery, [payslipId])
+    const signaturesResult = await query(signaturesQuery, [payslipId], req.dbClient)
 
     // Log the download
     await logEmployeeActionFromRequest(
@@ -2026,7 +2012,7 @@ export async function getYtdEarnings(req: Request, res: Response) {
         AND payslip_year = $2 
         AND status = 'COMPLETED'
     `
-    const summaryResult = await pool.query(summaryQuery, [employeeId, year])
+    const summaryResult = await query(summaryQuery, [employeeId, year], req.dbClient)
     const summary = summaryResult.rows[0]
 
     // Get monthly breakdown
@@ -2046,7 +2032,7 @@ export async function getYtdEarnings(req: Request, res: Response) {
         AND status = 'COMPLETED'
       ORDER BY payslip_month ASC
     `
-    const monthlyResult = await pool.query(monthlyQuery, [employeeId, year])
+    const monthlyResult = await query(monthlyQuery, [employeeId, year], req.dbClient)
 
     // Compile response
     const ytdData = {
@@ -2192,7 +2178,7 @@ export async function signPayslip(req: Request, res: Response) {
       JOIN employees e ON p.employee_id = e.id
       WHERE p.payslip_id = $1 AND p.employee_id = $2
     `
-    const payslipResult = await pool.query(payslipQuery, [payslipId, employeeId])
+    const payslipResult = await query(payslipQuery, [payslipId, employeeId], req.dbClient)
 
     if (payslipResult.rows.length === 0) {
       return res.status(404).json({ error: 'payslip_not_found', message: 'Payslip not found' })
@@ -2214,7 +2200,7 @@ export async function signPayslip(req: Request, res: Response) {
       FROM payslip_signatures 
       WHERE payslip_id = $1 AND signer_role = 'EMPLOYEE'
     `
-    const existingSignatureResult = await pool.query(existingSignatureQuery, [payslipId])
+    const existingSignatureResult = await query(existingSignatureQuery, [payslipId], req.dbClient)
 
     if (existingSignatureResult.rows.length > 0) {
       return res.status(400).json({
@@ -2225,7 +2211,7 @@ export async function signPayslip(req: Request, res: Response) {
 
     // Get user ID for signature
     const userQuery = `SELECT user_id FROM employees WHERE id = $1`
-    const userResult = await pool.query(userQuery, [employeeId])
+    const userResult = await query(userQuery, [employeeId], req.dbClient)
 
     if (userResult.rows.length === 0 || !userResult.rows[0].user_id) {
       return res.status(400).json({
@@ -2246,12 +2232,13 @@ export async function signPayslip(req: Request, res: Response) {
       ) VALUES ($1, $2, 'EMPLOYEE', $3)
       RETURNING signature_id, signed_at
     `
-    const signatureResult = await pool.query(signatureQuery, [payslipId, userId, signature])
+    const signatureResult = await query(signatureQuery, [payslipId, userId, signature], req.dbClient)
 
     // Update payslip status to COMPLETED
-    await pool.query(
+    await query(
       `UPDATE payslips SET status = 'COMPLETED', updated_at = NOW() WHERE payslip_id = $1`,
-      [payslipId]
+      [payslipId],
+      req.dbClient
     )
 
     // Mark token as used
@@ -2282,7 +2269,7 @@ export async function signPayslip(req: Request, res: Response) {
       FROM payslips
       WHERE payslip_id = $1
     `
-    const payslipDetailsResult = await pool.query(payslipDetailsQuery, [payslipId])
+    const payslipDetailsResult = await query(payslipDetailsQuery, [payslipId], req.dbClient)
     const details = payslipDetailsResult.rows[0]
 
     await sendPayslipSignedConfirmation({
@@ -2346,7 +2333,7 @@ export async function getDocuments(req: Request, res: Response) {
     // Build query - get documents accessible to employees
     // Note: Documents table stores files as BYTEA, not paths
     // Showing all documents (file_type contains MIME types, not categories)
-    let query = `
+    let documentsQuery = `
       SELECT 
         d.id as document_id,
         d.document_name,
@@ -2366,20 +2353,20 @@ export async function getDocuments(req: Request, res: Response) {
     // Apply category filter
     if (category && category !== 'all') {
       paramCount++
-      query += ` AND d.file_type = $${paramCount}`
+      documentsQuery += ` AND d.file_type = $${paramCount}`
       params.push(category)
     }
 
     // Apply search filter
     if (search) {
       paramCount++
-      query += ` AND (d.document_name ILIKE $${paramCount} OR d.description ILIKE $${paramCount})`
+      documentsQuery += ` AND (d.document_name ILIKE $${paramCount} OR d.description ILIKE $${paramCount})`
       params.push(`%${search}%`)
     }
 
-    query += ' ORDER BY d.upload_date DESC'
+    documentsQuery += ' ORDER BY d.upload_date DESC'
 
-    const result = await pool.query(query, params)
+    const result = await query(documentsQuery, params, req.dbClient)
 
     return res.status(200).json({ 
       documents: result.rows,
@@ -2430,7 +2417,7 @@ export async function downloadDocument(req: Request, res: Response) {
       FROM documents d
       WHERE d.id = $1
     `
-    const docResult = await pool.query(docQuery, [documentId])
+    const docResult = await query(docQuery, [documentId], req.dbClient)
 
     if (docResult.rows.length === 0) {
       return res.status(404).json({
@@ -2601,7 +2588,7 @@ export async function uploadDocument(req: Request, res: Response) {
       employeeId // uploaded_by
     ]
 
-    const result = await pool.query(insertQuery, values)
+    const result = await query(insertQuery, values, req.dbClient)
     const document = result.rows[0]
 
     // Log the upload
@@ -2674,7 +2661,7 @@ export async function getPersonalDocuments(req: Request, res: Response) {
   const employeeId = parseInt(req.params.employeeId)
   
   try {
-    const query = `
+    const personalDocumentsQuery = `
       SELECT 
         document_id,
         document_type,
@@ -2688,7 +2675,7 @@ export async function getPersonalDocuments(req: Request, res: Response) {
       ORDER BY uploaded_at DESC
     `
     
-    const result = await pool.query(query, [employeeId])
+    const result = await query(personalDocumentsQuery, [employeeId], req.dbClient)
     
     return res.status(200).json({
       documents: result.rows,
@@ -2716,7 +2703,7 @@ export async function downloadPersonalDocument(req: Request, res: Response) {
   
   try {
     // Verify document belongs to employee
-    const query = `
+    const docQuery = `
       SELECT 
         document_id,
         original_name,
@@ -2727,7 +2714,7 @@ export async function downloadPersonalDocument(req: Request, res: Response) {
       WHERE document_id = $1 AND employee_id = $2
     `
     
-    const result = await pool.query(query, [documentId, employeeId])
+    const result = await query(docQuery, [documentId, employeeId], req.dbClient)
     
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -2932,12 +2919,12 @@ export async function getEmailPreferences(req: Request, res: Response) {
 
   try {
     // Check if employee has settings record
-    const query = `
+    const sqlQuery = `
       SELECT email_preferences
       FROM employee_portal_settings
       WHERE employee_id = $1
     `
-    const result = await pool.query(query, [employeeId])
+    const result = await query(sqlQuery, [employeeId], req.dbClient)
 
     let preferences
     if (result.rows.length === 0) {
@@ -3001,7 +2988,7 @@ export async function updateEmailPreferences(req: Request, res: Response) {
       FROM employee_portal_settings
       WHERE employee_id = $1
     `
-    const checkResult = await pool.query(checkQuery, [employeeId])
+    const checkResult = await query(checkQuery, [employeeId], req.dbClient)
 
     let currentPreferences = {
       pto_notifications: true,
@@ -3023,7 +3010,7 @@ export async function updateEmailPreferences(req: Request, res: Response) {
 
     if (checkResult.rows.length === 0) {
       // Create new settings record
-      await pool.query(
+      await query(
         `
         INSERT INTO employee_portal_settings (
           employee_id,
@@ -3032,18 +3019,20 @@ export async function updateEmailPreferences(req: Request, res: Response) {
           updated_at
         ) VALUES ($1, $2, NOW(), NOW())
         `,
-        [employeeId, JSON.stringify(updatedPreferences)]
+        [employeeId, JSON.stringify(updatedPreferences)],
+        req.dbClient
       )
     } else {
       // Update existing record
-      await pool.query(
+      await query(
         `
         UPDATE employee_portal_settings
         SET email_preferences = $1,
             updated_at = NOW()
         WHERE employee_id = $2
         `,
-        [JSON.stringify(updatedPreferences), employeeId]
+        [JSON.stringify(updatedPreferences), employeeId],
+        req.dbClient
       )
     }
 
@@ -3113,7 +3102,7 @@ export async function getEmployeeDirectory(req: Request, res: Response) {
   
   try {
     // Build query with privacy and filters
-    let query = `
+    let directoryQuery = `
       SELECT 
         e.id,
         e.employee_number,
@@ -3138,36 +3127,32 @@ export async function getEmployeeDirectory(req: Request, res: Response) {
     // Search filter (searches both first and last name)
     if (search && typeof search === 'string' && search.trim().length > 0) {
       paramCount++
-      query += ` AND (
-        e.first_name ILIKE $${paramCount} OR 
-        e.last_name ILIKE $${paramCount} OR
-        CONCAT(e.first_name, ' ', e.last_name) ILIKE $${paramCount}
-      )`
+      directoryQuery += ` AND (\n        e.first_name ILIKE $${paramCount} OR \n        e.last_name ILIKE $${paramCount} OR\n        CONCAT(e.first_name, ' ', e.last_name) ILIKE $${paramCount}\n      )`
       params.push(`%${search.trim()}%`)
     }
 
     // Department filter
     if (department && typeof department === 'string' && department !== 'all') {
       paramCount++
-      query += ` AND e.employee_department = $${paramCount}`
+      directoryQuery += ` AND e.employee_department = $${paramCount}`
       params.push(department)
     }
 
     // Role filter (searches both role and designation)
     if (role && typeof role === 'string' && role !== 'all') {
       paramCount++
-      query += ` AND (e.role = $${paramCount} OR e.designation ILIKE $${paramCount})`
+      directoryQuery += ` AND (e.role = $${paramCount} OR e.designation ILIKE $${paramCount})`
       params.push(role)
     }
 
     // Order by name
-    query += ` ORDER BY e.first_name ASC, e.last_name ASC`
+    directoryQuery += ` ORDER BY e.first_name ASC, e.last_name ASC`
 
     // Execute query
-    const result = await pool.query(query, params)
+    const result = await query(directoryQuery, params, req.dbClient)
 
     // Process results - mask phone if privacy setting enabled
-    const employees = result.rows.map(emp => ({
+    const employees = result.rows.map((emp: any) => ({
       id: emp.id,
       employeeNumber: emp.employee_number,
       firstName: emp.first_name,
@@ -3189,8 +3174,8 @@ export async function getEmployeeDirectory(req: Request, res: Response) {
         AND employee_department != ''
       ORDER BY employee_department ASC
     `
-    const departmentsResult = await pool.query(departmentsQuery)
-    const departments = departmentsResult.rows.map(row => row.employee_department)
+    const departmentsResult = await query(departmentsQuery, [], req.dbClient)
+    const departments = departmentsResult.rows.map((row: any) => row.employee_department)
 
     const rolesQuery = `
       SELECT DISTINCT designation 
@@ -3199,8 +3184,8 @@ export async function getEmployeeDirectory(req: Request, res: Response) {
         AND designation != ''
       ORDER BY designation ASC
     `
-    const rolesResult = await pool.query(rolesQuery)
-    const roles = rolesResult.rows.map(row => row.designation)
+    const rolesResult = await query(rolesQuery, [], req.dbClient)
+    const roles = rolesResult.rows.map((row: any) => row.designation)
 
     // Log directory access (for security auditing)
     // Note: We don't have req.user.employeeId here, so we'll log generically

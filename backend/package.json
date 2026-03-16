@@ -29,7 +29,13 @@
     "fix:railway-errors": "ts-node src/scripts/fixRailwayDatabaseErrors.ts",
     "verify:railway-fix": "ts-node src/scripts/verifyRailwayDatabaseFix.ts",
     "init:railway-portal": "ts-node src/scripts/initRailwayEmployeePortal.ts",
-    "verify:railway-portal": "ts-node src/scripts/verifyRailwayEmployeePortal.ts"
+    "verify:railway-portal": "ts-node src/scripts/verifyRailwayEmployeePortal.ts",
+    "migrate:documents-tenancy": "ts-node src/scripts/addTenantToDocuments.ts",
+    "migrate:employees-tenancy": "ts-node src/scripts/addTenantToEmployees.ts",
+    "db:setup-multitenancy": "ts-node src/scripts/setup-multitenancy.ts",
+    "db:create-tenants-example": "ts-node src/scripts/create-tenants-example.ts",
+    "migrate:marketing-columns": "ts-node src/scripts/addMarketingColumns.ts",
+    "fresh-start": "ts-node src/scripts/freshStart.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

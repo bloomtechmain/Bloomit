@@ -279,25 +279,56 @@ export const assignPermissionsToRole = async (req: Request, res: Response) => {
 
 export const createUser = async (req: Request, res: Response) => {
   const { email, roleIds } = req.body
-  
+  const tenantId = req.user?.tenantId
+
   // Validation
   if (!email) {
     return res.status(400).json({ error: 'validation_error', message: 'Email is required' })
   }
-  
+
   if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) {
     return res.status(400).json({ error: 'validation_error', message: 'At least one role must be assigned' })
   }
-  
+
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email)) {
     return res.status(400).json({ error: 'validation_error', message: 'Invalid email format' })
   }
-  
+
   try {
-    // Check if email already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email])
+    // Enforce plan user limit
+    if (tenantId) {
+      const planResult = await pool.query(
+        `SELECT no_of_users FROM public.users
+         WHERE tenant_id = $1 AND no_of_users IS NOT NULL
+         LIMIT 1`,
+        [tenantId]
+      )
+      if (planResult.rows.length > 0 && planResult.rows[0].no_of_users !== null) {
+        const userLimit: number = planResult.rows[0].no_of_users
+        const countResult = await pool.query(
+          `SELECT COUNT(*) AS total FROM public.users
+           WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`,
+          [tenantId]
+        )
+        const currentCount = parseInt(countResult.rows[0].total, 10)
+        if (currentCount >= userLimit) {
+          return res.status(403).json({
+            error: 'user_limit_reached',
+            message: `Your plan allows a maximum of ${userLimit} user${userLimit === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
+            limit: userLimit,
+            current: currentCount
+          })
+        }
+      }
+    }
+
+    // Check if email already exists within this tenant
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND tenant_id = $2',
+      [email, tenantId]
+    )
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ error: 'conflict', message: 'Email already exists' })
     }
@@ -316,12 +347,12 @@ export const createUser = async (req: Request, res: Response) => {
     const temporaryPassword = generateSecurePassword(12)
     const passwordHash = await bcrypt.hash(temporaryPassword, 10)
     
-    // Create user (name is same as email per requirement)
+    // Create user
     const userResult = await pool.query(
-      `INSERT INTO users (name, email, password_hash, password_must_change, created_at)
-       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)
+      `INSERT INTO users (name, email, password_hash, password_must_change, created_at, tenant_id, source)
+       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP, $4, 'internal')
        RETURNING id, name, email, created_at`,
-      [email, email, passwordHash]
+      [email, email, passwordHash, tenantId]
     )
     
     const newUser = userResult.rows[0]
@@ -373,15 +404,15 @@ export const createUser = async (req: Request, res: Response) => {
 }
 
 export const getAllUsersWithRoles = async (req: Request, res: Response) => {
+  const tenantId = req.user?.tenantId
   try {
-    // Get all users
     const usersResult = await pool.query(`
       SELECT u.id, u.name, u.email, u.created_at
       FROM users u
+      WHERE u.tenant_id = $1
       ORDER BY u.created_at DESC
-    `)
-    
-    // Get roles for each user
+    `, [tenantId])
+
     const users = await Promise.all(usersResult.rows.map(async (user) => {
       const rolesResult = await pool.query(`
         SELECT r.id, r.name, r.is_system_role
@@ -390,13 +421,13 @@ export const getAllUsersWithRoles = async (req: Request, res: Response) => {
         WHERE ur.user_id = $1
         ORDER BY r.name
       `, [user.id])
-      
+
       return {
         ...user,
         roles: rolesResult.rows
       }
     }))
-    
+
     return res.json({ users })
   } catch (error) {
     console.error('Error fetching users:', error)
@@ -407,14 +438,18 @@ export const getAllUsersWithRoles = async (req: Request, res: Response) => {
 export const assignRolesToUser = async (req: Request, res: Response) => {
   const { userId } = req.params
   const { roleIds } = req.body
-  
+  const tenantId = req.user?.tenantId
+
   if (!Array.isArray(roleIds)) {
     return res.status(400).json({ error: 'validation_error', message: 'roleIds must be an array' })
   }
-  
+
   try {
-    // Check if user exists
-    const userResult = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId])
+    // Check if user exists within this tenant
+    const userResult = await pool.query(
+      'SELECT id, name, email FROM users WHERE id = $1 AND tenant_id = $2',
+      [userId, tenantId]
+    )
     
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'not_found', message: 'User not found' })
@@ -472,12 +507,13 @@ export const assignRolesToUser = async (req: Request, res: Response) => {
 
 export const resetUserPassword = async (req: Request, res: Response) => {
   const { userId } = req.params
-  
+  const tenantId = req.user?.tenantId
+
   try {
-    // Check if user exists
+    // Check if user exists within this tenant
     const userResult = await pool.query(
-      'SELECT id, name, email FROM users WHERE id = $1',
-      [userId]
+      'SELECT id, name, email FROM users WHERE id = $1 AND tenant_id = $2',
+      [userId, tenantId]
     )
     
     if (userResult.rows.length === 0) {

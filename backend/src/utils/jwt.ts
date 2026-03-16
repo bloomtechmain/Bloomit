@@ -6,10 +6,12 @@ const REFRESH_TOKEN_EXPIRES_IN = '7d' // Refresh token expires in 7 days
 
 export interface JWTPayload {
   userId: number
+  tenantId: number
   email: string
   roleIds: number[]
   roleNames: string[]
   permissions: string[]
+  sessionToken: string
 }
 
 export interface DecodedToken extends JWTPayload {
