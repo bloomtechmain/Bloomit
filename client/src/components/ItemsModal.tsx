@@ -3,6 +3,8 @@ import { X, Plus, Edit2, Trash2 } from 'lucide-react'
 import type { Contract, ContractItem, BudgetInfo } from '../types/projects'
 import { itemsApi } from '../services/projectsApi'
 import { BudgetProgressBar } from './BudgetProgressBar'
+import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 
 interface ItemsModalProps {
   isOpen: boolean
@@ -27,17 +29,17 @@ export const ItemsModal: React.FC<ItemsModalProps> = ({
 }) => {
   const [items, setItems] = useState<ContractItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+  const confirm = useConfirm()
 
   const fetchItems = async () => {
     setLoading(true)
-    setError(null)
     try {
       const response = await itemsApi.getAll(projectId, contract.contract_id)
       setItems(response.data.items || [])
     } catch (err: any) {
       console.error('Error fetching items:', err)
-      setError(err.response?.data?.message || 'Failed to load items')
+      toast.error(err.response?.data?.message || 'Failed to load items')
     } finally {
       setLoading(false)
     }
@@ -70,12 +72,13 @@ export const ItemsModal: React.FC<ItemsModalProps> = ({
 
   const handleDelete = async (item: ContractItem, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (
-      window.confirm(
-        `Are you sure you want to delete item "${item.requirements.substring(0, 50)}..."?`
-      )
-    ) {
+    const confirmed = await confirm(
+      `Delete item "${item.requirements.substring(0, 50)}..."?`,
+      { destructive: true }
+    )
+    if (confirmed) {
       await onDeleteItem(projectId, contract.contract_id, item.requirements)
+      toast.success('Item deleted')
       // Refresh items immediately after delete
       await fetchItems()
     }
@@ -307,18 +310,6 @@ export const ItemsModal: React.FC<ItemsModalProps> = ({
             {loading ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
                 Loading items...
-              </div>
-            ) : error ? (
-              <div
-                style={{
-                  padding: '1rem',
-                  backgroundColor: '#fee2e2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  color: '#dc2626'
-                }}
-              >
-                {error}
               </div>
             ) : items.length === 0 ? (
               <div

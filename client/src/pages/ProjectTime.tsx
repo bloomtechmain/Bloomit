@@ -9,22 +9,20 @@ import ManualEntryTab from '../components/timeTracking/ManualEntryTab'
 import MyEntriesTab from '../components/timeTracking/MyEntriesTab'
 import ManagerApprovalTab from '../components/timeTracking/ManagerApprovalTab'
 import SummaryTab from '../components/timeTracking/SummaryTab'
+import { useToast } from '../context/ToastContext'
 
 type TabType = 'timer' | 'manual' | 'entries' | 'approval' | 'summary'
 
 export default function ProjectTime({ userId, isManager }: { userId: number; isManager?: boolean }) {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<TabType>('timer')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [projects, setProjects] = useState<Project[]>([])
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
-  const [notification, setNotification] = useState<{
-    message: string
-    type: 'success' | 'error'
-  } | null>(null)
 
   const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type })
-    setTimeout(() => setNotification(null), 3000)
+    if (type === 'success') toast.success(message)
+    else toast.error(message)
   }
 
   const refreshData = () => {
@@ -67,27 +65,6 @@ export default function ProjectTime({ userId, isManager }: { userId: number; isM
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Notification */}
-      {notification && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '2rem',
-            right: '2rem',
-            padding: '1rem 1.5rem',
-            backgroundColor: notification.type === 'success' ? '#dcfce7' : '#fee2e2',
-            border: `1px solid ${notification.type === 'success' ? '#86efac' : '#fecaca'}`,
-            borderRadius: '8px',
-            color: notification.type === 'success' ? '#166534' : '#991b1b',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            zIndex: 9999,
-            animation: 'slideIn 0.3s ease-out'
-          }}
-        >
-          {notification.message}
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>

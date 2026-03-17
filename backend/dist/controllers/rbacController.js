@@ -3,12 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetUserPassword = exports.assignRolesToUser = exports.getAllUsersWithRoles = exports.createUser = exports.assignPermissionsToRole = exports.getPermissionsByRole = exports.getAllPermissions = exports.deleteRole = exports.updateRole = exports.createRole = exports.getRoleById = exports.getAllRoles = void 0;
+exports.executeGranularMigration = exports.previewGranularMigration = exports.getMigrationStatus = exports.resetUserPassword = exports.assignRolesToUser = exports.getAllUsersWithRoles = exports.createUser = exports.assignPermissionsToRole = exports.getPermissionsByRole = exports.getAllPermissions = exports.deleteRole = exports.updateRole = exports.createRole = exports.getRoleById = exports.getAllRoles = void 0;
 const db_1 = require("../db");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const passwordGenerator_1 = require("../utils/passwordGenerator");
 const emailService_1 = require("../utils/emailService");
 const passwordHistory_1 = require("../utils/passwordHistory");
+const migrateToGranularPermissions_1 = require("../scripts/migrateToGranularPermissions");
 // ===== ROLES =====
 const getAllRoles = async (req, res) => {
     try {
@@ -227,6 +228,7 @@ exports.assignPermissionsToRole = assignPermissionsToRole;
 // ===== USERS =====
 const createUser = async (req, res) => {
     const { email, roleIds } = req.body;
+    const tenantId = req.user?.tenantId;
     // Validation
     if (!email) {
         return res.status(400).json({ error: 'validation_error', message: 'Email is required' });
@@ -240,8 +242,28 @@ const createUser = async (req, res) => {
         return res.status(400).json({ error: 'validation_error', message: 'Invalid email format' });
     }
     try {
-        // Check if email already exists
-        const existingUser = await db_1.pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        // Enforce plan user limit
+        if (tenantId) {
+            const planResult = await db_1.pool.query(`SELECT no_of_users FROM public.users
+         WHERE tenant_id = $1 AND no_of_users IS NOT NULL
+         LIMIT 1`, [tenantId]);
+            if (planResult.rows.length > 0 && planResult.rows[0].no_of_users !== null) {
+                const userLimit = planResult.rows[0].no_of_users;
+                const countResult = await db_1.pool.query(`SELECT COUNT(*) AS total FROM public.users
+           WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`, [tenantId]);
+                const currentCount = parseInt(countResult.rows[0].total, 10);
+                if (currentCount >= userLimit) {
+                    return res.status(403).json({
+                        error: 'user_limit_reached',
+                        message: `Your plan allows a maximum of ${userLimit} user${userLimit === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
+                        limit: userLimit,
+                        current: currentCount
+                    });
+                }
+            }
+        }
+        // Check if email already exists within this tenant
+        const existingUser = await db_1.pool.query('SELECT id FROM users WHERE email = $1 AND tenant_id = $2', [email, tenantId]);
         if (existingUser.rows.length > 0) {
             return res.status(409).json({ error: 'conflict', message: 'Email already exists' });
         }
@@ -253,10 +275,10 @@ const createUser = async (req, res) => {
         // Generate secure temporary password
         const temporaryPassword = (0, passwordGenerator_1.generateSecurePassword)(12);
         const passwordHash = await bcryptjs_1.default.hash(temporaryPassword, 10);
-        // Create user (name is same as email per requirement)
-        const userResult = await db_1.pool.query(`INSERT INTO users (name, email, password_hash, password_must_change, created_at)
-       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)
-       RETURNING id, name, email, created_at`, [email, email, passwordHash]);
+        // Create user
+        const userResult = await db_1.pool.query(`INSERT INTO users (name, email, password_hash, password_must_change, created_at, tenant_id, source)
+       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP, $4, 'internal')
+       RETURNING id, name, email, created_at`, [email, email, passwordHash, tenantId]);
         const newUser = userResult.rows[0];
         // Assign roles
         for (const roleId of roleIds) {
@@ -296,14 +318,14 @@ const createUser = async (req, res) => {
 };
 exports.createUser = createUser;
 const getAllUsersWithRoles = async (req, res) => {
+    const tenantId = req.user?.tenantId;
     try {
-        // Get all users
         const usersResult = await db_1.pool.query(`
       SELECT u.id, u.name, u.email, u.created_at
       FROM users u
+      WHERE u.tenant_id = $1
       ORDER BY u.created_at DESC
-    `);
-        // Get roles for each user
+    `, [tenantId]);
         const users = await Promise.all(usersResult.rows.map(async (user) => {
             const rolesResult = await db_1.pool.query(`
         SELECT r.id, r.name, r.is_system_role
@@ -328,12 +350,13 @@ exports.getAllUsersWithRoles = getAllUsersWithRoles;
 const assignRolesToUser = async (req, res) => {
     const { userId } = req.params;
     const { roleIds } = req.body;
+    const tenantId = req.user?.tenantId;
     if (!Array.isArray(roleIds)) {
         return res.status(400).json({ error: 'validation_error', message: 'roleIds must be an array' });
     }
     try {
-        // Check if user exists
-        const userResult = await db_1.pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+        // Check if user exists within this tenant
+        const userResult = await db_1.pool.query('SELECT id, name, email FROM users WHERE id = $1 AND tenant_id = $2', [userId, tenantId]);
         if (userResult.rows.length === 0) {
             return res.status(404).json({ error: 'not_found', message: 'User not found' });
         }
@@ -376,9 +399,10 @@ const assignRolesToUser = async (req, res) => {
 exports.assignRolesToUser = assignRolesToUser;
 const resetUserPassword = async (req, res) => {
     const { userId } = req.params;
+    const tenantId = req.user?.tenantId;
     try {
-        // Check if user exists
-        const userResult = await db_1.pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+        // Check if user exists within this tenant
+        const userResult = await db_1.pool.query('SELECT id, name, email FROM users WHERE id = $1 AND tenant_id = $2', [userId, tenantId]);
         if (userResult.rows.length === 0) {
             return res.status(404).json({ error: 'not_found', message: 'User not found' });
         }
@@ -457,3 +481,78 @@ const resetUserPassword = async (req, res) => {
     }
 };
 exports.resetUserPassword = resetUserPassword;
+// ===== GRANULAR PERMISSION MIGRATION =====
+const getMigrationStatus = async (req, res) => {
+    try {
+        const status = await (0, migrateToGranularPermissions_1.checkMigrationStatus)();
+        return res.json(status);
+    }
+    catch (error) {
+        console.error('Error checking migration status:', error);
+        return res.status(500).json({
+            error: 'server_error',
+            message: 'Failed to check migration status'
+        });
+    }
+};
+exports.getMigrationStatus = getMigrationStatus;
+const previewGranularMigration = async (req, res) => {
+    try {
+        const preview = await (0, migrateToGranularPermissions_1.previewMigration)();
+        if (!preview.success) {
+            return res.status(500).json({
+                error: 'server_error',
+                message: preview.error || 'Failed to preview migration'
+            });
+        }
+        return res.json(preview);
+    }
+    catch (error) {
+        console.error('Error previewing migration:', error);
+        return res.status(500).json({
+            error: 'server_error',
+            message: 'Failed to preview migration'
+        });
+    }
+};
+exports.previewGranularMigration = previewGranularMigration;
+const executeGranularMigration = async (req, res) => {
+    try {
+        console.log('🚀 Starting granular permission migration...');
+        const result = await (0, migrateToGranularPermissions_1.executeMigration)();
+        if (!result.success) {
+            return res.status(500).json({
+                error: 'migration_failed',
+                message: result.error || 'Migration failed'
+            });
+        }
+        // Log audit
+        if (req.user && result.report) {
+            await db_1.pool.query(`INSERT INTO rbac_audit_log (user_id, action, details) 
+         VALUES ($1, $2, $3)`, [
+                req.user.userId,
+                'MIGRATE_GRANULAR_PERMISSIONS',
+                JSON.stringify({
+                    permissionsAdded: result.report.permissionsAdded,
+                    rolesUpdated: result.report.rolesUpdated,
+                    timestamp: new Date().toISOString()
+                })
+            ]);
+        }
+        console.log('✅ Granular permission migration completed successfully');
+        return res.json({
+            success: true,
+            message: 'Migration completed successfully',
+            report: result.report || { permissionsAdded: 0, permissionsSkipped: 0, rolesUpdated: 0, permissionIdsAdded: [], errors: [] }
+        });
+    }
+    catch (error) {
+        console.error('Error executing migration:', error);
+        return res.status(500).json({
+            error: 'server_error',
+            message: 'Failed to execute migration',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
+exports.executeGranularMigration = executeGranularMigration;

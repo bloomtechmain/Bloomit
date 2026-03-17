@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 export const getAllVendors = async (req: Request, res: Response) => {
   try {
@@ -8,7 +7,7 @@ export const getAllVendors = async (req: Request, res: Response) => {
       FROM vendors
       ORDER BY created_at DESC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ vendors: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -30,7 +29,7 @@ export const createVendor = async (req: Request, res: Response) => {
       RETURNING vendor_id, vendor_name, contact_email, contact_phone, is_active, created_at
     `
     const values = [vendor_name, contact_email || null, contact_phone || null, is_active ?? true]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     return res.status(201).json({ vendor: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'

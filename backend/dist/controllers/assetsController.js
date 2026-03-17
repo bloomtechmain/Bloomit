@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDepreciationSchedule = exports.createAsset = exports.getAssets = void 0;
-const db_1 = require("../db");
 function calculateDepreciation(originalValue, salvageValue, usefulLife, purchaseDate, depreciationMethod) {
     const purchase = new Date(purchaseDate);
     const today = new Date();
@@ -46,7 +45,7 @@ function calculateDepreciation(originalValue, salvageValue, usefulLife, purchase
 }
 const getAssets = async (req, res) => {
     try {
-        const result = await (0, db_1.query)('SELECT * FROM assets ORDER BY created_at DESC');
+        const result = await req.dbClient.query('SELECT * FROM assets ORDER BY created_at DESC');
         // Calculate current book value for each asset
         const assetsWithDepreciation = result.rows.map(asset => {
             if (asset.depreciation_method && asset.salvage_value !== null && asset.useful_life) {
@@ -77,7 +76,7 @@ const createAsset = async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
     }
     try {
-        const result = await (0, db_1.query)(`INSERT INTO assets (asset_name, value, purchase_date, depreciation_method, salvage_value, useful_life) 
+        const result = await req.dbClient.query(`INSERT INTO assets (asset_name, value, purchase_date, depreciation_method, salvage_value, useful_life)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [
             asset_name,
             value,
@@ -98,7 +97,7 @@ const getDepreciationSchedule = async (req, res) => {
     const { id } = req.params;
     const { view } = req.query; // 'monthly' or 'yearly'
     try {
-        const result = await (0, db_1.query)('SELECT * FROM assets WHERE id = $1', [id]);
+        const result = await req.dbClient.query('SELECT * FROM assets WHERE id = $1', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Asset not found' });
         }

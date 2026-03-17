@@ -3,6 +3,7 @@ import { UserCheck, XCircle, Eye, Calendar, DollarSign, User, Building2, FileTex
 import { getAllPayslips, getPayslipById, adminApprove, rejectPayslip } from '../services/payrollService'
 import type { Payslip, PayslipWithSignatures } from '../types/payroll'
 import { truncateSignatureHash } from '../utils/signatureHashGenerator'
+import { useToast } from '../context/ToastContext'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -10,6 +11,7 @@ const MONTHS = [
 ]
 
 export default function PayslipAdminApproval() {
+  const { toast } = useToast()
   const [payslips, setPayslips] = useState<Payslip[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPayslip, setSelectedPayslip] = useState<PayslipWithSignatures | null>(null)
@@ -18,7 +20,6 @@ export default function PayslipAdminApproval() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   useEffect(() => {
     loadPayslips()
@@ -57,11 +58,10 @@ export default function PayslipAdminApproval() {
       setProcessing(true)
       setError(null)
       await adminApprove(selectedPayslip.payslip.payslip_id)
-      setSuccessMessage('Payslip approved! Employee will be notified via email.')
+      toast.success('Payslip approved! Employee will be notified via email.')
       setViewingPayslip(false)
       setSelectedPayslip(null)
       await loadPayslips()
-      setTimeout(() => setSuccessMessage(null), 5000)
     } catch (err) {
       setError('Failed to approve payslip')
       console.error('Error approving payslip:', err)
@@ -80,13 +80,12 @@ export default function PayslipAdminApproval() {
       setProcessing(true)
       setError(null)
       await rejectPayslip(selectedPayslip.payslip.payslip_id, rejectionReason)
-      setSuccessMessage('Payslip rejected and sent back for revision')
+      toast.success('Payslip rejected and sent back for revision')
       setShowRejectModal(false)
       setRejectionReason('')
       setViewingPayslip(false)
       setSelectedPayslip(null)
       await loadPayslips()
-      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       setError('Failed to reject payslip')
       console.error('Error rejecting payslip:', err)
@@ -118,22 +117,7 @@ export default function PayslipAdminApproval() {
 
     return (
       <div style={{ display: 'grid', gap: 24 }}>
-        {/* Success/Error Messages */}
-        {successMessage && (
-          <div style={{ 
-            padding: 16, 
-            background: '#d4edda', 
-            border: '1px solid #c3e6cb', 
-            borderRadius: 8,
-            color: '#155724',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}>
-            <CheckCircle size={20} />
-            <span>{successMessage}</span>
-          </div>
-        )}
+        {/* Error Message */}
         {error && (
           <div style={{ 
             padding: 16, 
@@ -539,24 +523,6 @@ export default function PayslipAdminApproval() {
 
   return (
     <div className="glass-panel" style={{ padding: 24 }}>
-      {/* Success Message */}
-      {successMessage && (
-        <div style={{ 
-          padding: 16, 
-          background: '#d4edda', 
-          border: '1px solid #c3e6cb', 
-          borderRadius: 8,
-          color: '#155724',
-          marginBottom: 24,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <CheckCircle size={20} />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>

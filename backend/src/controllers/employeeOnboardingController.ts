@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 import bcrypt from 'bcryptjs'
 import { generateSecurePassword } from '../utils/passwordGenerator'
 import { sendWelcomeEmail } from '../utils/emailService'
@@ -74,8 +73,8 @@ export const onboardEmployee = async (req: Request, res: Response) => {
     })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -187,21 +186,19 @@ export const onboardEmployee = async (req: Request, res: Response) => {
     }
 
     // 3. Create employee record linked to user
-    const fullName = `${first_name} ${last_name}`
     const employeeResult = await client.query(
       `INSERT INTO employees (
-        employee_number, first_name, last_name, name, email, phone, 
+        employee_number, first_name, last_name, email, phone,
         dob, nic, address, designation, employee_department, role,
-        hire_date, base_salary, epf_enabled, epf_contribution_rate, 
+        hire_date, base_salary, epf_enabled, epf_contribution_rate,
         etf_enabled, allowances, pto_allowance, user_id, is_active, created_at, tenant_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, CURRENT_TIMESTAMP, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE, CURRENT_TIMESTAMP, $20)
       RETURNING id, employee_number, first_name, last_name, email, designation, employee_department, created_at`,
       [
         employee_number,
         first_name,
         last_name,
-        fullName,
         email,
         phone,
         dob || null,
@@ -289,13 +286,11 @@ export const onboardEmployee = async (req: Request, res: Response) => {
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Error onboarding employee:', error)
-    return res.status(500).json({ 
-      error: 'server_error', 
+    return res.status(500).json({
+      error: 'server_error',
       message: 'Failed to onboard employee',
       details: error instanceof Error ? error.message : 'Unknown error'
     })
-  } finally {
-    client.release()
   }
 }
 
@@ -346,7 +341,7 @@ export const getAllEmployeesWithUserStatus = async (req: Request, res: Response)
       ORDER BY e.created_at DESC
     `
     
-    const result = await pool.query(query, [tenantId])
+    const result = await req.dbClient!.query(query, [tenantId])
     
     return res.json({ 
       employees: result.rows,
@@ -367,8 +362,8 @@ export const getFullEmployeeProfile = async (req: Request, res: Response) => {
   
   try {
     // Get employee data
-    const employeeResult = await pool.query(
-      `SELECT 
+    const employeeResult = await req.dbClient!.query(
+      `SELECT
         e.*,
         u.name as user_name,
         u.email as user_email,
@@ -391,7 +386,7 @@ export const getFullEmployeeProfile = async (req: Request, res: Response) => {
     // Get roles if user exists
     let roles = []
     if (employee.user_id) {
-      const rolesResult = await pool.query(
+      const rolesResult = await req.dbClient!.query(
         `SELECT r.id, r.name, r.description, r.is_system_role
          FROM roles r
          INNER JOIN user_roles ur ON r.id = ur.role_id
@@ -430,7 +425,7 @@ export const linkEmployeeToUser = async (req: Request, res: Response) => {
   
   try {
     // Check if employee exists
-    const employeeCheck = await pool.query(
+    const employeeCheck = await req.dbClient!.query(
       'SELECT id, email, user_id FROM employees WHERE id = $1',
       [employeeId]
     )
@@ -450,7 +445,7 @@ export const linkEmployeeToUser = async (req: Request, res: Response) => {
     }
     
     // Check if user exists
-    const userCheck = await pool.query(
+    const userCheck = await req.dbClient!.query(
       'SELECT id, email FROM users WHERE id = $1',
       [userId]
     )
@@ -463,15 +458,15 @@ export const linkEmployeeToUser = async (req: Request, res: Response) => {
     }
     
     // Link employee to user
-    await pool.query(
+    await req.dbClient!.query(
       'UPDATE employees SET user_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [userId, employeeId]
     )
-    
+
     // Log audit
     if (req.user) {
-      await pool.query(
-        `INSERT INTO rbac_audit_log (user_id, action, details) 
+      await req.dbClient!.query(
+        `INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`,
         [
           req.user.userId,
@@ -532,19 +527,17 @@ export const updateEmployeeProfile = async (req: Request, res: Response) => {
   }
 
   try {
-    const fullName = `${first_name} ${last_name}`
-    
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `UPDATE employees
-       SET first_name = $1, last_name = $2, name = $3, email = $4, phone = $5,
-           dob = $6, nic = $7, address = $8, employee_number = $9,
-           designation = $10, employee_department = $11, base_salary = $12,
-           epf_enabled = $13, epf_contribution_rate = $14, etf_enabled = $15,
-           allowances = $16, pto_allowance = $17, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $18
+       SET first_name = $1, last_name = $2, email = $3, phone = $4,
+           dob = $5, nic = $6, address = $7, employee_number = $8,
+           designation = $9, employee_department = $10, base_salary = $11,
+           epf_enabled = $12, epf_contribution_rate = $13, etf_enabled = $14,
+           allowances = $15, pto_allowance = $16, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $17
        RETURNING id, employee_number, first_name, last_name, email, designation, employee_department`,
       [
-        first_name, last_name, fullName, email, phone,
+        first_name, last_name, email, phone,
         dob || null, nic || null, address || null, employee_number,
         designation || null, employee_department || null, base_salary || null,
         epf_enabled, epf_contribution_rate || 8.00, etf_enabled,
@@ -577,11 +570,11 @@ export const updateEmployeeProfile = async (req: Request, res: Response) => {
 // Generate next available employee number
 export const generateEmployeeNumber = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT employee_number 
-      FROM employees 
+    const result = await req.dbClient!.query(`
+      SELECT employee_number
+      FROM employees
       WHERE employee_number ~ '^EMP[0-9]+$'
-      ORDER BY CAST(SUBSTRING(employee_number FROM 4) AS INTEGER) DESC 
+      ORDER BY CAST(SUBSTRING(employee_number FROM 4) AS INTEGER) DESC
       LIMIT 1
     `)
     
@@ -617,8 +610,8 @@ export const suspendEmployee = async (req: Request, res: Response) => {
     })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -627,12 +620,12 @@ export const suspendEmployee = async (req: Request, res: Response) => {
       'SELECT id, user_id, first_name, last_name, email FROM employees WHERE id = $1',
       [id]
     )
-    
+
     if (employeeCheck.rows.length === 0) {
       await client.query('ROLLBACK')
-      return res.status(404).json({ 
-        error: 'not_found', 
-        message: 'Employee not found' 
+      return res.status(404).json({
+        error: 'not_found',
+        message: 'Employee not found'
       })
     }
 
@@ -640,9 +633,9 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 
     if (!employee.user_id) {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee does not have a user account to suspend' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee does not have a user account to suspend'
       })
     }
 
@@ -654,17 +647,17 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 
     if (statusCheck.rows[0].account_status === 'terminated') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Cannot suspend a terminated employee' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Cannot suspend a terminated employee'
       })
     }
 
     if (statusCheck.rows[0].account_status === 'suspended') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee is already suspended' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee is already suspended'
       })
     }
 
@@ -672,8 +665,8 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 
     // Update user account status
     await client.query(
-      `UPDATE users 
-       SET account_status = 'suspended', 
+      `UPDATE users
+       SET account_status = 'suspended',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = $2
@@ -683,7 +676,7 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 
     // Update employee record
     await client.query(
-      `UPDATE employees 
+      `UPDATE employees
        SET is_active = FALSE,
            suspended_at = CURRENT_TIMESTAMP,
            suspended_by = $1,
@@ -695,7 +688,7 @@ export const suspendEmployee = async (req: Request, res: Response) => {
     // Log audit trail
     if (currentUserId) {
       await client.query(
-        `INSERT INTO rbac_audit_log (user_id, action, details) 
+        `INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`,
         [
           currentUserId,
@@ -713,7 +706,7 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 
     await client.query('COMMIT')
 
-    console.log(`⚠️ Employee suspended: ${employee.email} (Employee ID: ${id})`)
+    console.log(`Employee suspended: ${employee.email} (Employee ID: ${id})`)
 
     return res.json({
       success: true,
@@ -724,13 +717,11 @@ export const suspendEmployee = async (req: Request, res: Response) => {
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Error suspending employee:', error)
-    return res.status(500).json({ 
-      error: 'server_error', 
+    return res.status(500).json({
+      error: 'server_error',
       message: 'Failed to suspend employee',
       details: error instanceof Error ? error.message : 'Unknown error'
     })
-  } finally {
-    client.release()
   }
 }
 
@@ -738,8 +729,8 @@ export const suspendEmployee = async (req: Request, res: Response) => {
 export const reactivateEmployee = async (req: Request, res: Response) => {
   const { id } = req.params
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -748,12 +739,12 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
       'SELECT id, user_id, first_name, last_name, email FROM employees WHERE id = $1',
       [id]
     )
-    
+
     if (employeeCheck.rows.length === 0) {
       await client.query('ROLLBACK')
-      return res.status(404).json({ 
-        error: 'not_found', 
-        message: 'Employee not found' 
+      return res.status(404).json({
+        error: 'not_found',
+        message: 'Employee not found'
       })
     }
 
@@ -761,9 +752,9 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
 
     if (!employee.user_id) {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee does not have a user account' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee does not have a user account'
       })
     }
 
@@ -775,17 +766,17 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
 
     if (statusCheck.rows[0].account_status === 'terminated') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Cannot reactivate a terminated employee. Terminated accounts are permanent.' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Cannot reactivate a terminated employee. Terminated accounts are permanent.'
       })
     }
 
     if (statusCheck.rows[0].account_status === 'active') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee account is already active' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee account is already active'
       })
     }
 
@@ -793,8 +784,8 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
 
     // Update user account status
     await client.query(
-      `UPDATE users 
-       SET account_status = 'active', 
+      `UPDATE users
+       SET account_status = 'active',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = 'Account reactivated'
@@ -804,7 +795,7 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
 
     // Update employee record
     await client.query(
-      `UPDATE employees 
+      `UPDATE employees
        SET is_active = TRUE,
            suspended_at = NULL,
            suspended_by = NULL,
@@ -816,7 +807,7 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
     // Log audit trail
     if (currentUserId) {
       await client.query(
-        `INSERT INTO rbac_audit_log (user_id, action, details) 
+        `INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`,
         [
           currentUserId,
@@ -833,7 +824,7 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
 
     await client.query('COMMIT')
 
-    console.log(`✅ Employee reactivated: ${employee.email} (Employee ID: ${id})`)
+    console.log(`Employee reactivated: ${employee.email} (Employee ID: ${id})`)
 
     return res.json({
       success: true,
@@ -844,13 +835,11 @@ export const reactivateEmployee = async (req: Request, res: Response) => {
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Error reactivating employee:', error)
-    return res.status(500).json({ 
-      error: 'server_error', 
+    return res.status(500).json({
+      error: 'server_error',
       message: 'Failed to reactivate employee',
       details: error instanceof Error ? error.message : 'Unknown error'
     })
-  } finally {
-    client.release()
   }
 }
 
@@ -866,8 +855,8 @@ export const terminateEmployee = async (req: Request, res: Response) => {
     })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -876,12 +865,12 @@ export const terminateEmployee = async (req: Request, res: Response) => {
       'SELECT id, user_id, first_name, last_name, email FROM employees WHERE id = $1',
       [id]
     )
-    
+
     if (employeeCheck.rows.length === 0) {
       await client.query('ROLLBACK')
-      return res.status(404).json({ 
-        error: 'not_found', 
-        message: 'Employee not found' 
+      return res.status(404).json({
+        error: 'not_found',
+        message: 'Employee not found'
       })
     }
 
@@ -889,9 +878,9 @@ export const terminateEmployee = async (req: Request, res: Response) => {
 
     if (!employee.user_id) {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee does not have a user account to terminate' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee does not have a user account to terminate'
       })
     }
 
@@ -903,9 +892,9 @@ export const terminateEmployee = async (req: Request, res: Response) => {
 
     if (statusCheck.rows[0].account_status === 'terminated') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ 
-        error: 'validation_error', 
-        message: 'Employee is already terminated' 
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Employee is already terminated'
       })
     }
 
@@ -916,8 +905,8 @@ export const terminateEmployee = async (req: Request, res: Response) => {
 
     // Update user account status to terminated
     await client.query(
-      `UPDATE users 
-       SET account_status = 'terminated', 
+      `UPDATE users
+       SET account_status = 'terminated',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = $2
@@ -927,7 +916,7 @@ export const terminateEmployee = async (req: Request, res: Response) => {
 
     // Update employee record with termination details
     await client.query(
-      `UPDATE employees 
+      `UPDATE employees
        SET is_active = FALSE,
            terminated_at = $1,
            terminated_by = $2,
@@ -943,7 +932,7 @@ export const terminateEmployee = async (req: Request, res: Response) => {
     // Log audit trail
     if (currentUserId) {
       await client.query(
-        `INSERT INTO rbac_audit_log (user_id, action, details) 
+        `INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`,
         [
           currentUserId,
@@ -963,8 +952,8 @@ export const terminateEmployee = async (req: Request, res: Response) => {
 
     await client.query('COMMIT')
 
-    console.log(`🔴 Employee terminated: ${employee.email} (Employee ID: ${id})`)
-    console.log(`   Scheduled for purge on: ${purgeDate.toISOString().split('T')[0]}`)
+    console.log(`Employee terminated: ${employee.email} (Employee ID: ${id})`)
+    console.log(`Scheduled for purge on: ${purgeDate.toISOString().split('T')[0]}`)
 
     return res.json({
       success: true,
@@ -977,12 +966,10 @@ export const terminateEmployee = async (req: Request, res: Response) => {
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Error terminating employee:', error)
-    return res.status(500).json({ 
-      error: 'server_error', 
+    return res.status(500).json({
+      error: 'server_error',
       message: 'Failed to terminate employee',
       details: error instanceof Error ? error.message : 'Unknown error'
     })
-  } finally {
-    client.release()
   }
 }

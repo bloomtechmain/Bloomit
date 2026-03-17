@@ -1,20 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteContract = exports.updateContract = exports.createContract = exports.getContractById = exports.getContractsByProject = void 0;
-const db_1 = require("../db");
 const getContractsByProject = async (req, res) => {
     const { projectId } = req.params;
     try {
         const query = `
-      SELECT 
-        contract_id, 
-        project_id, 
-        contract_name, 
-        customer_name, 
-        description, 
-        initial_cost_budget, 
-        extra_budget_allocation, 
-        payment_type, 
+      SELECT
+        contract_id,
+        project_id,
+        contract_name,
+        customer_name,
+        description,
+        initial_cost_budget,
+        extra_budget_allocation,
+        payment_type,
         status,
         created_at,
         (initial_cost_budget + extra_budget_allocation) AS total_budget
@@ -22,7 +21,7 @@ const getContractsByProject = async (req, res) => {
       WHERE project_id = $1
       ORDER BY contract_id DESC
     `;
-        const result = await db_1.pool.query(query, [projectId]);
+        const result = await req.dbClient.query(query, [projectId]);
         return res.status(200).json({ contracts: result.rows });
     }
     catch (err) {
@@ -35,22 +34,22 @@ const getContractById = async (req, res) => {
     const { projectId, contractId } = req.params;
     try {
         const query = `
-      SELECT 
-        contract_id, 
-        project_id, 
-        contract_name, 
-        customer_name, 
-        description, 
-        initial_cost_budget, 
-        extra_budget_allocation, 
-        payment_type, 
+      SELECT
+        contract_id,
+        project_id,
+        contract_name,
+        customer_name,
+        description,
+        initial_cost_budget,
+        extra_budget_allocation,
+        payment_type,
         status,
         created_at,
         (initial_cost_budget + extra_budget_allocation) AS total_budget
       FROM contracts
       WHERE contract_id = $1 AND project_id = $2
     `;
-        const result = await db_1.pool.query(query, [contractId, projectId]);
+        const result = await req.dbClient.query(query, [contractId, projectId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'contract_not_found' });
         }
@@ -72,21 +71,21 @@ const createContract = async (req, res) => {
         const query = `
       INSERT INTO contracts (project_id, contract_name, customer_name, description, initial_cost_budget, extra_budget_allocation, payment_type, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING 
-        contract_id, 
-        project_id, 
-        contract_name, 
-        customer_name, 
-        description, 
-        initial_cost_budget, 
-        extra_budget_allocation, 
-        payment_type, 
+      RETURNING
+        contract_id,
+        project_id,
+        contract_name,
+        customer_name,
+        description,
+        initial_cost_budget,
+        extra_budget_allocation,
+        payment_type,
         status,
         created_at,
         (initial_cost_budget + extra_budget_allocation) AS total_budget
     `;
         const values = [projectId, contract_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         return res.status(201).json({ contract: result.rows[0] });
     }
     catch (err) {
@@ -104,30 +103,30 @@ const updateContract = async (req, res) => {
     try {
         const query = `
       UPDATE contracts
-      SET 
-        contract_name = $1, 
-        customer_name = $2, 
-        description = $3, 
-        initial_cost_budget = $4, 
-        extra_budget_allocation = $5, 
-        payment_type = $6, 
+      SET
+        contract_name = $1,
+        customer_name = $2,
+        description = $3,
+        initial_cost_budget = $4,
+        extra_budget_allocation = $5,
+        payment_type = $6,
         status = $7
       WHERE contract_id = $8 AND project_id = $9
-      RETURNING 
-        contract_id, 
-        project_id, 
-        contract_name, 
-        customer_name, 
-        description, 
-        initial_cost_budget, 
-        extra_budget_allocation, 
-        payment_type, 
+      RETURNING
+        contract_id,
+        project_id,
+        contract_name,
+        customer_name,
+        description,
+        initial_cost_budget,
+        extra_budget_allocation,
+        payment_type,
         status,
         created_at,
         (initial_cost_budget + extra_budget_allocation) AS total_budget
     `;
         const values = [contract_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status, contractId, projectId];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'contract_not_found' });
         }
@@ -147,7 +146,7 @@ const deleteContract = async (req, res) => {
       WHERE contract_id = $1 AND project_id = $2
       RETURNING contract_id
     `;
-        const result = await db_1.pool.query(query, [contractId, projectId]);
+        const result = await req.dbClient.query(query, [contractId, projectId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'contract_not_found' });
         }

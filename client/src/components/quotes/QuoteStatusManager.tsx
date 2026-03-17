@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { updateQuoteStatus, assignQuote } from '../../services/quotesApi'
 import type { Quote, QuoteStatus } from '../../types/quotes'
+import { useToast } from '../../context/ToastContext'
 
 interface QuoteStatusManagerProps {
   quote: Quote
@@ -18,8 +19,7 @@ const QuoteStatusManager: React.FC<QuoteStatusManagerProps> = ({ quote, onStatus
   const [assignedTo, setAssignedTo] = useState<number | null>(quote.assigned_to || null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const { toast } = useToast()
   const [showStatusDialog, setShowStatusDialog] = useState(false)
 
   // Load employees for assignment
@@ -47,13 +47,11 @@ const QuoteStatusManager: React.FC<QuoteStatusManagerProps> = ({ quote, onStatus
   // Handle status update
   const handleStatusUpdate = async () => {
     if (selectedStatus === quote.status) {
-      setError('Please select a different status')
+      toast.error('Please select a different status')
       return
     }
 
     setLoading(true)
-    setError(null)
-    setSuccess(null)
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -63,14 +61,12 @@ const QuoteStatusManager: React.FC<QuoteStatusManagerProps> = ({ quote, onStatus
         notes: statusNotes || undefined
       })
 
-      setSuccess(`Status updated to ${selectedStatus}`)
+      toast.success(`Status updated to ${selectedStatus}`)
       onStatusUpdate(updatedQuote)
       setShowStatusDialog(false)
       setStatusNotes('')
-
-      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update status')
+      toast.error(err instanceof Error ? err.message : 'Failed to update status')
     } finally {
       setLoading(false)
     }
@@ -89,18 +85,14 @@ const QuoteStatusManager: React.FC<QuoteStatusManagerProps> = ({ quote, onStatus
     }
 
     setLoading(true)
-    setError(null)
-    setSuccess(null)
 
     try {
       const updatedQuote = await assignQuote(quote.quote_id, employeeId)
       setAssignedTo(employeeId)
-      setSuccess('Quote assigned successfully')
+      toast.success('Quote assigned successfully')
       onStatusUpdate(updatedQuote)
-
-      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to assign quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to assign quote')
     } finally {
       setLoading(false)
     }
@@ -121,19 +113,6 @@ const QuoteStatusManager: React.FC<QuoteStatusManagerProps> = ({ quote, onStatus
 
   return (
     <div className="space-y-6">
-      {/* Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
-          {success}
-        </div>
-      )}
-
       {/* Current Status & Quick Actions */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Status Management</h3>

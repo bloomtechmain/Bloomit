@@ -2,20 +2,21 @@ import { useState, useEffect } from 'react'
 import { Check, X } from 'lucide-react'
 import { timeEntriesApi } from '../../services/timeEntriesApi'
 import type { TimeEntry } from '../../types/timeEntries'
+import { useToast } from '../../context/ToastContext'
 
 type ManagerApprovalTabProps = {
   userId: number
   refreshTrigger: number
   onSuccess: () => void
-  showNotification: (message: string, type: 'success' | 'error') => void
+  showNotification?: (message: string, type: 'success' | 'error') => void
 }
 
 export default function ManagerApprovalTab({
   userId,
   refreshTrigger,
-  onSuccess,
-  showNotification
+  onSuccess
 }: ManagerApprovalTabProps) {
+  const { toast } = useToast()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [rejectingEntry, setRejectingEntry] = useState<TimeEntry | null>(null)
@@ -28,7 +29,7 @@ export default function ManagerApprovalTab({
       setEntries(response.data.timeEntries || [])
     } catch (error) {
       console.error('Error fetching pending entries:', error)
-      showNotification('Failed to load pending entries', 'error')
+      toast.error('Failed to load pending entries')
     } finally {
       setLoading(false)
     }
@@ -41,11 +42,11 @@ export default function ManagerApprovalTab({
   const handleApprove = async (entryId: number) => {
     try {
       await timeEntriesApi.manager.approve(entryId, userId)
-      showNotification('Time entry approved successfully', 'success')
+      toast.success('Time entry approved successfully')
       fetchPendingEntries()
       onSuccess()
     } catch (error: any) {
-      showNotification(error.response?.data?.error || 'Failed to approve entry', 'error')
+      toast.error(error.response?.data?.error || 'Failed to approve entry')
     }
   }
 
@@ -54,13 +55,13 @@ export default function ManagerApprovalTab({
 
     try {
       await timeEntriesApi.manager.reject(rejectingEntry.id, userId, rejectionNote || undefined)
-      showNotification('Time entry rejected', 'success')
+      toast.success('Time entry rejected')
       setRejectingEntry(null)
       setRejectionNote('')
       fetchPendingEntries()
       onSuccess()
     } catch (error: any) {
-      showNotification(error.response?.data?.error || 'Failed to reject entry', 'error')
+      toast.error(error.response?.data?.error || 'Failed to reject entry')
     }
   }
 
@@ -72,11 +73,11 @@ export default function ManagerApprovalTab({
       for (const entry of entries) {
         await timeEntriesApi.manager.approve(entry.id, userId)
       }
-      showNotification(`${entries.length} entries approved successfully`, 'success')
+      toast.success(`${entries.length} entries approved successfully`)
       fetchPendingEntries()
       onSuccess()
     } catch (error: any) {
-      showNotification('Some entries failed to approve', 'error')
+      toast.error('Some entries failed to approve')
       fetchPendingEntries()
     } finally {
       setLoading(false)

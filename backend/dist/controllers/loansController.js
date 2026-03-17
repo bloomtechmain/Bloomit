@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateInstallment = exports.getInstallments = exports.recordInstallmentPayment = exports.deleteLoan = exports.updateLoan = exports.getLoanSummary = exports.getLoanById = exports.getLoans = exports.createLoan = void 0;
-const db_1 = require("../db");
 const amortization_1 = require("../utils/amortization");
 /**
  * Create a new loan and auto-generate installments
@@ -14,13 +13,13 @@ const createLoan = async (req, res) => {
         return res.status(400).json({ error: 'missing_required_fields' });
     }
     try {
-        await db_1.pool.query('BEGIN');
+        await req.dbClient.query('BEGIN');
         // Calculate end date
         const startDateObj = new Date(start_date);
         const endDate = new Date(startDateObj);
         endDate.setMonth(endDate.getMonth() + total_installments);
         // Insert loan
-        const loanResult = await db_1.pool.query(`INSERT INTO loans (
+        const loanResult = await req.dbClient.query(`INSERT INTO loans (
         loan_account_number, borrower_name, bank_name, loan_amount,
         total_installments, monthly_installment_amount, interest_rate,
         loan_type, start_date, calculated_end_date, notes, status
@@ -45,7 +44,7 @@ const createLoan = async (req, res) => {
         for (let i = 1; i <= total_installments; i++) {
             const dueDate = new Date(startDateObj);
             dueDate.setMonth(dueDate.getMonth() + i);
-            await db_1.pool.query(`INSERT INTO loan_installments (
+            await req.dbClient.query(`INSERT INTO loan_installments (
           loan_id, installment_number, due_date, scheduled_amount, status
         ) VALUES ($1, $2, $3, $4, $5)`, [loan.id, i, dueDate.toISOString().split('T')[0], monthly_installment_amount, 'PENDING']);
             installments.push({
@@ -55,7 +54,7 @@ const createLoan = async (req, res) => {
                 status: 'PENDING'
             });
         }
-        await db_1.pool.query('COMMIT');
+        await req.dbClient.query('COMMIT');
         return res.status(201).json({
             loan,
             installments,
@@ -63,7 +62,7 @@ const createLoan = async (req, res) => {
         });
     }
     catch (err) {
-        await db_1.pool.query('ROLLBACK');
+        await req.dbClient.query('ROLLBACK');
         if (err.code === '23505') { // Unique violation
             return res.status(409).json({ error: 'loan_account_number_exists' });
         }
@@ -77,8 +76,8 @@ exports.createLoan = createLoan;
  */
 const getLoans = async (req, res) => {
     try {
-        const result = await db_1.pool.query(`
-      SELECT 
+        const result = await req.dbClient.query(`
+      SELECT
         l.*,
         COUNT(CASE WHEN li.status = 'PAID' THEN 1 END)::int as installments_paid,
         COUNT(CASE WHEN li.status = 'PENDING' THEN 1 END)::int as installments_pending,
@@ -103,13 +102,13 @@ exports.getLoans = getLoans;
 const getLoanById = async (req, res) => {
     const { id } = req.params;
     try {
-        const loanResult = await db_1.pool.query('SELECT * FROM loans WHERE id = $1', [id]);
+        const loanResult = await req.dbClient.query('SELECT * FROM loans WHERE id = $1', [id]);
         if (loanResult.rows.length === 0) {
             return res.status(404).json({ error: 'loan_not_found' });
         }
         const loan = loanResult.rows[0];
         // Get installments
-        const installmentsResult = await db_1.pool.query(`SELECT * FROM loan_installments WHERE loan_id = $1 ORDER BY installment_number`, [id]);
+        const installmentsResult = await req.dbClient.query(`SELECT * FROM loan_installments WHERE loan_id = $1 ORDER BY installment_number`, [id]);
         return res.json({
             loan,
             installments: installmentsResult.rows
@@ -127,8 +126,8 @@ exports.getLoanById = getLoanById;
 const getLoanSummary = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db_1.pool.query(`
-      SELECT 
+        const result = await req.dbClient.query(`
+      SELECT
         l.*,
         COUNT(li.id)::int as total_installments_count,
         COUNT(CASE WHEN li.status = 'PAID' THEN 1 END)::int as installments_paid,
@@ -171,7 +170,7 @@ const updateLoan = async (req, res) => {
     const { id } = req.params;
     const { borrower_name, bank_name, loan_type, notes, status } = req.body;
     try {
-        const result = await db_1.pool.query(`UPDATE loans 
+        const result = await req.dbClient.query(`UPDATE loans
        SET borrower_name = COALESCE($1, borrower_name),
            bank_name = COALESCE($2, bank_name),
            loan_type = COALESCE($3, loan_type),
@@ -197,7 +196,7 @@ exports.updateLoan = updateLoan;
 const deleteLoan = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db_1.pool.query('DELETE FROM loans WHERE id = $1 RETURNING *', [id]);
+        const result = await req.dbClient.query('DELETE FROM loans WHERE id = $1 RETURNING *', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'loan_not_found' });
         }
@@ -219,9 +218,9 @@ const recordInstallmentPayment = async (req, res) => {
         return res.status(400).json({ error: 'missing_required_fields' });
     }
     try {
-        await db_1.pool.query('BEGIN');
+        await req.dbClient.query('BEGIN');
         // Update installment
-        const result = await db_1.pool.query(`UPDATE loan_installments
+        const result = await req.dbClient.query(`UPDATE loan_installments
        SET payment_date = $1,
            amount_paid = $2,
            paid_bank = $3,
@@ -230,23 +229,23 @@ const recordInstallmentPayment = async (req, res) => {
        WHERE loan_id = $5 AND installment_number = $6
        RETURNING *`, [payment_date, amount_paid, paid_bank, payment_description, id, installment_number]);
         if (result.rows.length === 0) {
-            await db_1.pool.query('ROLLBACK');
+            await req.dbClient.query('ROLLBACK');
             return res.status(404).json({ error: 'installment_not_found' });
         }
         // Check if all installments are paid to update loan status
-        const unpaidCount = await db_1.pool.query(`SELECT COUNT(*) as count FROM loan_installments 
+        const unpaidCount = await req.dbClient.query(`SELECT COUNT(*) as count FROM loan_installments
        WHERE loan_id = $1 AND status != 'PAID'`, [id]);
         if (parseInt(unpaidCount.rows[0].count) === 0) {
-            await db_1.pool.query(`UPDATE loans SET status = 'PAID_OFF', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [id]);
+            await req.dbClient.query(`UPDATE loans SET status = 'PAID_OFF', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [id]);
         }
-        await db_1.pool.query('COMMIT');
+        await req.dbClient.query('COMMIT');
         return res.json({
             installment: result.rows[0],
             message: 'Payment recorded successfully'
         });
     }
     catch (err) {
-        await db_1.pool.query('ROLLBACK');
+        await req.dbClient.query('ROLLBACK');
         console.error('Error recording payment:', err);
         return res.status(500).json({ error: 'server_error', message: err.message });
     }
@@ -258,7 +257,7 @@ exports.recordInstallmentPayment = recordInstallmentPayment;
 const getInstallments = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db_1.pool.query(`SELECT * FROM loan_installments WHERE loan_id = $1 ORDER BY installment_number`, [id]);
+        const result = await req.dbClient.query(`SELECT * FROM loan_installments WHERE loan_id = $1 ORDER BY installment_number`, [id]);
         return res.json({ installments: result.rows });
     }
     catch (err) {
@@ -274,7 +273,7 @@ const updateInstallment = async (req, res) => {
     const { id, installmentId } = req.params;
     const { payment_date, amount_paid, paid_bank, payment_description, status } = req.body;
     try {
-        const result = await db_1.pool.query(`UPDATE loan_installments
+        const result = await req.dbClient.query(`UPDATE loan_installments
        SET payment_date = COALESCE($1, payment_date),
            amount_paid = COALESCE($2, amount_paid),
            paid_bank = COALESCE($3, paid_bank),

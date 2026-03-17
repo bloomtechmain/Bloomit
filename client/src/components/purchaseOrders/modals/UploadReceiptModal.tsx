@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Upload, Link as LinkIcon, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_URL } from '../../../config/api';
+import { useToast } from '../../../context/ToastContext';
 
 interface UploadReceiptModalProps {
   poId: number;
@@ -26,8 +27,8 @@ const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,7 +55,6 @@ const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
 
   const handleFileSelect = useCallback((file: File) => {
     setValidationError(null);
-    setError(null);
     
     const validationError = validateFile(file);
     if (validationError) {
@@ -178,7 +178,6 @@ const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    setError(null);
     setValidationError(null);
 
     try {
@@ -215,10 +214,11 @@ const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
       }
 
       // Success - call parent success handler
+      toast.success('Receipt uploaded successfully');
       onSuccess();
     } catch (err: any) {
       console.error('Upload error:', err);
-      setError(err.message || 'Failed to upload receipt');
+      toast.error(err.message || 'Failed to upload receipt');
       setIsSubmitting(false);
       setUploadProgress(0);
     }
@@ -448,14 +448,6 @@ const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-yellow-800">{validationError}</p>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 

@@ -21,39 +21,34 @@ async function requireAuth(req, res, next) {
         if (!decoded) {
             return res.status(401).json({ error: 'unauthorized', message: 'Invalid or expired token' });
         }
-        // Check account status in database (if column exists)
-        try {
-            const userStatusResult = await db_1.pool.query('SELECT account_status FROM users WHERE id = $1', [decoded.userId]);
-            if (userStatusResult.rows.length === 0) {
-                return res.status(401).json({ error: 'unauthorized', message: 'User account not found' });
-            }
-            const accountStatus = userStatusResult.rows[0].account_status;
-            // Block suspended users
-            if (accountStatus === 'suspended') {
-                return res.status(403).json({
-                    error: 'account_suspended',
-                    message: 'Your account has been suspended. Please contact your administrator.'
-                });
-            }
-            // Block terminated users
-            if (accountStatus === 'terminated') {
-                return res.status(403).json({
-                    error: 'account_terminated',
-                    message: 'Your account has been terminated. Access is no longer available.'
-                });
-            }
+        // Check account status and validate active session
+        const userStatusResult = await (0, db_1.query)('SELECT account_status, tenant_id FROM users WHERE id = $1', [decoded.userId], req.dbClient);
+        if (userStatusResult.rows.length === 0) {
+            return res.status(401).json({ error: 'unauthorized', message: 'User account not found' });
         }
-        catch (statusError) {
-            // If account_status column doesn't exist yet, just verify user exists
-            if (statusError.code === '42703') { // PostgreSQL error code for undefined column
-                console.warn('[AUTH] account_status column not found, skipping status check');
-                const userExistsResult = await db_1.pool.query('SELECT id FROM users WHERE id = $1', [decoded.userId]);
-                if (userExistsResult.rows.length === 0) {
-                    return res.status(401).json({ error: 'unauthorized', message: 'User account not found' });
-                }
-            }
-            else {
-                throw statusError;
+        const { account_status, tenant_id } = userStatusResult.rows[0];
+        decoded.tenantId = tenant_id;
+        if (account_status === 'suspended') {
+            return res.status(403).json({
+                error: 'account_suspended',
+                message: 'Your account has been suspended. Please contact your administrator.'
+            });
+        }
+        if (account_status === 'terminated') {
+            return res.status(403).json({
+                error: 'account_terminated',
+                message: 'Your account has been terminated. Access is no longer available.'
+            });
+        }
+        // Validate active session — ensures only one device is logged in at a time
+        if (decoded.sessionToken) {
+            const sessionResult = await (0, db_1.query)(`SELECT id FROM public.active_sessions
+         WHERE user_id = $1 AND session_token = $2 AND expires_at > NOW()`, [decoded.userId, decoded.sessionToken], req.dbClient);
+            if (sessionResult.rows.length === 0) {
+                return res.status(401).json({
+                    error: 'session_invalidated',
+                    message: 'Your session is no longer valid. Another device may have logged into this account. Please log in again.'
+                });
             }
         }
         // Attach user data to request

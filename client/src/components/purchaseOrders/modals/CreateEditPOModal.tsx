@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { PurchaseOrder, PurchaseOrderItem } from '../../../types/purchaseOrders'
 import { purchaseOrdersApi } from '../../../services/purchaseOrdersApi'
+import { useToast } from '../../../context/ToastContext'
 import { POModalHeader } from './POModalHeader'
 import { POBasicInfoSection } from './POBasicInfoSection'
 import { POLineItemsTable } from './POLineItemsTable'
@@ -50,6 +51,7 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
   projects
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
   const [formData, setFormData] = useState<Partial<PurchaseOrder>>({
     po_number: '',
     requested_by_name: currentUser.name,
@@ -106,7 +108,7 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
       }))
     } catch (error) {
       console.error('Failed to fetch next PO number:', error)
-      alert('Failed to generate PO number. Please try again.')
+      toast.error('Failed to generate PO number. Please try again.')
     }
   }
 
@@ -235,10 +237,10 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
 
       if (mode === 'create') {
         await purchaseOrdersApi.create(payload)
-        alert('Purchase order created successfully!')
+        toast.success('Purchase order created successfully!')
       } else {
         await purchaseOrdersApi.update(purchaseOrder!.id, payload)
-        alert('Purchase order updated successfully!')
+        toast.success('Purchase order updated successfully!')
       }
 
       onSuccess()
@@ -246,7 +248,7 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
     } catch (error: any) {
       console.error('Failed to save purchase order:', error)
       const errorMessage = error.response?.data?.error || error.message || 'Failed to save purchase order'
-      alert(`Error: ${errorMessage}`)
+      toast.error(`Error: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)
     }

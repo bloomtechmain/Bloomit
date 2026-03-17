@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectById = exports.getAllProjects = void 0;
-const db_1 = require("../db");
 const getAllProjects = async (req, res) => {
     try {
         const query = `
@@ -9,7 +8,7 @@ const getAllProjects = async (req, res) => {
       FROM projects
       ORDER BY project_id DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ projects: result.rows });
     }
     catch (err) {
@@ -26,7 +25,7 @@ const getProjectById = async (req, res) => {
       FROM projects
       WHERE project_id = $1
     `;
-        const result = await db_1.pool.query(query, [id]);
+        const result = await req.dbClient.query(query, [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'project_not_found' });
         }
@@ -50,7 +49,7 @@ const createProject = async (req, res) => {
       RETURNING project_id, projects_name AS project_name, customer_name, description, initial_cost_budget, extra_budget_allocation, payment_type, status AS status
     `;
         const values = [project_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         return res.status(201).json({ project: result.rows[0] });
     }
     catch (err) {
@@ -73,7 +72,7 @@ const updateProject = async (req, res) => {
       RETURNING project_id, projects_name AS project_name, customer_name, description, initial_cost_budget, extra_budget_allocation, payment_type, status
     `;
         const values = [project_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status, id];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'project_not_found' });
         }
@@ -93,7 +92,7 @@ const deleteProject = async (req, res) => {
       WHERE project_id = $1
       RETURNING project_id
     `;
-        const result = await db_1.pool.query(query, [id]);
+        const result = await req.dbClient.query(query, [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'project_not_found' });
         }

@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getNoteShares = exports.unshareNote = exports.shareNote = exports.deleteNote = exports.updateNote = exports.createNote = exports.getNotes = void 0;
-const db_1 = require("../db");
 // Get all notes for a user (including shared notes)
 const getNotes = async (req, res) => {
     try {
@@ -9,9 +8,9 @@ const getNotes = async (req, res) => {
         if (!userId) {
             return res.status(400).json({ error: 'user_id is required' });
         }
-        const result = await db_1.pool.query(`
+        const result = await req.dbClient.query(`
       SELECT DISTINCT n.*, u.name as owner_name,
-        CASE 
+        CASE
           WHEN n.user_id = $1 THEN 'owner'
           ELSE ns.permission
         END as access_level
@@ -36,7 +35,7 @@ const createNote = async (req, res) => {
         if (!user_id || !title) {
             return res.status(400).json({ error: 'user_id and title are required' });
         }
-        const result = await db_1.pool.query(`
+        const result = await req.dbClient.query(`
       INSERT INTO notes (user_id, title, content, color, is_pinned)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
@@ -58,7 +57,7 @@ const updateNote = async (req, res) => {
             return res.status(400).json({ error: 'user_id is required' });
         }
         // Check if user has write permission
-        const permCheck = await db_1.pool.query(`
+        const permCheck = await req.dbClient.query(`
       SELECT n.user_id, ns.permission
       FROM notes n
       LEFT JOIN note_shares ns ON n.id = ns.note_id AND ns.shared_with_user_id = $1
@@ -72,7 +71,7 @@ const updateNote = async (req, res) => {
         if (!isOwner && !hasWriteAccess) {
             return res.status(403).json({ error: 'No permission to edit this note' });
         }
-        const result = await db_1.pool.query(`
+        const result = await req.dbClient.query(`
       UPDATE notes
       SET title = $1, content = $2, color = $3, is_pinned = $4, updated_at = CURRENT_TIMESTAMP
       WHERE id = $5
@@ -94,7 +93,7 @@ const deleteNote = async (req, res) => {
         if (!userId) {
             return res.status(400).json({ error: 'user_id is required' });
         }
-        const result = await db_1.pool.query(`
+        const result = await req.dbClient.query(`
       DELETE FROM notes
       WHERE id = $1 AND user_id = $2
       RETURNING id
@@ -119,17 +118,17 @@ const shareNote = async (req, res) => {
             return res.status(400).json({ error: 'user_id and shared_with_user_id are required' });
         }
         // Check if user owns the note
-        const noteCheck = await db_1.pool.query('SELECT user_id FROM notes WHERE id = $1', [id]);
+        const noteCheck = await req.dbClient.query('SELECT user_id FROM notes WHERE id = $1', [id]);
         if (noteCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Note not found' });
         }
         if (noteCheck.rows[0].user_id != user_id) {
             return res.status(403).json({ error: 'Only the owner can share notes' });
         }
-        const result = await db_1.pool.query(`
+        const result = await req.dbClient.query(`
       INSERT INTO note_shares (note_id, shared_with_user_id, permission)
       VALUES ($1, $2, $3)
-      ON CONFLICT (note_id, shared_with_user_id) 
+      ON CONFLICT (note_id, shared_with_user_id)
       DO UPDATE SET permission = $3
       RETURNING *
       `, [id, shared_with_user_id, permission || 'read']);
@@ -150,14 +149,14 @@ const unshareNote = async (req, res) => {
             return res.status(400).json({ error: 'user_id is required' });
         }
         // Check if user owns the note
-        const noteCheck = await db_1.pool.query('SELECT user_id FROM notes WHERE id = $1', [id]);
+        const noteCheck = await req.dbClient.query('SELECT user_id FROM notes WHERE id = $1', [id]);
         if (noteCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Note not found' });
         }
         if (noteCheck.rows[0].user_id != userId) {
             return res.status(403).json({ error: 'Only the owner can manage shares' });
         }
-        await db_1.pool.query('DELETE FROM note_shares WHERE id = $1 AND note_id = $2', [shareId, id]);
+        await req.dbClient.query('DELETE FROM note_shares WHERE id = $1 AND note_id = $2', [shareId, id]);
         res.json({ message: 'Share removed successfully' });
     }
     catch (error) {
@@ -175,14 +174,14 @@ const getNoteShares = async (req, res) => {
             return res.status(400).json({ error: 'user_id is required' });
         }
         // Check if user owns the note
-        const noteCheck = await db_1.pool.query('SELECT user_id FROM notes WHERE id = $1', [id]);
+        const noteCheck = await req.dbClient.query('SELECT user_id FROM notes WHERE id = $1', [id]);
         if (noteCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Note not found' });
         }
         if (noteCheck.rows[0].user_id != userId) {
             return res.status(403).json({ error: 'Only the owner can view shares' });
         }
-        const result = await db_1.pool.query(`SELECT ns.id, ns.note_id, ns.shared_with_user_id, ns.permission, ns.created_at,
+        const result = await req.dbClient.query(`SELECT ns.id, ns.note_id, ns.shared_with_user_id, ns.permission, ns.created_at,
               u.name as user_name, u.email as user_email
        FROM note_shares ns
        JOIN users u ON ns.shared_with_user_id = u.id

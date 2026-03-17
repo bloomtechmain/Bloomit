@@ -5,6 +5,7 @@ import { createQuote, getServiceSuggestions } from '../services/quotesApi'
 import QuoteList from '../components/quotes/QuoteList'
 import QuoteDetail from '../components/quotes/QuoteDetail'
 import QuoteReminderModal from '../components/quotes/QuoteReminderModal'
+import { useToast } from '../context/ToastContext'
 
 type ViewMode = 'list' | 'create' | 'edit' | 'view'
 
@@ -27,6 +28,7 @@ const TEMPLATE_FIXED_ITEMS: Record<TemplateType, QuoteItem[]> = {
 }
 
 const QuoteGenerator: React.FC = () => {
+  const { toast } = useToast()
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null)
@@ -53,7 +55,6 @@ const QuoteGenerator: React.FC = () => {
   // UI state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   
   // Reminder modal state
   const [showReminderModal, setShowReminderModal] = useState(false)
@@ -177,7 +178,6 @@ const QuoteGenerator: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
 
     // Validation
     if (!companyName.trim()) {
@@ -197,7 +197,7 @@ const QuoteGenerator: React.FC = () => {
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
-      
+
       const newQuote = await createQuote({
         template_type: templateType,
         company_name: companyName,
@@ -210,9 +210,9 @@ const QuoteGenerator: React.FC = () => {
         additional_services: additionalServices.length > 0 ? additionalServices : undefined
       })
 
-      setSuccess(true)
+      toast.success('Quote created successfully!')
       setCreatedQuote(newQuote)
-      
+
       // Show reminder modal after successful creation
       setTimeout(() => {
         setShowReminderModal(true)
@@ -233,7 +233,6 @@ const QuoteGenerator: React.FC = () => {
     setStatus('DRAFT')
     setItems([{ description: '', quantity: 1, unit_price: 0, total: 0 }])
     setAdditionalServices([])
-    setSuccess(false)
     setSelectedQuoteId(null)
   }
 
@@ -317,19 +316,6 @@ const QuoteGenerator: React.FC = () => {
               {error}
             </div>
           )}
-
-          {success && (
-            <div style={{ marginBottom: 24, padding: '12px 16px', borderRadius: 8, background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4CAF50', color: '#4CAF50', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Quote created successfully!</span>
-              <button
-                onClick={handleBackToList}
-                className="btn-secondary"
-                style={{ padding: '6px 12px' }}
-              >
-                View All Quotes
-              </button>
-            </div>
-        )}
 
         <form onSubmit={handleSubmit}>
             {/* Phase 4A: Template Selection */}

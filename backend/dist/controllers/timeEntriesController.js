@@ -1,19 +1,18 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTimeSummary = exports.rejectTimeEntry = exports.approveTimeEntry = exports.deleteTimeEntry = exports.updateTimeEntry = exports.stopTimer = exports.resumeTimer = exports.pauseTimer = exports.getActiveTimer = exports.startTimer = exports.createTimeEntry = exports.getPendingTimeEntries = exports.getMyTimeEntries = void 0;
-const db_1 = require("../db");
 // Get employee's own time entries
 const getMyTimeEntries = async (req, res) => {
     try {
         const employeeId = req.query.employee_id;
         const { start_date, end_date, project_id, status } = req.query;
         let query = `
-      SELECT 
+      SELECT
         te.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         p.project_name as project_name,
         c.contract_name,
-        approver.name as approved_by_name
+        CONCAT(approver.first_name, ' ', approver.last_name) as approved_by_name
       FROM time_entries te
       LEFT JOIN employees e ON te.employee_id = e.id
       LEFT JOIN projects p ON te.project_id = p.project_id
@@ -44,7 +43,7 @@ const getMyTimeEntries = async (req, res) => {
             params.push(status);
         }
         query += ' ORDER BY te.date DESC, te.created_at DESC';
-        const result = await db_1.pool.query(query, params);
+        const result = await req.dbClient.query(query, params);
         return res.status(200).json({ timeEntries: result.rows });
     }
     catch (err) {
@@ -57,9 +56,9 @@ exports.getMyTimeEntries = getMyTimeEntries;
 const getPendingTimeEntries = async (req, res) => {
     try {
         const query = `
-      SELECT 
+      SELECT
         te.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         e.email as employee_email,
         p.project_name as project_name,
         c.contract_name
@@ -70,7 +69,7 @@ const getPendingTimeEntries = async (req, res) => {
       WHERE te.status = 'pending'
       ORDER BY te.date DESC, te.created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ timeEntries: result.rows });
     }
     catch (err) {
@@ -88,7 +87,7 @@ const createTimeEntry = async (req, res) => {
     try {
         const query = `
       INSERT INTO time_entries (
-        employee_id, project_id, contract_id, date, total_hours, 
+        employee_id, project_id, contract_id, date, total_hours,
         break_time_minutes, description, is_timer_based, status
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'pending')
@@ -103,7 +102,7 @@ const createTimeEntry = async (req, res) => {
             break_time_minutes || 0,
             description || null
         ];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         return res.status(201).json({ timeEntry: result.rows[0] });
     }
     catch (err) {
@@ -121,7 +120,7 @@ const startTimer = async (req, res) => {
     try {
         // Check if employee already has an active timer
         const checkQuery = 'SELECT * FROM active_timers WHERE employee_id = $1';
-        const checkResult = await db_1.pool.query(checkQuery, [employee_id]);
+        const checkResult = await req.dbClient.query(checkQuery, [employee_id]);
         if (checkResult.rows.length > 0) {
             return res.status(400).json({ error: 'timer_already_running' });
         }
@@ -129,7 +128,7 @@ const startTimer = async (req, res) => {
         const now = new Date();
         const timeEntryQuery = `
       INSERT INTO time_entries (
-        employee_id, project_id, contract_id, date, clock_in, 
+        employee_id, project_id, contract_id, date, clock_in,
         description, is_timer_based, status
       )
       VALUES ($1, $2, $3, $4, $5, $6, true, 'pending')
@@ -143,7 +142,7 @@ const startTimer = async (req, res) => {
             now,
             description || null
         ];
-        const timeEntryResult = await db_1.pool.query(timeEntryQuery, timeEntryValues);
+        const timeEntryResult = await req.dbClient.query(timeEntryQuery, timeEntryValues);
         const timeEntry = timeEntryResult.rows[0];
         // Create active timer
         const timerQuery = `
@@ -151,7 +150,7 @@ const startTimer = async (req, res) => {
       VALUES ($1, $2, $3)
       RETURNING *
     `;
-        const timerResult = await db_1.pool.query(timerQuery, [employee_id, timeEntry.id, now]);
+        const timerResult = await req.dbClient.query(timerQuery, [employee_id, timeEntry.id, now]);
         return res.status(201).json({
             timeEntry,
             activeTimer: timerResult.rows[0]
@@ -168,7 +167,7 @@ const getActiveTimer = async (req, res) => {
     const { employeeId } = req.params;
     try {
         const query = `
-      SELECT 
+      SELECT
         at.*,
         te.project_id,
         te.contract_id,
@@ -181,7 +180,7 @@ const getActiveTimer = async (req, res) => {
       LEFT JOIN contracts c ON te.contract_id = c.contract_id
       WHERE at.employee_id = $1
     `;
-        const result = await db_1.pool.query(query, [employeeId]);
+        const result = await req.dbClient.query(query, [employeeId]);
         if (result.rows.length === 0) {
             return res.status(200).json({ activeTimer: null });
         }
@@ -207,7 +206,7 @@ const pauseTimer = async (req, res) => {
       WHERE employee_id = $2 AND is_on_break = false
       RETURNING *
     `;
-        const result = await db_1.pool.query(query, [now, employee_id]);
+        const result = await req.dbClient.query(query, [now, employee_id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'no_active_timer_or_already_on_break' });
         }
@@ -229,7 +228,7 @@ const resumeTimer = async (req, res) => {
         const now = new Date();
         // Get current timer
         const getQuery = 'SELECT * FROM active_timers WHERE employee_id = $1 AND is_on_break = true';
-        const getResult = await db_1.pool.query(getQuery, [employee_id]);
+        const getResult = await req.dbClient.query(getQuery, [employee_id]);
         if (getResult.rows.length === 0) {
             return res.status(404).json({ error: 'no_active_break' });
         }
@@ -239,14 +238,14 @@ const resumeTimer = async (req, res) => {
         // Update timer
         const updateQuery = `
       UPDATE active_timers
-      SET 
+      SET
         is_on_break = false,
         total_break_time_minutes = total_break_time_minutes + $1,
         last_break_start = NULL
       WHERE employee_id = $2
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [breakDurationMinutes, employee_id]);
+        const result = await req.dbClient.query(updateQuery, [breakDurationMinutes, employee_id]);
         return res.status(200).json({ activeTimer: result.rows[0] });
     }
     catch (err) {
@@ -265,7 +264,7 @@ const stopTimer = async (req, res) => {
         const now = new Date();
         // Get active timer
         const getTimerQuery = 'SELECT * FROM active_timers WHERE employee_id = $1';
-        const timerResult = await db_1.pool.query(getTimerQuery, [employee_id]);
+        const timerResult = await req.dbClient.query(getTimerQuery, [employee_id]);
         if (timerResult.rows.length === 0) {
             return res.status(404).json({ error: 'no_active_timer' });
         }
@@ -285,7 +284,7 @@ const stopTimer = async (req, res) => {
         // Update time entry
         const updateEntryQuery = `
       UPDATE time_entries
-      SET 
+      SET
         clock_out = $1,
         total_hours = $2,
         break_time_minutes = $3,
@@ -294,7 +293,7 @@ const stopTimer = async (req, res) => {
       WHERE id = $5
       RETURNING *
     `;
-        const entryResult = await db_1.pool.query(updateEntryQuery, [
+        const entryResult = await req.dbClient.query(updateEntryQuery, [
             now,
             totalHours,
             totalBreakTime,
@@ -302,7 +301,7 @@ const stopTimer = async (req, res) => {
             timer.time_entry_id
         ]);
         // Delete active timer
-        await db_1.pool.query('DELETE FROM active_timers WHERE employee_id = $1', [employee_id]);
+        await req.dbClient.query('DELETE FROM active_timers WHERE employee_id = $1', [employee_id]);
         return res.status(200).json({ timeEntry: entryResult.rows[0] });
     }
     catch (err) {
@@ -318,7 +317,7 @@ const updateTimeEntry = async (req, res) => {
     try {
         // Check if entry is pending (only pending entries can be edited)
         const checkQuery = 'SELECT status FROM time_entries WHERE id = $1';
-        const checkResult = await db_1.pool.query(checkQuery, [id]);
+        const checkResult = await req.dbClient.query(checkQuery, [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'time_entry_not_found' });
         }
@@ -327,7 +326,7 @@ const updateTimeEntry = async (req, res) => {
         }
         const query = `
       UPDATE time_entries
-      SET 
+      SET
         total_hours = COALESCE($1, total_hours),
         break_time_minutes = COALESCE($2, break_time_minutes),
         description = COALESCE($3, description),
@@ -337,7 +336,7 @@ const updateTimeEntry = async (req, res) => {
       RETURNING *
     `;
         const values = [total_hours, break_time_minutes, description, date, id];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         return res.status(200).json({ timeEntry: result.rows[0] });
     }
     catch (err) {
@@ -352,7 +351,7 @@ const deleteTimeEntry = async (req, res) => {
     try {
         // Check if entry is pending
         const checkQuery = 'SELECT status FROM time_entries WHERE id = $1';
-        const checkResult = await db_1.pool.query(checkQuery, [id]);
+        const checkResult = await req.dbClient.query(checkQuery, [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'time_entry_not_found' });
         }
@@ -360,7 +359,7 @@ const deleteTimeEntry = async (req, res) => {
             return res.status(400).json({ error: 'cannot_delete_approved_or_rejected_entry' });
         }
         const query = 'DELETE FROM time_entries WHERE id = $1 RETURNING id';
-        const result = await db_1.pool.query(query, [id]);
+        const result = await req.dbClient.query(query, [id]);
         return res.status(200).json({ message: 'time_entry_deleted', id: result.rows[0].id });
     }
     catch (err) {
@@ -379,7 +378,7 @@ const approveTimeEntry = async (req, res) => {
     try {
         const query = `
       UPDATE time_entries
-      SET 
+      SET
         status = 'approved',
         approved_by = $1,
         approved_at = CURRENT_TIMESTAMP,
@@ -387,7 +386,7 @@ const approveTimeEntry = async (req, res) => {
       WHERE id = $2 AND status = 'pending'
       RETURNING *
     `;
-        const result = await db_1.pool.query(query, [approved_by, id]);
+        const result = await req.dbClient.query(query, [approved_by, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'time_entry_not_found_or_already_processed' });
         }
@@ -409,7 +408,7 @@ const rejectTimeEntry = async (req, res) => {
     try {
         const query = `
       UPDATE time_entries
-      SET 
+      SET
         status = 'rejected',
         approved_by = $1,
         approved_at = CURRENT_TIMESTAMP,
@@ -418,7 +417,7 @@ const rejectTimeEntry = async (req, res) => {
       WHERE id = $3 AND status = 'pending'
       RETURNING *
     `;
-        const result = await db_1.pool.query(query, [approved_by, rejection_note || null, id]);
+        const result = await req.dbClient.query(query, [approved_by, rejection_note || null, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'time_entry_not_found_or_already_processed' });
         }
@@ -459,7 +458,7 @@ const getTimeSummary = async (req, res) => {
         }
         // Total hours by project
         const projectQuery = `
-      SELECT 
+      SELECT
         p.project_id,
         p.project_name as project_name,
         SUM(te.total_hours) as total_hours,
@@ -471,25 +470,25 @@ const getTimeSummary = async (req, res) => {
       GROUP BY p.project_id, p.project_name
       ORDER BY total_hours DESC
     `;
-        const projectResult = await db_1.pool.query(projectQuery, params);
+        const projectResult = await req.dbClient.query(projectQuery, params);
         // Total hours by employee
         const employeeQuery = `
-      SELECT 
+      SELECT
         e.id as employee_id,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         SUM(te.total_hours) as total_hours,
         SUM(te.break_time_minutes) as total_break_minutes,
         COUNT(te.id) as entry_count
       FROM time_entries te
       JOIN employees e ON te.employee_id = e.id
       ${whereClause}
-      GROUP BY e.id, e.name
+      GROUP BY e.id, e.first_name, e.last_name
       ORDER BY total_hours DESC
     `;
-        const employeeResult = await db_1.pool.query(employeeQuery, params);
+        const employeeResult = await req.dbClient.query(employeeQuery, params);
         // Overall summary
         const overallQuery = `
-      SELECT 
+      SELECT
         SUM(total_hours) as total_hours,
         SUM(break_time_minutes) as total_break_minutes,
         COUNT(id) as total_entries,
@@ -497,7 +496,7 @@ const getTimeSummary = async (req, res) => {
       FROM time_entries te
       ${whereClause}
     `;
-        const overallResult = await db_1.pool.query(overallQuery, params);
+        const overallResult = await req.dbClient.query(overallQuery, params);
         return res.status(200).json({
             byProject: projectResult.rows,
             byEmployee: employeeResult.rows,

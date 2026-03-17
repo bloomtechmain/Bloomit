@@ -3,12 +3,14 @@ import { Search, Users } from 'lucide-react'
 import { getEmployeeDirectory } from '../services/employeePortalService'
 import type { EmployeeDirectoryResponse } from '../services/employeePortalService'
 import EmployeeDirectoryCard from '../components/employee/EmployeeDirectoryCard'
+import { useToast } from '../context/ToastContext'
 
 interface EmployeeDirectoryProps {
   accessToken: string
 }
 
 export default function EmployeeDirectory({ accessToken }: EmployeeDirectoryProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [directory, setDirectory] = useState<EmployeeDirectoryResponse | null>(null)
@@ -39,7 +41,9 @@ export default function EmployeeDirectory({ accessToken }: EmployeeDirectoryProp
       setDirectory(data)
     } catch (err) {
       console.error('Error fetching directory:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load directory')
+      const msg = err instanceof Error ? err.message : 'Failed to load directory'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

@@ -1,16 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadReceipt = exports.uploadReceipt = exports.rejectPurchaseOrder = exports.approvePurchaseOrder = exports.updatePurchaseOrder = exports.createPurchaseOrder = exports.getPurchaseOrderById = exports.getAllPurchaseOrders = exports.getNextPoNumber = void 0;
-const db_1 = require("../db");
+exports.deletePurchaseOrder = exports.downloadReceipt = exports.uploadReceipt = exports.rejectPurchaseOrder = exports.approvePurchaseOrder = exports.updatePurchaseOrder = exports.createPurchaseOrder = exports.getPurchaseOrderById = exports.getAllPurchaseOrders = exports.getNextPoNumber = void 0;
 const emailService_1 = require("../utils/emailService");
 // Generate next PO number
 const getNextPoNumber = async (req, res) => {
     try {
         const year = new Date().getFullYear();
         const prefix = `PO-${year}-`;
-        const result = await db_1.pool.query(`SELECT po_number FROM purchase_orders 
-       WHERE po_number LIKE $1 
-       ORDER BY po_number DESC 
+        const result = await req.dbClient.query(`SELECT po_number FROM purchase_orders
+       WHERE po_number LIKE $1
+       ORDER BY po_number DESC
        LIMIT 1`, [`${prefix}%`]);
         let nextNumber = 1;
         if (result.rows.length > 0) {
@@ -32,7 +31,7 @@ const getAllPurchaseOrders = async (req, res) => {
     try {
         const { status, vendor_id, search, start_date, end_date } = req.query;
         let query = `
-      SELECT po.*, 
+      SELECT po.*,
              v.vendor_name,
              c.contract_name as project_name,
              ru.name as requested_by_user_name,
@@ -72,7 +71,7 @@ const getAllPurchaseOrders = async (req, res) => {
             paramIndex++;
         }
         query += ` ORDER BY po.created_at DESC`;
-        const result = await db_1.pool.query(query, params);
+        const result = await req.dbClient.query(query, params);
         return res.status(200).json({ purchase_orders: result.rows });
     }
     catch (err) {
@@ -86,7 +85,7 @@ const getPurchaseOrderById = async (req, res) => {
     try {
         const { id } = req.params;
         // Get purchase order
-        const poResult = await db_1.pool.query(`SELECT po.*, 
+        const poResult = await req.dbClient.query(`SELECT po.*,
               v.vendor_name,
               c.contract_name as project_name,
               ru.name as requested_by_user_name,
@@ -101,8 +100,8 @@ const getPurchaseOrderById = async (req, res) => {
             return res.status(404).json({ error: 'purchase_order_not_found' });
         }
         // Get items
-        const itemsResult = await db_1.pool.query(`SELECT * FROM purchase_order_items 
-       WHERE purchase_order_id = $1 
+        const itemsResult = await req.dbClient.query(`SELECT * FROM purchase_order_items
+       WHERE purchase_order_id = $1
        ORDER BY line_order, id`, [id]);
         const purchaseOrder = {
             ...poResult.rows[0],
@@ -123,7 +122,7 @@ const createPurchaseOrder = async (req, res) => {
     if (!po_number || !requested_by_name || !total_amount || !items || items.length === 0) {
         return res.status(400).json({ error: 'missing_required_fields' });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Insert purchase order
@@ -162,7 +161,7 @@ const createPurchaseOrder = async (req, res) => {
         }
         await client.query('COMMIT');
         // Fetch complete purchase order with items
-        const completePoResult = await client.query(`SELECT po.*, 
+        const completePoResult = await client.query(`SELECT po.*,
               v.vendor_name,
               c.contract_name as project_name
        FROM purchase_orders po
@@ -179,7 +178,7 @@ const createPurchaseOrder = async (req, res) => {
             try {
                 // Get requestor email
                 if (requested_by_user_id) {
-                    const userResult = await db_1.pool.query('SELECT email FROM users WHERE id = $1', [requested_by_user_id]);
+                    const userResult = await client.query('SELECT email FROM users WHERE id = $1', [requested_by_user_id]);
                     if (userResult.rows.length > 0) {
                         const requestorEmail = userResult.rows[0].email;
                         // Send creation confirmation to requestor
@@ -193,15 +192,15 @@ const createPurchaseOrder = async (req, res) => {
                             status: 'PENDING'
                         });
                         // Get admin emails for approval notification
-                        const adminResult = await db_1.pool.query(`
-              SELECT DISTINCT u.email 
+                        const adminResult = await client.query(`
+              SELECT DISTINCT u.email
               FROM users u
               JOIN user_roles ur ON u.id = ur.user_id
               JOIN roles r ON ur.role_id = r.id
               WHERE r.role_name IN ('Super Admin', 'Admin')
               AND u.email IS NOT NULL
             `);
-                        const adminEmails = adminResult.rows.map(row => row.email);
+                        const adminEmails = adminResult.rows.map((row) => row.email);
                         if (adminEmails.length > 0) {
                             // Send approval request to admins
                             await (0, emailService_1.sendPOPendingApprovalEmail)(adminEmails, {
@@ -229,16 +228,13 @@ const createPurchaseOrder = async (req, res) => {
         const message = err instanceof Error ? err.message : 'server_error';
         return res.status(500).json({ error: message });
     }
-    finally {
-        client.release();
-    }
 };
 exports.createPurchaseOrder = createPurchaseOrder;
 // Update purchase order (only if PENDING)
 const updatePurchaseOrder = async (req, res) => {
     const { id } = req.params;
     const { requested_by_name, requested_by_title, vendor_id, vendor_invoice_number, project_id, subtotal, sales_tax, shipping_handling, banking_fee, total_amount, payment_method, check_number, payment_amount, payment_date, notes, items } = req.body;
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Check if PO exists and is PENDING
@@ -298,7 +294,7 @@ const updatePurchaseOrder = async (req, res) => {
         }
         await client.query('COMMIT');
         // Fetch updated purchase order
-        const updatedPoResult = await client.query(`SELECT po.*, 
+        const updatedPoResult = await client.query(`SELECT po.*,
               v.vendor_name,
               c.contract_name as project_name
        FROM purchase_orders po
@@ -317,9 +313,6 @@ const updatePurchaseOrder = async (req, res) => {
         const message = err instanceof Error ? err.message : 'server_error';
         return res.status(500).json({ error: message });
     }
-    finally {
-        client.release();
-    }
 };
 exports.updatePurchaseOrder = updatePurchaseOrder;
 // Approve purchase order
@@ -328,7 +321,7 @@ const approvePurchaseOrder = async (req, res) => {
     const { approved_by_user_id, approved_by_name, approved_by_title } = req.body;
     try {
         // Check if PO exists and is PENDING
-        const checkResult = await db_1.pool.query('SELECT status FROM purchase_orders WHERE id = $1', [id]);
+        const checkResult = await req.dbClient.query('SELECT status FROM purchase_orders WHERE id = $1', [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'purchase_order_not_found' });
         }
@@ -336,7 +329,7 @@ const approvePurchaseOrder = async (req, res) => {
             return res.status(400).json({ error: 'purchase_order_not_pending' });
         }
         // Approve the PO
-        const result = await db_1.pool.query(`UPDATE purchase_orders SET
+        const result = await req.dbClient.query(`UPDATE purchase_orders SET
         status = 'APPROVED',
         approved_by_user_id = $1,
         approved_by_name = $2,
@@ -346,11 +339,12 @@ const approvePurchaseOrder = async (req, res) => {
       RETURNING *`, [approved_by_user_id, approved_by_name, approved_by_title || null, id]);
         const approvedPO = result.rows[0];
         // Send approval email notification (async, don't wait)
+        const dbClient = req.dbClient;
         setImmediate(async () => {
             try {
                 // Get complete PO details with vendor and project names
-                const poDetailsResult = await db_1.pool.query(`
-          SELECT po.*, 
+                const poDetailsResult = await dbClient.query(`
+          SELECT po.*,
                  v.vendor_name,
                  c.contract_name as project_name,
                  u.email as requestor_email
@@ -396,7 +390,7 @@ const rejectPurchaseOrder = async (req, res) => {
     }
     try {
         // Check if PO exists and is PENDING
-        const checkResult = await db_1.pool.query('SELECT status FROM purchase_orders WHERE id = $1', [id]);
+        const checkResult = await req.dbClient.query('SELECT status FROM purchase_orders WHERE id = $1', [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'purchase_order_not_found' });
         }
@@ -404,18 +398,19 @@ const rejectPurchaseOrder = async (req, res) => {
             return res.status(400).json({ error: 'purchase_order_not_pending' });
         }
         // Reject the PO
-        const result = await db_1.pool.query(`UPDATE purchase_orders SET
+        const result = await req.dbClient.query(`UPDATE purchase_orders SET
         status = 'REJECTED',
         rejection_reason = $1
       WHERE id = $2
       RETURNING *`, [rejection_reason, id]);
         const rejectedPO = result.rows[0];
         // Send rejection email notification (async, don't wait)
+        const dbClient = req.dbClient;
         setImmediate(async () => {
             try {
                 // Get complete PO details with vendor and project names
-                const poDetailsResult = await db_1.pool.query(`
-          SELECT po.*, 
+                const poDetailsResult = await dbClient.query(`
+          SELECT po.*,
                  v.vendor_name,
                  c.contract_name as project_name,
                  u.email as requestor_email
@@ -457,7 +452,7 @@ const uploadReceipt = async (req, res) => {
     const { id } = req.params;
     try {
         // Check if PO exists and is APPROVED
-        const checkResult = await db_1.pool.query('SELECT status, po_number FROM purchase_orders WHERE id = $1', [id]);
+        const checkResult = await req.dbClient.query('SELECT status, po_number FROM purchase_orders WHERE id = $1', [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'purchase_order_not_found' });
         }
@@ -484,7 +479,7 @@ const uploadReceipt = async (req, res) => {
             const userId = req.user?.userId;
             const documentName = `Receipt - ${poNumber}`;
             // Insert receipt document into documents table
-            const docResult = await db_1.pool.query(`INSERT INTO documents 
+            const docResult = await req.dbClient.query(`INSERT INTO documents
           (document_name, original_filename, file_type, file_size, file_data, uploaded_by, description)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id`, [
@@ -498,7 +493,7 @@ const uploadReceipt = async (req, res) => {
             ]);
             const documentId = docResult.rows[0].id;
             // Update PO with receipt document reference and mark as PAID
-            const result = await db_1.pool.query(`UPDATE purchase_orders SET
+            const result = await req.dbClient.query(`UPDATE purchase_orders SET
           receipt_document_id = $1,
           receipt_document_url = $2,
           receipt_uploaded_at = CURRENT_TIMESTAMP,
@@ -513,7 +508,7 @@ const uploadReceipt = async (req, res) => {
         // Handle URL input (legacy support)
         else if (req.body.receipt_document_url) {
             const { receipt_document_url } = req.body;
-            const result = await db_1.pool.query(`UPDATE purchase_orders SET
+            const result = await req.dbClient.query(`UPDATE purchase_orders SET
           receipt_document_url = $1,
           receipt_uploaded_at = CURRENT_TIMESTAMP,
           status = 'PAID'
@@ -535,7 +530,7 @@ exports.uploadReceipt = uploadReceipt;
 const downloadReceipt = async (req, res) => {
     const { id } = req.params;
     try {
-        const poResult = await db_1.pool.query('SELECT receipt_document_id, po_number FROM purchase_orders WHERE id = $1', [id]);
+        const poResult = await req.dbClient.query('SELECT receipt_document_id, po_number FROM purchase_orders WHERE id = $1', [id]);
         if (poResult.rows.length === 0) {
             return res.status(404).json({ error: 'purchase_order_not_found' });
         }
@@ -544,7 +539,7 @@ const downloadReceipt = async (req, res) => {
             return res.status(404).json({ error: 'receipt_not_found' });
         }
         // Fetch the receipt document
-        const docResult = await db_1.pool.query('SELECT original_filename, file_type, file_data FROM documents WHERE id = $1', [receipt_document_id]);
+        const docResult = await req.dbClient.query('SELECT original_filename, file_type, file_data FROM documents WHERE id = $1', [receipt_document_id]);
         if (docResult.rows.length === 0) {
             return res.status(404).json({ error: 'receipt_document_not_found' });
         }
@@ -561,3 +556,27 @@ const downloadReceipt = async (req, res) => {
     }
 };
 exports.downloadReceipt = downloadReceipt;
+// Delete purchase order (Admin/Super Admin only)
+const deletePurchaseOrder = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Check if PO exists
+        const checkResult = await req.dbClient.query('SELECT po_number, status FROM purchase_orders WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'purchase_order_not_found' });
+        }
+        const { po_number, status } = checkResult.rows[0];
+        // Delete the purchase order (items will cascade delete automatically)
+        await req.dbClient.query('DELETE FROM purchase_orders WHERE id = $1', [id]);
+        return res.status(200).json({
+            message: 'purchase_order_deleted',
+            po_number,
+            status
+        });
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : 'server_error';
+        return res.status(500).json({ error: message });
+    }
+};
+exports.deletePurchaseOrder = deletePurchaseOrder;

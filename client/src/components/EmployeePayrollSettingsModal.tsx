@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Save, X } from 'lucide-react'
 import { updateEmployeePayrollData } from '../services/payrollService'
 import type { EmployeePayrollData } from '../types/payroll'
+import { useToast } from '../context/ToastContext'
 
 type EmployeePayrollSettingsModalProps = {
   employee: EmployeePayrollData
@@ -25,6 +26,7 @@ export default function EmployeePayrollSettingsModal({
   const [newAllowanceName, setNewAllowanceName] = useState('')
   const [newAllowanceAmount, setNewAllowanceAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
   // Initialize form with employee data
   useEffect(() => {
@@ -58,12 +60,12 @@ export default function EmployeePayrollSettingsModal({
 
   const handleSave = async () => {
     if (!baseSalary || Number(baseSalary) <= 0) {
-      alert('Please enter a valid base salary')
+      toast.error('Please enter a valid base salary')
       return
     }
 
     if (epfEnabled && (Number(epfRate) < 8 || Number(epfRate) > 100)) {
-      alert('EPF rate must be between 8% and 100%')
+      toast.error('EPF rate must be between 8% and 100%')
       return
     }
 
@@ -77,13 +79,13 @@ export default function EmployeePayrollSettingsModal({
         etf_enabled: etfEnabled,
         employee_department: department
       })
-      
-      alert('Employee payroll settings updated successfully!')
+
+      toast.success('Employee payroll settings updated successfully!')
       onSave()
       onClose()
     } catch (error: any) {
       console.error('Error updating employee payroll data:', error)
-      alert(error.message || 'Failed to update employee payroll settings')
+      toast.error(error.message || 'Failed to update employee payroll settings')
     } finally {
       setSaving(false)
     }

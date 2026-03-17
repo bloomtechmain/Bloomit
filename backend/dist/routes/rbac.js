@@ -25,4 +25,8 @@ router.post('/users', rbacController_1.createUser);
 router.get('/users', rbacController_1.getAllUsersWithRoles);
 router.put('/users/:userId/roles', rbacController_1.assignRolesToUser);
 router.post('/users/:userId/reset-password', rbacController_1.resetUserPassword);
+// Granular permission migration routes
+router.get('/migration/status', rbacController_1.getMigrationStatus);
+router.get('/migration/preview', rbacController_1.previewGranularMigration);
+router.post('/migration/execute', rbacController_1.executeGranularMigration);
 exports.default = router;

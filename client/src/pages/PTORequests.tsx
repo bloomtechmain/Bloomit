@@ -4,6 +4,7 @@ import { ptoRequestsApi } from '../services/ptoRequestsApi'
 import type { PTORequest, PTOStats } from '../types/ptoRequests'
 import { ABSENCE_TYPES } from '../types/ptoRequests'
 import { API_URL } from '../config/api'
+import { useToast } from '../context/ToastContext'
 
 type TabType = 'request' | 'my-requests' | 'approvals'
 
@@ -20,6 +21,7 @@ type Project = {
 }
 
 export default function PTORequests({ userId, isManager, accessToken }: { userId: number; isManager?: boolean; accessToken: string }) {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<TabType>('request')
   const [myRequests, setMyRequests] = useState<PTORequest[]>([])
   const [pendingRequests, setPendingRequests] = useState<PTORequest[]>([])
@@ -27,7 +29,6 @@ export default function PTORequests({ userId, isManager, accessToken }: { userId
   const [employees, setEmployees] = useState<Employee[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Form state
   const [absenceType, setAbsenceType] = useState('')
@@ -40,8 +41,8 @@ export default function PTORequests({ userId, isManager, accessToken }: { userId
   const [managerId, setManagerId] = useState('')
 
   const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type })
-    setTimeout(() => setNotification(null), 3000)
+    if (type === 'success') toast.success(message)
+    else toast.error(message)
   }
 
   // Fetch employees
@@ -228,24 +229,6 @@ export default function PTORequests({ userId, isManager, accessToken }: { userId
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Notification */}
-      {notification && (
-        <div style={{
-          position: 'fixed',
-          top: '2rem',
-          right: '2rem',
-          padding: '1rem 1.5rem',
-          backgroundColor: notification.type === 'success' ? '#dcfce7' : '#fee2e2',
-          border: `1px solid ${notification.type === 'success' ? '#86efac' : '#fecaca'}`,
-          borderRadius: '8px',
-          color: notification.type === 'success' ? '#166534' : '#991b1b',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          zIndex: 9999
-        }}>
-          {notification.message}
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>

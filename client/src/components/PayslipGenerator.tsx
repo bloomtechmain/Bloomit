@@ -3,8 +3,10 @@ import { Send, AlertCircle, FileText } from 'lucide-react'
 import PayslipForm from './PayslipForm'
 import { getAllEmployeesWithPayroll, createPayslip, submitForReview, getAllPayslips, updatePayslip } from '../services/payrollService'
 import type { EmployeePayrollData, Payslip } from '../types/payroll'
+import { useToast } from '../context/ToastContext'
 
 export default function PayslipGenerator() {
+  const { toast } = useToast()
   const [employees, setEmployees] = useState<EmployeePayrollData[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -27,7 +29,7 @@ export default function PayslipGenerator() {
       setEmployees(data.employees || [])
     } catch (error) {
       console.error('Error fetching employees:', error)
-      alert('Failed to fetch employees')
+      toast.error('Failed to fetch employees')
     } finally {
       setLoading(false)
     }
@@ -68,14 +70,14 @@ export default function PayslipGenerator() {
 
   const handleSubmitForReview = async () => {
     if (!selectedEmployee || !calculatedData) {
-      alert('Please select an employee and complete the form')
+      toast.error('Please select an employee and complete the form')
       return
     }
 
     // Check if payslip already exists
     if (existingPayslip) {
       const status = existingPayslip.status
-      
+
       // If it's in DRAFT or REJECTED status, we can update and submit
       if (status === 'DRAFT' || status === 'REJECTED') {
         const confirmUpdate = confirm(
@@ -84,9 +86,8 @@ export default function PayslipGenerator() {
         if (!confirmUpdate) return
       } else {
         // Payslip exists in a non-editable state
-        alert(
-          `A payslip already exists for this employee and period with status: ${status}.\n\n` +
-          `Please view the existing payslip in the Payslips list or select a different period.`
+        toast.error(
+          `A payslip already exists for this employee and period with status: ${status}. Please view the existing payslip in the Payslips list or select a different period.`
         )
         return
       }
@@ -119,8 +120,8 @@ export default function PayslipGenerator() {
       
       // Then submit it for review
       await submitForReview(payslipId)
-      
-      alert('Payslip submitted for review successfully!')
+
+      toast.success('Payslip submitted for review successfully!')
       // Reset form
       setSelectedEmployee(null)
       setCalculatedData(null)
@@ -128,14 +129,11 @@ export default function PayslipGenerator() {
     } catch (error: any) {
       console.error('Error submitting payslip:', error)
       const errorMessage = error.message || 'Failed to submit payslip'
-      
+
       if (errorMessage.includes('payslip_already_exists')) {
-        alert(
-          'A payslip already exists for this employee and period.\n\n' +
-          'Please refresh the page and try again, or select a different period.'
-        )
+        toast.error('A payslip already exists for this employee and period. Please refresh the page and try again, or select a different period.')
       } else {
-        alert(errorMessage)
+        toast.error(errorMessage)
       }
     } finally {
       setSaving(false)

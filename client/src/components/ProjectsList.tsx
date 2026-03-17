@@ -4,6 +4,7 @@ import type { Project, Contract } from '../types/projects'
 import { projectsApi } from '../services/projectsApi'
 import { ContractsList } from './ContractsList'
 import { ProjectSkeleton } from './SkeletonLoader'
+import { useConfirm } from '../context/ConfirmContext'
 
 interface ProjectsListProps {
   onEdit: (project: Project) => void
@@ -24,6 +25,7 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({
   onViewItems,
   refreshTrigger
 }) => {
+  const confirm = useConfirm()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -83,11 +85,13 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({
     }
   }
 
-  const handleDelete = (project: Project, e: React.MouseEvent) => {
+  const handleDelete = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (window.confirm(`Are you sure you want to delete project "${project.project_name}"?`)) {
-      onDelete(project)
-    }
+    const confirmed = await confirm(
+      `Delete project "${project.project_name}"?`,
+      { destructive: true }
+    )
+    if (confirmed) onDelete(project)
   }
 
   if (loading) {

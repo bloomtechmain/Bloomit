@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 export const openAccount = async (req: Request, res: Response) => {
   const { bank_name, branch, account_number, account_name, opening_balance } = req.body as {
@@ -19,9 +18,10 @@ export const openAccount = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'invalid_opening_balance' })
   }
 
+  const client = req.dbClient!
   try {
-    await pool.query('BEGIN')
-    const bankLookup = await pool.query(
+    await client.query('BEGIN')
+    const bankLookup = await client.query(
       `SELECT id, bank_name, branch FROM banks WHERE bank_name = $1 AND COALESCE(branch,'') = COALESCE($2,'') LIMIT 1`,
       [bank_name, branch ?? null]
     )
@@ -29,26 +29,26 @@ export const openAccount = async (req: Request, res: Response) => {
     if (bankLookup.rows.length > 0) {
       bankId = bankLookup.rows[0].id as number
     } else {
-      const bankInsert = await pool.query(
+      const bankInsert = await client.query(
         `INSERT INTO banks(bank_name, branch) VALUES($1, $2) RETURNING id, bank_name, branch, created_at`,
         [bank_name, branch ?? null]
       )
       bankId = bankInsert.rows[0].id as number
     }
 
-    const accountInsert = await pool.query(
+    const accountInsert = await client.query(
       `INSERT INTO company_bank_accounts(bank_id, account_number, account_name, opening_balance, current_balance)
        VALUES($1, $2, $3, $4, $4)
        RETURNING id, bank_id, account_number, account_name, opening_balance, current_balance, created_at`,
       [bankId, account_number, account_name ?? null, openingBalanceNum]
     )
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
     return res.status(201).json({
       bank: { id: bankId, bank_name, branch: branch ?? null },
       account: accountInsert.rows[0],
     })
   } catch (err) {
-    await pool.query('ROLLBACK').catch(() => null)
+    await client.query('ROLLBACK').catch(() => null)
     const message = err instanceof Error ? err.message : 'server_error'
     if (message.includes('company_bank_accounts_account_number_key')) {
       return res.status(409).json({ error: 'account_number_exists' })
@@ -59,7 +59,7 @@ export const openAccount = async (req: Request, res: Response) => {
 
 export const getAccounts = async (req: Request, res: Response) => {
   try {
-    const r = await pool.query(
+    const r = await req.dbClient!.query(
       `SELECT
          a.id,
          a.bank_id,
@@ -87,8 +87,8 @@ export const deleteAccount = async (req: Request, res: Response) => {
   const { id } = req.params
 
   try {
-    // Check if account exists
-    const checkResult = await pool.query(
+    const client = req.dbClient!
+    const checkResult = await client.query(
       'SELECT account_number, bank_id, is_active FROM company_bank_accounts WHERE id = $1',
       [id]
     )
@@ -103,13 +103,12 @@ export const deleteAccount = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'account_already_deleted' })
     }
 
-    // Soft delete - set is_active to false
-    await pool.query(
+    await client.query(
       'UPDATE company_bank_accounts SET is_active = FALSE WHERE id = $1',
       [id]
     )
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: 'account_deleted',
       account_number: account.account_number
     })

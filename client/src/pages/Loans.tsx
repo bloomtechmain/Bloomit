@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config/api'
 import { Plus, DollarSign, TrendingUp, CheckCircle } from 'lucide-react'
+import { useToast } from '../context/ToastContext'
 
 type Loan = {
   id: number
@@ -46,6 +47,7 @@ type AmortizationScheduleItem = {
 }
 
 export default function Loans() {
+  const { toast } = useToast()
   const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -104,9 +106,9 @@ export default function Loans() {
   }, [fetchLoans])
 
   const handleCreateLoan = async () => {
-    if (!loanAccountNumber || !borrowerName || !bankName || !loanAmount || 
+    if (!loanAccountNumber || !borrowerName || !bankName || !loanAmount ||
         !totalInstallments || !monthlyInstallmentAmount || !startDate) {
-      alert('Please fill in all required fields')
+      toast.error('Please fill in all required fields')
       return
     }
 
@@ -134,17 +136,17 @@ export default function Loans() {
       })
 
       if (r.ok) {
-        alert('Loan created successfully!')
+        toast.success('Loan created successfully!')
         setAddModalOpen(false)
         resetForm()
         fetchLoans()
       } else {
         const error = await r.json()
-        alert(error.error || 'Failed to create loan')
+        toast.error(error.error || 'Failed to create loan')
       }
     } catch (err) {
       console.error('Error creating loan:', err)
-      alert('Error creating loan')
+      toast.error('Error creating loan')
     } finally {
       setSaving(false)
     }
@@ -210,7 +212,7 @@ export default function Loans() {
 
   const handleRecordPayment = async () => {
     if (!selectedLoan || !selectedInstallment || !paymentDate || !amountPaid) {
-      alert('Please fill in all required fields')
+      toast.error('Please fill in all required fields')
       return
     }
 
@@ -233,7 +235,7 @@ export default function Loans() {
       })
 
       if (r.ok) {
-        alert('Payment recorded successfully!')
+        toast.success('Payment recorded successfully!')
         setPaymentModalOpen(false)
         setSelectedInstallment(null)
         setPaymentDate('')
@@ -247,11 +249,11 @@ export default function Loans() {
         fetchLoans()
       } else {
         const error = await r.json()
-        alert(error.error || 'Failed to record payment')
+        toast.error(error.error || 'Failed to record payment')
       }
     } catch (err) {
       console.error('Error recording payment:', err)
-      alert('Error recording payment')
+      toast.error('Error recording payment')
     } finally {
       setSaving(false)
     }

@@ -6,12 +6,11 @@ async function grantLoansPermissions() {
         console.log('🔄 Setting up loans permissions...');
         // Create permissions for loans module
         const permissions = [
-            { resource: 'loans', action: 'view' },
+            { resource: 'loans', action: 'read' },
             { resource: 'loans', action: 'create' },
             { resource: 'loans', action: 'update' },
             { resource: 'loans', action: 'delete' },
-            { resource: 'loans', action: 'manage_installments' },
-            { resource: 'loans', action: 'export_reports' }
+            { resource: 'loans', action: 'manage_installments' }
         ];
         const permissionIds = [];
         for (const perm of permissions) {

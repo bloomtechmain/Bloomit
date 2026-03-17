@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { deleteQuote } from '../../services/quotesApi'
+import { useToast } from '../../context/ToastContext'
 
 interface QuoteDeleteModalProps {
   quoteId: number
@@ -10,18 +11,18 @@ interface QuoteDeleteModalProps {
 
 const QuoteDeleteModal: React.FC<QuoteDeleteModalProps> = ({ quoteId, quoteNumber, onClose, onSuccess }) => {
   const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const handleDelete = async () => {
-    setError(null)
     setDeleting(true)
 
     try {
       await deleteQuote(quoteId)
+      toast.success('Quote deleted successfully')
       onSuccess()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to delete quote')
       setDeleting(false)
     }
   }
@@ -101,12 +102,6 @@ const QuoteDeleteModal: React.FC<QuoteDeleteModalProps> = ({ quoteId, quoteNumbe
 
         {/* Content */}
         <div style={{ padding: 32 }}>
-          {error && (
-            <div style={{ padding: '16px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', marginBottom: 24 }}>
-              {error}
-            </div>
-          )}
-
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>⚠️</div>
             <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 16px 0', color: '#fff' }}>

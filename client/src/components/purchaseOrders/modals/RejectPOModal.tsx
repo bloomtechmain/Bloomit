@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
 
 interface RejectPOModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const RejectPOModal: React.FC<RejectPOModalProps> = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const { toast } = useToast();
 
   const MIN_REASON_LENGTH = 10;
 
@@ -56,13 +58,14 @@ const RejectPOModal: React.FC<RejectPOModalProps> = ({
     setIsSubmitting(true);
     try {
       await onReject(poId, rejectionReason.trim());
+      toast.success('Purchase order rejected successfully');
       // Reset state on success
       setRejectionReason('');
       setValidationError('');
       onClose();
     } catch (error) {
       console.error('Error rejecting PO:', error);
-      setValidationError('Failed to reject purchase order. Please try again.');
+      toast.error('Failed to reject purchase order. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

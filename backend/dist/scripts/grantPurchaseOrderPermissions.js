@@ -5,9 +5,9 @@ async function main() {
     console.log('🛒 Adding Purchase Order permissions to RBAC...');
     // Define purchase order permissions
     const purchaseOrderPermissions = [
-        { resource: 'purchase_orders', action: 'view', description: 'View purchase orders' },
+        { resource: 'purchase_orders', action: 'read', description: 'View purchase orders' },
         { resource: 'purchase_orders', action: 'create', description: 'Create new purchase orders' },
-        { resource: 'purchase_orders', action: 'edit', description: 'Edit purchase orders (pending only)' },
+        { resource: 'purchase_orders', action: 'update', description: 'Edit purchase orders (pending only)' },
         { resource: 'purchase_orders', action: 'approve', description: 'Approve purchase orders' },
         { resource: 'purchase_orders', action: 'reject', description: 'Reject purchase orders' },
         { resource: 'purchase_orders', action: 'upload_receipt', description: 'Upload receipt documents' },
@@ -57,44 +57,44 @@ async function main() {
     console.log('🔗 Assigning purchase order permissions to roles...');
     // Super Admin - All permissions
     await assignPermissions('Super Admin', [
-        'purchase_orders:view',
+        'purchase_orders:read',
         'purchase_orders:create',
-        'purchase_orders:edit',
+        'purchase_orders:update',
         'purchase_orders:approve',
         'purchase_orders:reject',
         'purchase_orders:upload_receipt',
     ]);
     // Admin - All permissions
     await assignPermissions('Admin', [
-        'purchase_orders:view',
+        'purchase_orders:read',
         'purchase_orders:create',
-        'purchase_orders:edit',
+        'purchase_orders:update',
         'purchase_orders:approve',
         'purchase_orders:reject',
         'purchase_orders:upload_receipt',
     ]);
-    // Accountant - View, create, edit, upload receipt (but not approve/reject)
+    // Accountant - View, create, update, upload receipt (but not approve/reject)
     await assignPermissions('Accountant', [
-        'purchase_orders:view',
+        'purchase_orders:read',
         'purchase_orders:create',
-        'purchase_orders:edit',
+        'purchase_orders:update',
         'purchase_orders:upload_receipt',
     ]);
-    // Project Manager - View, create, edit, upload receipt
+    // Project Manager - View, create, update, upload receipt
     await assignPermissions('Project Manager', [
-        'purchase_orders:view',
+        'purchase_orders:read',
         'purchase_orders:create',
-        'purchase_orders:edit',
+        'purchase_orders:update',
         'purchase_orders:upload_receipt',
     ]);
     // Employee - View and create only (can create requests for approval)
     await assignPermissions('Employee', [
-        'purchase_orders:view',
+        'purchase_orders:read',
         'purchase_orders:create',
     ]);
     // Viewer - View only
     await assignPermissions('Viewer', [
-        'purchase_orders:view',
+        'purchase_orders:read',
     ]);
     console.log('🎉 Purchase Order permissions setup completed successfully!');
     console.log(`

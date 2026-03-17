@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { ContractItem } from '../types/projects'
 import { itemsApi } from '../services/projectsApi'
+import { useToast } from '../context/ToastContext'
 
 interface ItemModalProps {
   isOpen: boolean
@@ -29,7 +30,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
     requirement_type: 'Initial Requirement' as 'Initial Requirement' | 'Additional Requirement'
   })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (mode === 'edit' && item) {
@@ -47,24 +48,22 @@ export const ItemModal: React.FC<ItemModalProps> = ({
         requirement_type: 'Initial Requirement'
       })
     }
-    setError(null)
   }, [mode, item, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     // Validation
     if (!formData.requirements.trim()) {
-      setError('Requirements field is required')
+      toast.error('Requirements field is required')
       return
     }
     if (!formData.service_category.trim()) {
-      setError('Service category is required')
+      toast.error('Service category is required')
       return
     }
     if (!formData.unit_cost || isNaN(Number(formData.unit_cost)) || Number(formData.unit_cost) < 0) {
-      setError('Please enter a valid unit cost')
+      toast.error('Please enter a valid unit cost')
       return
     }
 
@@ -86,11 +85,12 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       }
 
       // Call onSuccess to trigger parent refresh
+      toast.success(mode === 'create' ? 'Item added successfully' : 'Item updated successfully')
       onSuccess()
       onClose()
     } catch (err: any) {
       console.error('Error saving item:', err)
-      setError(err.response?.data?.message || 'Failed to save item')
+      toast.error(err.response?.data?.message || 'Failed to save item')
     } finally {
       setLoading(false)
     }
@@ -172,22 +172,6 @@ export const ItemModal: React.FC<ItemModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {error && (
-            <div
-              style={{
-                padding: '0.75rem',
-                backgroundColor: '#fee2e2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#dc2626',
-                marginBottom: '1rem',
-                fontSize: '0.875rem'
-              }}
-            >
-              {error}
-            </div>
-          )}
-
           {/* Requirements */}
           <div style={{ marginBottom: '1.25rem' }}>
             <label

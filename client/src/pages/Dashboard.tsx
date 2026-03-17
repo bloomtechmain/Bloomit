@@ -19,6 +19,8 @@ import PurchaseOrders from './PurchaseOrders'
 import Payroll from './Payroll'
 import Loans from './Loans'
 import { LayoutDashboard, Users, ClipboardList, Store, FolderOpen, Banknote, Landmark, Receipt, Coins, Inbox, Plus, PlusCircle, CreditCard, Building2, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Settings as SettingsIcon, Clock, Calendar, Repeat, FileText, FileSignature, ShoppingCart, DollarSign, TrendingDown } from 'lucide-react'
+import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 
 type User = { 
   id: number
@@ -168,6 +170,8 @@ export default function Dashboard({
 }) {
   console.log('Dashboard render start', { user })
   const isAdmin = user.roleNames?.includes('Admin') || user.roleNames?.includes('Super Admin') || user.roleName === 'Admin' || user.roleName === 'Super Admin'
+  const { toast } = useToast()
+  const confirm = useConfirm()
   const [tab, setTab] = useState<'home' | 'employees' | 'projects' | 'accounting' | 'analytics' | 'documents' | 'quotes' | 'settings'>('home')
   const [navOpen, setNavOpen] = useState(true)
   const [projectSubTab, setProjectSubTab] = useState<'projects' | 'time' | 'quotes'>('projects')
@@ -503,10 +507,11 @@ export default function Dashboard({
   }, [])
 
   const handleDeleteAccount = async (accountId: number, accountNumber: string) => {
-    if (!confirm(`Are you sure you want to delete account ${accountNumber}?\n\nThis will hide it from view but preserve all historical data.`)) {
+    const confirmed = await confirm(`Are you sure you want to delete account ${accountNumber}? This will hide it from view but preserve all historical data.`, { destructive: true })
+    if (!confirmed) {
       return
     }
-    
+
     try {
       const response = await fetch(`${API_URL}/accounts/${accountId}`, {
         method: 'DELETE',
@@ -515,17 +520,17 @@ export default function Dashboard({
           'Content-Type': 'application/json'
         }
       })
-      
+
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error.error || 'Failed to delete account')
       }
-      
-      alert('Account deleted successfully (soft delete - hidden from view)')
+
+      toast.success('Account deleted successfully')
       fetchAccounts()
     } catch (error) {
       console.error('Error deleting account:', error)
-      alert(`Failed to delete account: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to delete account: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -737,6 +742,9 @@ export default function Dashboard({
           is_active: v.is_active === true || v.is_active === 1 || v.is_active === '1' || v.is_active === 'true'
         }))
         setVendors(normalizedVendors)
+      } else {
+        const errData = await r.json().catch(() => ({}))
+        console.error('fetchVendors failed:', r.status, errData)
       }
     } catch (e) {
       console.error('Failed to fetch vendors', e)
@@ -752,7 +760,7 @@ export default function Dashboard({
   }, [tab, employeeSubTab, fetchVendors])
 
   const handleSaveVendor = async () => {
-    if (!vendorName) return alert('Vendor Name is required')
+    if (!vendorName) { toast.error('Vendor Name is required'); return }
     setSaving(true)
     try {
       const r = await fetch(`${API_URL}/vendors`, {
@@ -776,11 +784,11 @@ export default function Dashboard({
         setIsAddingVendor(false)
         fetchVendors()
       } else {
-        alert('Failed to create vendor')
+        toast.error('Failed to create vendor')
       }
     } catch (e) {
       console.error(e)
-      alert('Error creating vendor')
+      toast.error('Error creating vendor')
     } finally {
       setSaving(false)
     }
@@ -826,7 +834,7 @@ export default function Dashboard({
     // Validation
     if (billType === 'PETTY_CASH') {
       if (!billAmount) {
-        alert('Missing required fields: Amount')
+        toast.error('Missing required fields: Amount')
         return
       }
       // Handle Petty Cash Bill separately
@@ -855,18 +863,18 @@ export default function Dashboard({
           fetchPettyCashBalance()
           fetchPettyCashTransactions()
         } else {
-          alert('Failed to add petty cash bill')
+          toast.error('Failed to add petty cash bill')
         }
       } catch (e) {
         console.error(e)
-        alert('Error adding petty cash bill')
+        toast.error('Error adding petty cash bill')
       } finally {
         setSaving(false)
       }
       return
     } else {
       if (!billVendorId || !billName || !billType || !billAmount) {
-        alert('Missing required fields')
+        toast.error('Missing required fields')
         return
       }
     }
@@ -916,11 +924,13 @@ export default function Dashboard({
           fetchPettyCashBalance()
         }
       } else {
-        alert('Failed to create bill')
+        const errData = await r.json().catch(() => ({})) as { error?: string }
+        console.error('Payables 500 error:', errData)
+        toast.error(errData.error || 'Failed to create bill')
       }
     } catch (e) {
       console.error(e)
-      alert('Error creating bill')
+      toast.error('Error creating bill')
     } finally {
       setSaving(false)
     }
@@ -959,7 +969,7 @@ export default function Dashboard({
   const saveProjectItem = async () => {
     if (!currentProjectForItems) return
     if (!itemRequirements || !itemServiceCategory || itemUnitCost === '' || !itemRequirementType) {
-      alert('Missing required fields for item')
+      toast.error('Missing required fields for item')
       return
     }
     const body = {
@@ -981,10 +991,10 @@ export default function Dashboard({
         })
         if (!r.ok) {
           const d = await r.json().catch(() => ({}))
-          alert(d.error || 'Failed to update item')
+          toast.error(d.error || 'Failed to update item')
           return
         }
-        alert('Item updated')
+        toast.success('Item updated')
       } else {
         const r = await fetch(`http://localhost:3000/projects/${currentProjectForItems.project_id}/items`, {
           method: 'POST',
@@ -993,17 +1003,17 @@ export default function Dashboard({
         })
         if (!r.ok) {
           const d = await r.json().catch(() => ({}))
-          alert(d.error || 'Failed to create item')
+          toast.error(d.error || 'Failed to create item')
           return
         }
-        alert('Item created')
+        toast.success('Item created')
       }
       clearItemForm()
       await fetchProjects()
       await fetchProjectItems()
     } catch (err) {
       console.error(err)
-      alert('Server error')
+      toast.error('Server error')
     }
   }
 
@@ -1011,7 +1021,7 @@ export default function Dashboard({
 
   const handleSaveReceivable = async () => {
     if (!receivablePayerName || !receivableName || !receivableAmount) {
-      alert('Missing required fields')
+      toast.error('Missing required fields')
       return
     }
 
@@ -1057,11 +1067,11 @@ export default function Dashboard({
         setIsAddingReceivable(false)
         fetchReceivables()
       } else {
-        alert('Failed to create receivable')
+        toast.error('Failed to create receivable')
       }
     } catch (e) {
       console.error(e)
-      alert('Error creating receivable')
+      toast.error('Error creating receivable')
     } finally {
       setSaving(false)
     }
@@ -1078,12 +1088,12 @@ export default function Dashboard({
 
   const saveOpenAccount = async () => {
     if (!bankName || !branch || !accountNumber || !accountName || openingBalance === '') {
-      alert('Missing required fields')
+      toast.error('Missing required fields')
       return
     }
     const openingBalanceNum = Number(openingBalance)
     if (Number.isNaN(openingBalanceNum)) {
-      alert('Opening balance must be a number')
+      toast.error('Opening balance must be a number')
       return
     }
     setSaving(true)
@@ -1104,12 +1114,13 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const d = await r.json().catch(() => ({}))
-        alert(d.error || 'Failed to open account')
+        toast.error(d.error || 'Failed to open account')
         return
       }
-      alert('Account created')
+      toast.success('Account created')
       setOpenAccountModalOpen(false)
       resetOpenAccountForm()
+      fetchAccounts()
     } finally {
       setSaving(false)
     }
@@ -1162,7 +1173,7 @@ export default function Dashboard({
 
   const addEmployee = async () => {
     if (!employeeNumber || !firstName || !lastName || !email || !phone || !role) {
-      alert('Missing required fields')
+      toast.error('Missing required fields')
       return
     }
     setSaving(true)
@@ -1189,10 +1200,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to add employee')
+        toast.error(data.error || 'Failed to add employee')
         return
       }
-      alert('Employee added')
+      toast.success('Employee added')
       setAddOpen(false)
       resetForm()
       await fetchEmployees()
@@ -1203,7 +1214,7 @@ export default function Dashboard({
 
   const updateEmployee = async () => {
     if (!editingEmployee || !employeeNumber || !firstName || !lastName || !email || !phone || !role) {
-      alert('Missing required fields')
+      toast.error('Missing required fields')
       return
     }
     setSaving(true)
@@ -1230,10 +1241,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to update employee')
+        toast.error(data.error || 'Failed to update employee')
         return
       }
-      alert('Employee updated')
+      toast.success('Employee updated')
       setEditOpen(false)
       resetForm()
       await fetchEmployees()
@@ -1254,10 +1265,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to delete employee')
+        toast.error(data.error || 'Failed to delete employee')
         return
       }
-      alert('Employee deleted')
+      toast.success('Employee deleted')
       setDeleteOpen(false)
       setDeletingEmployee(null)
       await fetchEmployees()
@@ -1268,12 +1279,12 @@ export default function Dashboard({
 
   const addProject = async () => {
     if (!projectName || !customerName || initialCostBudget === '' || !projectStatus) {
-      alert('Missing required fields')
+      toast.error('Missing required fields')
       return
     }
     const initialBudgetNum = Number(initialCostBudget)
     if (Number.isNaN(initialBudgetNum)) {
-      alert('Budget fields must be numbers')
+      toast.error('Budget fields must be numbers')
       return
     }
     setSaving(true)
@@ -1296,10 +1307,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to add project')
+        toast.error(data.error || 'Failed to add project')
         return
       }
-      alert('Project added')
+      toast.success('Project added')
       setProjectModalOpen(false)
       resetProjectForm()
       await fetchProjects()
@@ -1317,10 +1328,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to delete project')
+        toast.error(data.error || 'Failed to delete project')
         return
       }
-      alert('Project deleted')
+      toast.success('Project deleted')
       setProjectDeleteModalOpen(false)
       setDeletingProject(null)
       await fetchProjects()
@@ -1331,7 +1342,7 @@ export default function Dashboard({
 
   const handleReplenish = async () => {
     if (!replenishAmount || isNaN(Number(replenishAmount)) || Number(replenishAmount) <= 0) {
-      alert('Please enter a valid amount')
+      toast.error('Please enter a valid amount')
       return
     }
     setSaving(true)
@@ -1350,10 +1361,10 @@ export default function Dashboard({
       })
       if (!r.ok) {
         const data = await r.json().catch(() => ({}))
-        alert(data.error || 'Failed to replenish petty cash')
+        toast.error(data.error || 'Failed to replenish petty cash')
         return
       }
-      alert('Petty cash replenished successfully')
+      toast.success('Petty cash replenished successfully')
       setIsReplenishing(false)
       setReplenishAmount('')
       setReplenishSourceAccountId('')
@@ -1361,7 +1372,7 @@ export default function Dashboard({
       fetchPettyCashBalance()
     } catch (err) {
       console.error('Error replenishing:', err)
-      alert('Error replenishing petty cash')
+      toast.error('Error replenishing petty cash')
     } finally {
       setSaving(false)
     }
@@ -1372,7 +1383,7 @@ export default function Dashboard({
     
     // Validation for depreciable assets
     if (isDepreciable && (!salvageValue || !usefulLife)) {
-      alert('Please provide salvage value and useful life for depreciable assets')
+      toast.error('Please provide salvage value and useful life for depreciable assets')
       return
     }
     
@@ -1408,11 +1419,11 @@ export default function Dashboard({
         setUsefulLife('')
         fetchAssets()
       } else {
-        alert('Failed to save asset')
+        toast.error('Failed to save asset')
       }
     } catch (e) {
       console.error(e)
-      alert('Error saving asset')
+      toast.error('Error saving asset')
     }
   }
 
@@ -2922,7 +2933,8 @@ export default function Dashboard({
                         setItemsTableModalOpen(false)
                       }} className="btn-primary" style={{ padding: '4px 8px', fontSize: 12 }}>Edit</button>
                       <button onClick={async () => {
-                        if (!confirm('Delete item?')) return
+                        const confirmed = await confirm('Delete item?', { destructive: true })
+                        if (!confirmed) return
                         try {
                           const r = await fetch(`http://localhost:3000/projects/${item.project_id}/items/${encodeURIComponent(item.requirements)}`, { method: 'DELETE' })
                           if (r.ok) {

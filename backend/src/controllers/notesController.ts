@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 // Get all notes for a user (including shared notes)
 export const getNotes = async (req: Request, res: Response) => {
@@ -10,10 +9,10 @@ export const getNotes = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'user_id is required' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `
       SELECT DISTINCT n.*, u.name as owner_name,
-        CASE 
+        CASE
           WHEN n.user_id = $1 THEN 'owner'
           ELSE ns.permission
         END as access_level
@@ -42,7 +41,7 @@ export const createNote = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'user_id and title are required' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `
       INSERT INTO notes (user_id, title, content, color, is_pinned)
       VALUES ($1, $2, $3, $4, $5)
@@ -69,7 +68,7 @@ export const updateNote = async (req: Request, res: Response) => {
     }
 
     // Check if user has write permission
-    const permCheck = await pool.query(
+    const permCheck = await req.dbClient!.query(
       `
       SELECT n.user_id, ns.permission
       FROM notes n
@@ -90,7 +89,7 @@ export const updateNote = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'No permission to edit this note' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `
       UPDATE notes
       SET title = $1, content = $2, color = $3, is_pinned = $4, updated_at = CURRENT_TIMESTAMP
@@ -117,7 +116,7 @@ export const deleteNote = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'user_id is required' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `
       DELETE FROM notes
       WHERE id = $1 AND user_id = $2
@@ -148,7 +147,7 @@ export const shareNote = async (req: Request, res: Response) => {
     }
 
     // Check if user owns the note
-    const noteCheck = await pool.query(
+    const noteCheck = await req.dbClient!.query(
       'SELECT user_id FROM notes WHERE id = $1',
       [id]
     )
@@ -161,11 +160,11 @@ export const shareNote = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Only the owner can share notes' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `
       INSERT INTO note_shares (note_id, shared_with_user_id, permission)
       VALUES ($1, $2, $3)
-      ON CONFLICT (note_id, shared_with_user_id) 
+      ON CONFLICT (note_id, shared_with_user_id)
       DO UPDATE SET permission = $3
       RETURNING *
       `,
@@ -190,7 +189,7 @@ export const unshareNote = async (req: Request, res: Response) => {
     }
 
     // Check if user owns the note
-    const noteCheck = await pool.query(
+    const noteCheck = await req.dbClient!.query(
       'SELECT user_id FROM notes WHERE id = $1',
       [id]
     )
@@ -203,7 +202,7 @@ export const unshareNote = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Only the owner can manage shares' })
     }
 
-    await pool.query(
+    await req.dbClient!.query(
       'DELETE FROM note_shares WHERE id = $1 AND note_id = $2',
       [shareId, id]
     )
@@ -226,7 +225,7 @@ export const getNoteShares = async (req: Request, res: Response) => {
     }
 
     // Check if user owns the note
-    const noteCheck = await pool.query(
+    const noteCheck = await req.dbClient!.query(
       'SELECT user_id FROM notes WHERE id = $1',
       [id]
     )
@@ -239,7 +238,7 @@ export const getNoteShares = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Only the owner can view shares' })
     }
 
-    const result = await pool.query(
+    const result = await req.dbClient!.query(
       `SELECT ns.id, ns.note_id, ns.shared_with_user_id, ns.permission, ns.created_at,
               u.name as user_name, u.email as user_email
        FROM note_shares ns

@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDebitCards = exports.createDebitCard = void 0;
-const db_1 = require("../db");
 const createDebitCard = async (req, res) => {
     const { bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active } = req.body ?? {};
     if (!bank_account_id || !card_number_last4 || !card_holder_name || !expiry_date || is_active === undefined) {
@@ -21,12 +20,13 @@ const createDebitCard = async (req, res) => {
     if (Number.isNaN(expDateCheck.getTime())) {
         return res.status(400).json({ error: 'invalid_expiry_date' });
     }
+    const client = req.dbClient;
     try {
-        const acc = await db_1.pool.query('SELECT id FROM company_bank_accounts WHERE id=$1', [bank_account_id]);
+        const acc = await client.query('SELECT id FROM company_bank_accounts WHERE id=$1', [bank_account_id]);
         if (!acc.rows.length) {
             return res.status(404).json({ error: 'bank_account_not_found' });
         }
-        const r = await db_1.pool.query(`INSERT INTO debit_cards (bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active)
+        const r = await client.query(`INSERT INTO debit_cards (bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active, created_at`, [bank_account_id, String(card_number_last4), String(card_holder_name), expDateStr, Boolean(is_active)]);
         return res.status(201).json({ card: r.rows[0] });
@@ -39,7 +39,7 @@ const createDebitCard = async (req, res) => {
 exports.createDebitCard = createDebitCard;
 const getDebitCards = async (req, res) => {
     try {
-        const r = await db_1.pool.query(`SELECT id, bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active, created_at
+        const r = await req.dbClient.query(`SELECT id, bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active, created_at
        FROM debit_cards
        ORDER BY created_at DESC`);
         return res.json({ cards: r.rows });

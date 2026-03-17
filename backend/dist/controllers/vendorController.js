@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createVendor = exports.getAllVendors = void 0;
-const db_1 = require("../db");
 const getAllVendors = async (req, res) => {
     try {
         const query = `
@@ -9,7 +8,7 @@ const getAllVendors = async (req, res) => {
       FROM vendors
       ORDER BY created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ vendors: result.rows });
     }
     catch (err) {
@@ -30,7 +29,7 @@ const createVendor = async (req, res) => {
       RETURNING vendor_id, vendor_name, contact_email, contact_phone, is_active, created_at
     `;
         const values = [vendor_name, contact_email || null, contact_phone || null, is_active ?? true];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         return res.status(201).json({ vendor: result.rows[0] });
     }
     catch (err) {

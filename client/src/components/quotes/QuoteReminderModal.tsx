@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Bell, Calendar, X, User } from 'lucide-react'
 import { scheduleReminder } from '../../services/quotesApi'
 import { getAllEmployees, type Employee } from '../../services/employeesApi'
+import { useToast } from '../../context/ToastContext'
 
 interface QuoteReminderModalProps {
   quoteId: number
@@ -26,7 +27,7 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   // Fetch employees when modal opens
   useEffect(() => {
@@ -50,10 +51,9 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     if (!reminderDate) {
-      setError('Reminder date is required')
+      toast.error('Reminder date is required')
       return
     }
 
@@ -62,7 +62,7 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
     today.setHours(0, 0, 0, 0)
 
     if (selectedDate < today) {
-      setError('Reminder date cannot be in the past')
+      toast.error('Reminder date cannot be in the past')
       return
     }
 
@@ -76,6 +76,8 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
         assigned_to: assignedTo || undefined
       })
 
+      toast.success('Follow-up reminder scheduled successfully')
+
       if (onSuccess) {
         onSuccess()
       }
@@ -86,7 +88,7 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
       setAssignedTo('')
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to schedule reminder')
+      toast.error(err instanceof Error ? err.message : 'Failed to schedule reminder')
     } finally {
       setLoading(false)
     }
@@ -158,23 +160,6 @@ const QuoteReminderModal: React.FC<QuoteReminderModalProps> = ({
             <X size={20} />
           </button>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid #ef4444',
-              color: '#ef4444',
-              fontSize: 14
-            }}
-          >
-            {error}
-          </div>
-        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit}>

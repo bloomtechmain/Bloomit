@@ -1,11 +1,10 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 // Helper to get date ranges
 const getDateRange = (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  
+
   switch (period) {
     case 'daily':
       return {
@@ -38,8 +37,8 @@ export const getProjectProfitability = async (req: Request, res: Response) => {
   try {
     // Get all contracts first
     const contractsQuery = `SELECT * FROM contracts ORDER BY contract_id DESC`
-    const contractsResult = await pool.query(contractsQuery)
-    
+    const contractsResult = await req.dbClient!.query(contractsQuery)
+
     // Get receivables by contract
     const receivablesQuery = `
       SELECT contract_id, SUM(amount) as total_revenue
@@ -47,9 +46,9 @@ export const getProjectProfitability = async (req: Request, res: Response) => {
       WHERE is_active = true AND contract_id IS NOT NULL
       GROUP BY contract_id
     `
-    const receivablesResult = await pool.query(receivablesQuery)
+    const receivablesResult = await req.dbClient!.query(receivablesQuery)
     const receivablesMap = new Map(receivablesResult.rows.map(r => [r.contract_id, Number(r.total_revenue)]))
-    
+
     // Get payables by contract
     const payablesQuery = `
       SELECT contract_id, SUM(amount) as total_costs
@@ -57,18 +56,18 @@ export const getProjectProfitability = async (req: Request, res: Response) => {
       WHERE is_active = true AND contract_id IS NOT NULL
       GROUP BY contract_id
     `
-    const payablesResult = await pool.query(payablesQuery)
+    const payablesResult = await req.dbClient!.query(payablesQuery)
     const payablesMap = new Map(payablesResult.rows.map(p => [p.contract_id, Number(p.total_costs)]))
-    
+
     // Get contract items by contract
     const itemsQuery = `
       SELECT contract_id, SUM(unit_cost) as total_items_cost
       FROM contract_items
       GROUP BY contract_id
     `
-    const itemsResult = await pool.query(itemsQuery)
+    const itemsResult = await req.dbClient!.query(itemsQuery)
     const itemsMap = new Map(itemsResult.rows.map(i => [i.contract_id, Number(i.total_items_cost)]))
-    
+
     // Calculate margins and variances
     const contractsWithMetrics = contractsResult.rows.map(contract => {
       const revenue = receivablesMap.get(contract.contract_id) || 0
@@ -129,8 +128,8 @@ export const getARAgingReport = async (req: Request, res: Response) => {
   try {
     // Get aging buckets
     const agingQuery = `
-      SELECT 
-        CASE 
+      SELECT
+        CASE
           WHEN CURRENT_DATE - created_at::date <= 30 THEN '0-30 days'
           WHEN CURRENT_DATE - created_at::date <= 60 THEN '31-60 days'
           WHEN CURRENT_DATE - created_at::date <= 90 THEN '61-90 days'
@@ -141,28 +140,28 @@ export const getARAgingReport = async (req: Request, res: Response) => {
         AVG(CURRENT_DATE - created_at::date) as avg_days
       FROM receivables
       WHERE is_active = true
-      GROUP BY 
-        CASE 
+      GROUP BY
+        CASE
           WHEN CURRENT_DATE - created_at::date <= 30 THEN '0-30 days'
           WHEN CURRENT_DATE - created_at::date <= 60 THEN '31-60 days'
           WHEN CURRENT_DATE - created_at::date <= 90 THEN '61-90 days'
           ELSE '90+ days'
         END
-      ORDER BY 
-        CASE 
-          WHEN CASE 
+      ORDER BY
+        CASE
+          WHEN CASE
             WHEN CURRENT_DATE - created_at::date <= 30 THEN '0-30 days'
             WHEN CURRENT_DATE - created_at::date <= 60 THEN '31-60 days'
             WHEN CURRENT_DATE - created_at::date <= 90 THEN '61-90 days'
             ELSE '90+ days'
           END = '0-30 days' THEN 1
-          WHEN CASE 
+          WHEN CASE
             WHEN CURRENT_DATE - created_at::date <= 30 THEN '0-30 days'
             WHEN CURRENT_DATE - created_at::date <= 60 THEN '31-60 days'
             WHEN CURRENT_DATE - created_at::date <= 90 THEN '61-90 days'
             ELSE '90+ days'
           END = '31-60 days' THEN 2
-          WHEN CASE 
+          WHEN CASE
             WHEN CURRENT_DATE - created_at::date <= 30 THEN '0-30 days'
             WHEN CURRENT_DATE - created_at::date <= 60 THEN '31-60 days'
             WHEN CURRENT_DATE - created_at::date <= 90 THEN '61-90 days'
@@ -171,32 +170,32 @@ export const getARAgingReport = async (req: Request, res: Response) => {
           ELSE 4
         END
     `
-    
-    const agingResult = await pool.query(agingQuery)
+
+    const agingResult = await req.dbClient!.query(agingQuery)
 
     // Calculate DSO (Days Sales Outstanding)
     const dsoQuery = `
-      SELECT 
+      SELECT
         COALESCE(SUM(amount), 0) as total_receivables,
         COALESCE(AVG(CURRENT_DATE - created_at::date), 0) as avg_days_outstanding
       FROM receivables
       WHERE is_active = true
     `
-    
-    const dsoResult = await pool.query(dsoQuery)
-    
+
+    const dsoResult = await req.dbClient!.query(dsoQuery)
+
     // Get total revenue for DSO calculation
     const revenueQuery = `
       SELECT COALESCE(SUM(amount), 0) as total_revenue
       FROM receivables
       WHERE is_active = true
     `
-    const revenueResult = await pool.query(revenueQuery)
-    
+    const revenueResult = await req.dbClient!.query(revenueQuery)
+
     const totalReceivables = Number(dsoResult.rows[0]?.total_receivables) || 0
     const totalRevenue = Number(revenueResult.rows[0]?.total_revenue) || 0
     const avgDaysOutstanding = Number(dsoResult.rows[0]?.avg_days_outstanding) || 0
-    
+
     // DSO calculation: (Total Receivables / Total Revenue) * 365
     const dso = totalRevenue > 0 ? (totalReceivables / totalRevenue) * 365 : avgDaysOutstanding
 
@@ -221,7 +220,7 @@ export const getARAgingReport = async (req: Request, res: Response) => {
 export const getRecurringRevenue = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         frequency,
         SUM(amount) as total_amount,
         COUNT(*) as count
@@ -229,18 +228,18 @@ export const getRecurringRevenue = async (req: Request, res: Response) => {
       WHERE receivable_type = 'RECURRING' AND is_active = true
       GROUP BY frequency
     `
-    
-    const result = await pool.query(query)
-    
+
+    const result = await req.dbClient!.query(query)
+
     // Calculate MRR (normalize all to monthly)
     let mrr = 0
     const breakdown: any[] = []
-    
+
     result.rows.forEach(row => {
       const amount = Number(row.total_amount) || 0
       const count = Number(row.count)
       let monthlyAmount = 0
-      
+
       switch (row.frequency) {
         case 'WEEKLY':
           monthlyAmount = amount * 4.33 // Average weeks per month
@@ -254,7 +253,7 @@ export const getRecurringRevenue = async (req: Request, res: Response) => {
         default:
           monthlyAmount = amount
       }
-      
+
       mrr += monthlyAmount
       breakdown.push({
         frequency: row.frequency,
@@ -263,7 +262,7 @@ export const getRecurringRevenue = async (req: Request, res: Response) => {
         monthly_normalized: monthlyAmount
       })
     })
-    
+
     const arr = mrr * 12
 
     return res.json({
@@ -281,7 +280,7 @@ export const getRecurringRevenue = async (req: Request, res: Response) => {
 export const getSalesPipeline = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         contract_id,
         contract_name,
         customer_name,
@@ -291,10 +290,10 @@ export const getSalesPipeline = async (req: Request, res: Response) => {
       WHERE status = 'pending'
       ORDER BY (initial_cost_budget + extra_budget_allocation) DESC
     `
-    
-    const result = await pool.query(query)
-    
-    const totalValue = result.rows.reduce((sum, contract) => 
+
+    const result = await req.dbClient!.query(query)
+
+    const totalValue = result.rows.reduce((sum, contract) =>
       sum + Number(contract.estimated_value), 0
     )
 
@@ -324,36 +323,36 @@ export const getProfitLoss = async (req: Request, res: Response) => {
       FROM receivables
       WHERE is_active = true
     `
-    const revenueResult = await pool.query(revenueQuery)
-    
+    const revenueResult = await req.dbClient!.query(revenueQuery)
+
     // Contract Costs
     const contractCostsQuery = `
       SELECT COALESCE(SUM(amount), 0) as contract_costs
       FROM payables
       WHERE contract_id IS NOT NULL AND is_active = true
     `
-    const contractCostsResult = await pool.query(contractCostsQuery)
-    
+    const contractCostsResult = await req.dbClient!.query(contractCostsQuery)
+
     // Operating Costs (non-contract payables)
     const operatingCostsQuery = `
       SELECT COALESCE(SUM(amount), 0) as operating_costs
       FROM payables
       WHERE contract_id IS NULL AND is_active = true
     `
-    const operatingCostsResult = await pool.query(operatingCostsQuery)
-    
+    const operatingCostsResult = await req.dbClient!.query(operatingCostsQuery)
+
     // Contract items costs
     const itemsCostsQuery = `
       SELECT COALESCE(SUM(unit_cost), 0) as items_costs
       FROM contract_items
     `
-    const itemsCostsResult = await pool.query(itemsCostsQuery)
-    
+    const itemsCostsResult = await req.dbClient!.query(itemsCostsQuery)
+
     const totalRevenue = Number(revenueResult.rows[0]?.total_revenue) || 0
     const contractCosts = Number(contractCostsResult.rows[0]?.contract_costs) || 0
     const operatingCosts = Number(operatingCostsResult.rows[0]?.operating_costs) || 0
     const itemsCosts = Number(itemsCostsResult.rows[0]?.items_costs) || 0
-    
+
     const totalCosts = contractCosts + operatingCosts + itemsCosts
     const grossProfit = totalRevenue - totalCosts
     const netProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0
@@ -378,25 +377,25 @@ export const getProfitLoss = async (req: Request, res: Response) => {
 
 export const getAnalyticsSummary = async (req: Request, res: Response) => {
   const period = (req.query.period as string) || 'monthly'
-  
+
   if (!['daily', 'weekly', 'monthly', 'yearly'].includes(period)) {
     return res.status(400).json({ error: 'Invalid period' })
   }
-  
+
   const dateRange = getDateRange(period as 'daily' | 'weekly' | 'monthly' | 'yearly')
-  
+
   try {
     // Get financial summary
-    const accountsResult = await pool.query(
-      `SELECT 
+    const accountsResult = await req.dbClient!.query(
+      `SELECT
         SUM(current_balance) as total_balance,
         COUNT(*) as account_count
        FROM company_bank_accounts`
     )
-    
+
     // Get contracts summary - contracts table has created_at, so we filter by period
-    const contractsResult = await pool.query(
-      `SELECT 
+    const contractsResult = await req.dbClient!.query(
+      `SELECT
         status,
         COUNT(*) as count,
         SUM(initial_cost_budget + extra_budget_allocation) as total_budget
@@ -405,63 +404,63 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
        GROUP BY status`,
       [dateRange.start, dateRange.end]
     )
-    
+
     // Get all contracts for overall stats
-    const allContractsResult = await pool.query(
-      `SELECT 
+    const allContractsResult = await req.dbClient!.query(
+      `SELECT
         status,
         COUNT(*) as count,
         SUM(initial_cost_budget + extra_budget_allocation) as total_budget
        FROM contracts
        GROUP BY status`
     )
-    
+
     // Get payables summary
-    const payablesResult = await pool.query(
-      `SELECT 
+    const payablesResult = await req.dbClient!.query(
+      `SELECT
         SUM(amount) as total_payables,
         COUNT(*) as payable_count
        FROM payables
        WHERE created_at >= $1 AND created_at < $2 AND is_active = true`,
       [dateRange.start, dateRange.end]
     )
-    
+
     // Get all payables for overall stats
-    const allPayablesResult = await pool.query(
-      `SELECT 
+    const allPayablesResult = await req.dbClient!.query(
+      `SELECT
         SUM(amount) as total_payables,
         COUNT(*) as payable_count
        FROM payables
        WHERE is_active = true`
     )
-    
+
     // Get receivables summary
-    const receivablesResult = await pool.query(
-      `SELECT 
+    const receivablesResult = await req.dbClient!.query(
+      `SELECT
         SUM(amount) as total_receivables,
         COUNT(*) as receivable_count
        FROM receivables
        WHERE created_at >= $1 AND created_at < $2 AND is_active = true`,
       [dateRange.start, dateRange.end]
     )
-    
+
     // Get all receivables for overall stats
-    const allReceivablesResult = await pool.query(
-      `SELECT 
+    const allReceivablesResult = await req.dbClient!.query(
+      `SELECT
         SUM(amount) as total_receivables,
         COUNT(*) as receivable_count
        FROM receivables
        WHERE is_active = true`
     )
-    
+
     // Get petty cash
-    const pettyCashResult = await pool.query(
+    const pettyCashResult = await req.dbClient!.query(
       `SELECT current_balance FROM petty_cash_account LIMIT 1`
     )
-    
+
     // Get petty cash transactions for period
-    const pettyCashTransactionsResult = await pool.query(
-      `SELECT 
+    const pettyCashTransactionsResult = await req.dbClient!.query(
+      `SELECT
         transaction_type,
         SUM(amount) as total
        FROM petty_cash_transactions
@@ -469,36 +468,36 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
        GROUP BY transaction_type`,
       [dateRange.start, dateRange.end]
     )
-    
+
     // Get employees summary
-    const employeesResult = await pool.query(
-      `SELECT 
+    const employeesResult = await req.dbClient!.query(
+      `SELECT
         role,
         COUNT(*) as count
        FROM employees
        GROUP BY role`
     )
-    
+
     // Get vendors summary
-    const vendorsResult = await pool.query(
-      `SELECT 
+    const vendorsResult = await req.dbClient!.query(
+      `SELECT
         is_active,
         COUNT(*) as count
        FROM vendors
        GROUP BY is_active`
     )
-    
+
     // Get assets summary
-    const assetsResult = await pool.query(
-      `SELECT 
+    const assetsResult = await req.dbClient!.query(
+      `SELECT
         SUM(value) as total_value,
         COUNT(*) as count
        FROM assets`
     )
-    
+
     // Get daily transaction data for charts (last 30 days)
-    const transactionTrendsResult = await pool.query(
-      `SELECT 
+    const transactionTrendsResult = await req.dbClient!.query(
+      `SELECT
         DATE(created_at) as date,
         'payable' as type,
         SUM(amount) as amount
@@ -506,7 +505,7 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
        WHERE created_at >= NOW() - INTERVAL '30 days'
        GROUP BY DATE(created_at)
        UNION ALL
-       SELECT 
+       SELECT
         DATE(created_at) as date,
         'receivable' as type,
         SUM(amount) as amount
@@ -515,17 +514,17 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
        GROUP BY DATE(created_at)
        ORDER BY date DESC`
     )
-    
+
     // Get enhanced metrics - Fix nested aggregate by using subquery
     // Now using contracts table since receivables/payables link to contract_id
-    const profitabilityResult = await pool.query(`
-      SELECT 
+    const profitabilityResult = await req.dbClient!.query(`
+      SELECT
         COALESCE(AVG(margin_pct), 0) as avg_margin
       FROM (
-        SELECT 
+        SELECT
           c.contract_id,
-          CASE 
-            WHEN COALESCE(SUM(r.amount), 0) > 0 
+          CASE
+            WHEN COALESCE(SUM(r.amount), 0) > 0
             THEN ((COALESCE(SUM(r.amount), 0) - COALESCE(SUM(pay.amount), 0)) / COALESCE(SUM(r.amount), 0)) * 100
             ELSE 0
           END as margin_pct

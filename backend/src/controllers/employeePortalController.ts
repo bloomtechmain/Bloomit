@@ -1920,7 +1920,7 @@ export async function downloadPayslip(req: Request, res: Response) {
     const payslipQuery = `
       SELECT 
         p.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         e.email as employee_email,
         e.employee_department,
         e.role,

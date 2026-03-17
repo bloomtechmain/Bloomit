@@ -1,4 +1,5 @@
 import { API_URL } from '../config/api'
+import { emitToast } from './toastEmitter'
 
 interface FetchOptions extends RequestInit {
   headers?: Record<string, string>
@@ -131,7 +132,7 @@ export async function fetchWithAuth(
         localStorage.removeItem('token')
         
         // Show user-friendly message
-        alert('Your session has expired. Please log in again.')
+        emitToast('error', 'Your session has expired. Please log in again.')
         
         // Trigger a page reload to show login page
         window.location.href = '/'
@@ -147,7 +148,7 @@ export async function fetchWithAuth(
       localStorage.removeItem('token')
       
       // Show user-friendly message
-      alert('Your session has expired. Please log in again.')
+      emitToast('error', 'Your session has expired. Please log in again.')
       
       // Trigger a page reload to show login page
       window.location.href = '/'

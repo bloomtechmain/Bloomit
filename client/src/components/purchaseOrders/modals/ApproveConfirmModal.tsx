@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, DollarSign, FileText } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
 
 interface ApproveConfirmModalProps {
   poNumber: string;
@@ -17,16 +18,15 @@ const ApproveConfirmModal: React.FC<ApproveConfirmModalProps> = ({
   onCancel,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleConfirm = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
       await onConfirm();
-      // Success - parent will handle closing modal and showing success message
+      toast.success('Purchase order approved successfully');
     } catch (err: any) {
-      setError(err.message || 'Failed to approve purchase order');
+      toast.error(err.message || 'Failed to approve purchase order');
       setIsSubmitting(false);
     }
   };
@@ -114,12 +114,6 @@ const ApproveConfirmModal: React.FC<ApproveConfirmModalProps> = ({
             </p>
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-700 text-center">{error}</p>
-            </div>
-          )}
         </div>
 
         {/* Footer Actions */}

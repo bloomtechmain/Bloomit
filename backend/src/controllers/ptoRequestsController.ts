@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 type PTORequestPayload = {
   employee_id?: number
@@ -21,13 +20,13 @@ export const getAllPTORequests = async (req: Request, res: Response) => {
     const { status, employee_id } = req.query
 
     let query = `
-      SELECT 
+      SELECT
         pr.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         e.email as employee_email,
-        m.name as manager_name,
+        CONCAT(m.first_name, ' ', m.last_name) as manager_name,
         p.project_name,
-        c.name as cover_employee_name
+        CONCAT(c.first_name, ' ', c.last_name) as cover_employee_name
       FROM pto_requests pr
       LEFT JOIN employees e ON pr.employee_id = e.id
       LEFT JOIN employees m ON pr.manager_id = m.id
@@ -52,7 +51,7 @@ export const getAllPTORequests = async (req: Request, res: Response) => {
 
     query += ' ORDER BY pr.created_at DESC'
 
-    const result = await pool.query(query, params)
+    const result = await req.dbClient!.query(query, params)
     return res.status(200).json({ ptoRequests: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -66,12 +65,12 @@ export const getMyPTORequests = async (req: Request, res: Response) => {
 
   try {
     const query = `
-      SELECT 
+      SELECT
         pr.*,
-        e.name as employee_name,
-        m.name as manager_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
+        CONCAT(m.first_name, ' ', m.last_name) as manager_name,
         p.project_name,
-        c.name as cover_employee_name
+        CONCAT(c.first_name, ' ', c.last_name) as cover_employee_name
       FROM pto_requests pr
       LEFT JOIN employees e ON pr.employee_id = e.id
       LEFT JOIN employees m ON pr.manager_id = m.id
@@ -80,7 +79,7 @@ export const getMyPTORequests = async (req: Request, res: Response) => {
       WHERE pr.employee_id = $1
       ORDER BY pr.created_at DESC
     `
-    const result = await pool.query(query, [employeeId])
+    const result = await req.dbClient!.query(query, [employeeId])
     return res.status(200).json({ ptoRequests: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -92,13 +91,13 @@ export const getMyPTORequests = async (req: Request, res: Response) => {
 export const getPendingPTORequests = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         pr.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         e.email as employee_email,
         e.phone as employee_phone,
         p.project_name,
-        c.name as cover_employee_name
+        CONCAT(c.first_name, ' ', c.last_name) as cover_employee_name
       FROM pto_requests pr
       LEFT JOIN employees e ON pr.employee_id = e.id
       LEFT JOIN projects p ON pr.project_id = p.project_id
@@ -106,7 +105,7 @@ export const getPendingPTORequests = async (req: Request, res: Response) => {
       WHERE pr.status = 'pending'
       ORDER BY pr.created_at ASC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ ptoRequests: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -150,7 +149,7 @@ export const createPTORequest = async (req: Request, res: Response) => {
   try {
     const query = `
       INSERT INTO pto_requests (
-        employee_id, manager_id, absence_type, from_date, to_date, 
+        employee_id, manager_id, absence_type, from_date, to_date,
         total_hours, project_id, cover_person_id, cover_person_name, description, status
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
@@ -170,7 +169,7 @@ export const createPTORequest = async (req: Request, res: Response) => {
     ]
 
     console.log('🔍 Executing query with values:', values)
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     console.log('✅ PTO request created successfully:', result.rows[0])
     return res.status(201).json({ ptoRequest: result.rows[0] })
   } catch (err: unknown) {
@@ -200,7 +199,7 @@ export const updatePTORequest = async (req: Request, res: Response) => {
   try {
     // Check if request is still pending
     const checkQuery = 'SELECT status FROM pto_requests WHERE id = $1'
-    const checkResult = await pool.query(checkQuery, [id])
+    const checkResult = await req.dbClient!.query(checkQuery, [id])
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'pto_request_not_found' })
@@ -212,7 +211,7 @@ export const updatePTORequest = async (req: Request, res: Response) => {
 
     const query = `
       UPDATE pto_requests
-      SET 
+      SET
         manager_id = COALESCE($1, manager_id),
         absence_type = COALESCE($2, absence_type),
         from_date = COALESCE($3, from_date),
@@ -239,7 +238,7 @@ export const updatePTORequest = async (req: Request, res: Response) => {
       id
     ]
 
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     return res.status(200).json({ ptoRequest: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -254,7 +253,7 @@ export const deletePTORequest = async (req: Request, res: Response) => {
   try {
     // Check if request is still pending
     const checkQuery = 'SELECT status FROM pto_requests WHERE id = $1'
-    const checkResult = await pool.query(checkQuery, [id])
+    const checkResult = await req.dbClient!.query(checkQuery, [id])
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'pto_request_not_found' })
@@ -265,7 +264,7 @@ export const deletePTORequest = async (req: Request, res: Response) => {
     }
 
     const query = 'DELETE FROM pto_requests WHERE id = $1 RETURNING id'
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
 
     return res.status(200).json({ message: 'pto_request_deleted', id: result.rows[0].id })
   } catch (err: unknown) {
@@ -286,7 +285,7 @@ export const approvePTORequest = async (req: Request, res: Response) => {
   try {
     const query = `
       UPDATE pto_requests
-      SET 
+      SET
         status = 'approved',
         manager_id = $1,
         manager_comments = $2,
@@ -295,7 +294,7 @@ export const approvePTORequest = async (req: Request, res: Response) => {
       WHERE id = $3 AND status = 'pending'
       RETURNING *
     `
-    const result = await pool.query(query, [manager_id, manager_comments || null, id])
+    const result = await req.dbClient!.query(query, [manager_id, manager_comments || null, id])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'pto_request_not_found_or_already_processed' })
@@ -320,7 +319,7 @@ export const denyPTORequest = async (req: Request, res: Response) => {
   try {
     const query = `
       UPDATE pto_requests
-      SET 
+      SET
         status = 'denied',
         manager_id = $1,
         manager_comments = $2,
@@ -329,7 +328,7 @@ export const denyPTORequest = async (req: Request, res: Response) => {
       WHERE id = $3 AND status = 'pending'
       RETURNING *
     `
-    const result = await pool.query(query, [manager_id, manager_comments || null, id])
+    const result = await req.dbClient!.query(query, [manager_id, manager_comments || null, id])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'pto_request_not_found_or_already_processed' })
@@ -351,7 +350,7 @@ export const getPTOStats = async (req: Request, res: Response) => {
     const currentYear = year || new Date().getFullYear()
 
     const query = `
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE status = 'approved') as approved_count,
         COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
         COUNT(*) FILTER (WHERE status = 'denied') as denied_count,
@@ -361,7 +360,7 @@ export const getPTOStats = async (req: Request, res: Response) => {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = $2
     `
-    const result = await pool.query(query, [employeeId, currentYear])
+    const result = await req.dbClient!.query(query, [employeeId, currentYear])
 
     return res.status(200).json({ stats: result.rows[0] })
   } catch (err: unknown) {

@@ -7,6 +7,8 @@ import QuoteViewModal from './QuoteViewModal'
 import QuoteEditModal from './QuoteEditModal'
 import QuoteDeleteModal from './QuoteDeleteModal'
 import { generateQuotePDF } from '../../utils/pdfExport'
+import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 
 interface QuoteListProps {
   onCreateNew: () => void
@@ -16,6 +18,8 @@ type SortField = 'quote_number' | 'company_name' | 'date_of_issue' | 'total_due'
 type SortDirection = 'asc' | 'desc'
 
 const QuoteList: React.FC<QuoteListProps> = ({ onCreateNew }) => {
+  const { toast } = useToast()
+  const confirm = useConfirm()
   // State management
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,9 +69,8 @@ const QuoteList: React.FC<QuoteListProps> = ({ onCreateNew }) => {
 
   // Handle approve/deny actions
   const handleApprove = async (quote: Quote) => {
-    if (!window.confirm(`Are you sure you want to approve quote ${quote.quote_number}?`)) {
-      return
-    }
+    const confirmed = await confirm(`Approve quote ${quote.quote_number}?`)
+    if (!confirmed) return
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -76,28 +79,28 @@ const QuoteList: React.FC<QuoteListProps> = ({ onCreateNew }) => {
         changed_by: user.id,
         notes: 'Quote approved'
       })
+      toast.success(`Quote ${quote.quote_number} approved`)
       loadQuotes()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to approve quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to approve quote')
     }
   }
 
   const handleDeny = async (quote: Quote) => {
-    const reason = window.prompt(`Please provide a reason for denying quote ${quote.quote_number}:`)
-    if (reason === null) {
-      return // User cancelled
-    }
+    const confirmed = await confirm(`Deny quote ${quote.quote_number}?`, { destructive: true, confirmLabel: 'Deny' })
+    if (!confirmed) return
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       await updateQuoteStatus(quote.quote_id, {
         status: 'REJECTED',
         changed_by: user.id,
-        notes: reason || 'Quote denied'
+        notes: 'Quote denied'
       })
+      toast.success(`Quote ${quote.quote_number} denied`)
       loadQuotes()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to deny quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to deny quote')
     }
   }
 
@@ -107,7 +110,7 @@ const QuoteList: React.FC<QuoteListProps> = ({ onCreateNew }) => {
       const quote = await getQuoteById(quoteId)
       generateQuotePDF(quote)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to generate PDF')
+      toast.error(err instanceof Error ? err.message : 'Failed to generate PDF')
     }
   }
 

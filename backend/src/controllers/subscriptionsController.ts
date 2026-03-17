@@ -1,20 +1,19 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 export const getAllSubscriptions = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
-        id, 
-        description, 
-        amount, 
-        due_date, 
-        frequency, 
-        auto_pay, 
-        is_active, 
+      SELECT
+        id,
+        description,
+        amount,
+        due_date,
+        frequency,
+        auto_pay,
+        is_active,
         created_at,
         updated_at,
-        CASE 
+        CASE
           WHEN frequency = 'MONTHLY' THEN amount * 12
           WHEN frequency = 'YEARLY' THEN amount
           ELSE 0
@@ -22,7 +21,7 @@ export const getAllSubscriptions = async (req: Request, res: Response) => {
       FROM subscriptions
       ORDER BY due_date ASC, created_at DESC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ subscriptions: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -33,20 +32,20 @@ export const getAllSubscriptions = async (req: Request, res: Response) => {
 
 export const getSubscriptionById = async (req: Request, res: Response) => {
   const { id } = req.params
-  
+
   try {
     const query = `
-      SELECT 
-        id, 
-        description, 
-        amount, 
-        due_date, 
-        frequency, 
-        auto_pay, 
-        is_active, 
+      SELECT
+        id,
+        description,
+        amount,
+        due_date,
+        frequency,
+        auto_pay,
+        is_active,
         created_at,
         updated_at,
-        CASE 
+        CASE
           WHEN frequency = 'MONTHLY' THEN amount * 12
           WHEN frequency = 'YEARLY' THEN amount
           ELSE 0
@@ -54,12 +53,12 @@ export const getSubscriptionById = async (req: Request, res: Response) => {
       FROM subscriptions
       WHERE id = $1
     `
-    const result = await pool.query(query, [id])
-    
+    const result = await req.dbClient!.query(query, [id])
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'subscription_not_found' })
     }
-    
+
     return res.status(200).json({ subscription: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -83,31 +82,31 @@ export const createSubscription = async (req: Request, res: Response) => {
     const query = `
       INSERT INTO subscriptions (description, amount, due_date, frequency, auto_pay, is_active)
       VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING 
-        id, 
-        description, 
-        amount, 
-        due_date, 
-        frequency, 
-        auto_pay, 
-        is_active, 
+      RETURNING
+        id,
+        description,
+        amount,
+        due_date,
+        frequency,
+        auto_pay,
+        is_active,
         created_at,
         updated_at,
-        CASE 
+        CASE
           WHEN frequency = 'MONTHLY' THEN amount * 12
           WHEN frequency = 'YEARLY' THEN amount
           ELSE 0
         END as yearly_cost
     `
     const values = [
-      description, 
-      amount, 
-      due_date, 
-      frequency, 
-      auto_pay ?? false, 
+      description,
+      amount,
+      due_date,
+      frequency,
+      auto_pay ?? false,
       is_active ?? true
     ]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     return res.status(201).json({ subscription: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -131,7 +130,7 @@ export const updateSubscription = async (req: Request, res: Response) => {
   try {
     const query = `
       UPDATE subscriptions
-      SET 
+      SET
         description = $1,
         amount = $2,
         due_date = $3,
@@ -140,24 +139,24 @@ export const updateSubscription = async (req: Request, res: Response) => {
         is_active = $6,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $7
-      RETURNING 
-        id, 
-        description, 
-        amount, 
-        due_date, 
-        frequency, 
-        auto_pay, 
-        is_active, 
+      RETURNING
+        id,
+        description,
+        amount,
+        due_date,
+        frequency,
+        auto_pay,
+        is_active,
         created_at,
         updated_at,
-        CASE 
+        CASE
           WHEN frequency = 'MONTHLY' THEN amount * 12
           WHEN frequency = 'YEARLY' THEN amount
           ELSE 0
         END as yearly_cost
     `
     const values = [description, amount, due_date, frequency, auto_pay, is_active, id]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'subscription_not_found' })
@@ -176,7 +175,7 @@ export const deleteSubscription = async (req: Request, res: Response) => {
 
   try {
     const query = 'DELETE FROM subscriptions WHERE id = $1 RETURNING id'
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'subscription_not_found' })

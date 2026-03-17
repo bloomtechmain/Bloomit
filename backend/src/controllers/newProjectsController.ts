@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 type ProjectPayload = {
   project_name?: string
@@ -10,10 +9,10 @@ type ProjectPayload = {
 export const getAllProjects = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
-        p.project_id, 
-        p.project_name, 
-        p.project_description, 
+      SELECT
+        p.project_id,
+        p.project_name,
+        p.project_description,
         p.status,
         p.created_at,
         COUNT(c.contract_id) AS contract_count,
@@ -23,7 +22,7 @@ export const getAllProjects = async (req: Request, res: Response) => {
       GROUP BY p.project_id, p.project_name, p.project_description, p.status, p.created_at
       ORDER BY p.project_id DESC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ projects: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -35,10 +34,10 @@ export const getProjectById = async (req: Request, res: Response) => {
   const { id } = req.params
   try {
     const query = `
-      SELECT 
-        p.project_id, 
-        p.project_name, 
-        p.project_description, 
+      SELECT
+        p.project_id,
+        p.project_name,
+        p.project_description,
         p.status,
         p.created_at,
         COUNT(c.contract_id) AS contract_count,
@@ -48,7 +47,7 @@ export const getProjectById = async (req: Request, res: Response) => {
       WHERE p.project_id = $1
       GROUP BY p.project_id, p.project_name, p.project_description, p.status, p.created_at
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }
@@ -73,7 +72,7 @@ export const createProject = async (req: Request, res: Response) => {
       RETURNING project_id, project_name, project_description, status, created_at
     `
     const values = [project_name, project_description ?? null, status ?? 'active']
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     return res.status(201).json({ project: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -97,7 +96,7 @@ export const updateProject = async (req: Request, res: Response) => {
       RETURNING project_id, project_name, project_description, status, created_at
     `
     const values = [project_name, project_description ?? null, status ?? 'active', id]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }
@@ -116,7 +115,7 @@ export const deleteProject = async (req: Request, res: Response) => {
       WHERE project_id = $1
       RETURNING project_id
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }

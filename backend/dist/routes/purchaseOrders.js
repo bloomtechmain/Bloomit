@@ -28,4 +28,5 @@ router.post('/:id/upload-receipt', auth_1.requireAuth, (0, authorize_1.requirePe
 // Admin-only routes (approval/rejection requires specific permissions)
 router.post('/:id/approve', auth_1.requireAuth, (0, authorize_1.requirePermission)('purchase_orders', 'approve'), purchaseOrdersController_1.approvePurchaseOrder);
 router.post('/:id/reject', auth_1.requireAuth, (0, authorize_1.requirePermission)('purchase_orders', 'reject'), purchaseOrdersController_1.rejectPurchaseOrder);
+router.delete('/:id', auth_1.requireAuth, (0, authorize_1.requirePermission)('purchase_orders', 'delete'), purchaseOrdersController_1.deletePurchaseOrder);
 exports.default = router;

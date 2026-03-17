@@ -1,10 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPettyCashTransactions = exports.addPettyCashBill = exports.replenishPettyCash = exports.getPettyCashBalance = void 0;
-const db_1 = require("../db");
 const getPettyCashBalance = async (req, res) => {
     try {
-        const result = await db_1.pool.query('SELECT * FROM petty_cash_account LIMIT 1');
+        const result = await req.dbClient.query('SELECT * FROM petty_cash_account LIMIT 1');
         if (result.rows.length === 0) {
             // Return a default structure if no account exists yet
             return res.json({
@@ -27,16 +26,16 @@ const replenishPettyCash = async (req, res) => {
     if (!amount || isNaN(Number(amount))) {
         return res.status(400).json({ error: 'Invalid amount' });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // 1. Deduct from source account if provided
         if (source_account_id) {
-            // Log transaction (Trigger will update bank account balance automatically)
             await client.query(`
         INSERT INTO bank_transactions (bank_account_id, transaction_type, amount, description, transaction_date)
         VALUES ($1, 'DEBIT', $2, $3, CURRENT_TIMESTAMP)
       `, [source_account_id, amount, reference || 'Petty Cash Replenishment']);
+            await client.query(`UPDATE company_bank_accounts SET current_balance = current_balance - $1 WHERE id = $2`, [amount, source_account_id]);
         }
         // 2. Ensure petty cash account exists
         const checkRes = await client.query('SELECT * FROM petty_cash_account LIMIT 1');
@@ -52,13 +51,15 @@ const replenishPettyCash = async (req, res) => {
         else {
             accountId = checkRes.rows[0].id;
         }
-        // 3. Insert into petty_cash_transactions (Trigger will update petty_cash_account balance)
+        // 3. Insert into petty_cash_transactions
         await client.query(`
       INSERT INTO petty_cash_transactions (
         transaction_type, amount, description, source_bank_account_id, transaction_date, petty_cash_account_id
       )
       VALUES ('REPLENISHMENT', $1, $2, $3, CURRENT_TIMESTAMP, $4)
     `, [amount, reference || 'Petty Cash Replenishment', source_account_id || null, accountId]);
+        // 4. Update petty_cash_account balance and last replenished date
+        await client.query(`UPDATE petty_cash_account SET current_balance = current_balance + $1, last_replenished_date = CURRENT_DATE, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [amount, accountId]);
         await client.query('COMMIT');
         res.json({ message: 'Petty cash replenished successfully' });
     }
@@ -67,17 +68,14 @@ const replenishPettyCash = async (req, res) => {
         console.error('Error replenishing petty cash:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
-    finally {
-        client.release();
-    }
 };
 exports.replenishPettyCash = replenishPettyCash;
 const addPettyCashBill = async (req, res) => {
-    const { amount, description, contract_id, transaction_date } = req.body;
+    const { amount, description, project_id, transaction_date } = req.body;
     if (!amount || isNaN(Number(amount))) {
         return res.status(400).json({ error: 'Invalid amount' });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // 1. Ensure petty cash account exists
@@ -97,10 +95,12 @@ const addPettyCashBill = async (req, res) => {
         // 2. Insert into petty_cash_transactions
         await client.query(`
       INSERT INTO petty_cash_transactions (
-        transaction_type, amount, description, contract_id, transaction_date, petty_cash_account_id
+        transaction_type, amount, description, project_id, transaction_date, petty_cash_account_id
       )
       VALUES ('EXPENSE', $1, $2, $3, $4, $5)
-    `, [amount, description || 'Petty Cash Expense', contract_id || null, transaction_date || new Date(), accountId]);
+    `, [amount, description || 'Petty Cash Expense', project_id || null, transaction_date || new Date(), accountId]);
+        // 3. Deduct from petty cash account balance
+        await client.query(`UPDATE petty_cash_account SET current_balance = current_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [amount, accountId]);
         await client.query('COMMIT');
         res.json({ message: 'Petty cash bill added successfully' });
     }
@@ -109,20 +109,17 @@ const addPettyCashBill = async (req, res) => {
         console.error('Error adding petty cash bill:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
-    finally {
-        client.release();
-    }
 };
 exports.addPettyCashBill = addPettyCashBill;
 const getPettyCashTransactions = async (req, res) => {
     try {
         const query = `
-      SELECT t.*, c.contract_name
+      SELECT t.*, p.project_name
       FROM petty_cash_transactions t
-      LEFT JOIN contracts c ON t.contract_id = c.contract_id
+      LEFT JOIN projects p ON t.project_id = p.project_id
       ORDER BY t.transaction_date DESC, t.created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         res.json(result.rows);
     }
     catch (err) {

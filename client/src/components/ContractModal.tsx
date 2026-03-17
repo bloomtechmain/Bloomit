@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { Contract } from '../types/projects'
 import { contractsApi } from '../services/projectsApi'
+import { useToast } from '../context/ToastContext'
 
 interface ContractModalProps {
   isOpen: boolean
@@ -20,6 +21,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   contract,
   mode
 }) => {
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     contract_name: '',
     customer_name: '',
@@ -30,7 +32,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     status: 'ongoing' as 'ongoing' | 'completed' | 'paused'
   })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (mode === 'edit' && contract) {
@@ -54,28 +55,26 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         status: 'ongoing'
       })
     }
-    setError(null)
   }, [mode, contract, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     // Validation
     if (!formData.contract_name.trim()) {
-      setError('Contract name is required')
+      toast.error('Contract name is required')
       return
     }
     if (!formData.customer_name.trim()) {
-      setError('Customer name is required')
+      toast.error('Customer name is required')
       return
     }
     if (!formData.initial_cost_budget || isNaN(Number(formData.initial_cost_budget)) || Number(formData.initial_cost_budget) < 0) {
-      setError('Please enter a valid initial cost budget')
+      toast.error('Please enter a valid initial cost budget')
       return
     }
     if (isNaN(Number(formData.extra_budget_allocation)) || Number(formData.extra_budget_allocation) < 0) {
-      setError('Please enter a valid extra budget allocation')
+      toast.error('Please enter a valid extra budget allocation')
       return
     }
 
@@ -94,14 +93,16 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
       if (mode === 'create') {
         await contractsApi.create(projectId, payload)
+        toast.success('Contract created successfully')
       } else if (mode === 'edit' && contract) {
         await contractsApi.update(projectId, contract.contract_id, payload)
+        toast.success('Contract updated successfully')
       }
       onSuccess()
       onClose()
     } catch (err: any) {
       console.error('Error saving contract:', err)
-      setError(err.response?.data?.message || 'Failed to save contract')
+      toast.error(err.response?.data?.message || 'Failed to save contract')
     } finally {
       setLoading(false)
     }
@@ -183,22 +184,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {error && (
-            <div
-              style={{
-                padding: '0.75rem',
-                backgroundColor: '#fee2e2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#dc2626',
-                marginBottom: '1rem',
-                fontSize: '0.875rem'
-              }}
-            >
-              {error}
-            </div>
-          )}
-
           {/* Contract Name */}
           <div style={{ marginBottom: '1.25rem' }}>
             <label

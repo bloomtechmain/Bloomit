@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { Project } from '../types/projects'
 import { projectsApi, contractsApi } from '../services/projectsApi'
+import { useToast } from '../context/ToastContext'
 
 interface ProjectModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   project,
   mode
 }) => {
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     project_name: '',
     project_description: '',
@@ -27,7 +29,6 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     contract_name: ''
   })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (mode === 'edit' && project) {
@@ -49,27 +50,25 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         contract_name: ''
       })
     }
-    setError(null)
   }, [mode, project, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     // Validation
     if (!formData.project_name.trim()) {
-      setError('Project name is required')
+      toast.error('Project name is required')
       return
     }
 
     // Additional validation for create mode
     if (mode === 'create') {
       if (!formData.customer_name.trim()) {
-        setError('Customer name is required')
+        toast.error('Customer name is required')
         return
       }
       if (!formData.initial_cost_budget.trim() || isNaN(Number(formData.initial_cost_budget))) {
-        setError('Initial cost budget is required and must be a valid number')
+        toast.error('Initial cost budget is required and must be a valid number')
         return
       }
     }
@@ -84,9 +83,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           project_description: formData.project_description,
           status: formData.status
         })
-        
+
         const newProject = projectResponse.data.project
-        
+
         // Step 2: Auto-create a default contract for the project
         const contractName = formData.contract_name.trim() || `${formData.project_name} - Main Contract`
         await contractsApi.create(newProject.project_id, {
@@ -98,19 +97,20 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           payment_type: 'Pending',
           status: 'ongoing'
         })
-        
+        toast.success('Project created successfully')
       } else if (mode === 'edit' && project) {
         await projectsApi.update(project.project_id, {
           project_name: formData.project_name,
           project_description: formData.project_description,
           status: formData.status
         })
+        toast.success('Project updated successfully')
       }
       onSuccess()
       onClose()
     } catch (err: any) {
       console.error('Error saving project:', err)
-      setError(err.response?.data?.message || 'Failed to save project')
+      toast.error(err.response?.data?.message || 'Failed to save project')
     } finally {
       setLoading(false)
     }
@@ -192,22 +192,6 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {error && (
-            <div
-              style={{
-                padding: '0.75rem',
-                backgroundColor: '#fee2e2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#dc2626',
-                marginBottom: '1rem',
-                fontSize: '0.875rem'
-              }}
-            >
-              {error}
-            </div>
-          )}
-
           {/* Project Name */}
           <div style={{ marginBottom: '1.25rem' }}>
             <label

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getQuoteById, updateQuote } from '../../services/quotesApi'
 import type { QuoteItem, QuoteAdditionalService, TemplateType } from '../../types/quotes'
+import { useToast } from '../../context/ToastContext'
 
 interface QuoteEditModalProps {
   quoteId: number
@@ -11,8 +12,7 @@ interface QuoteEditModalProps {
 const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const { toast } = useToast()
 
   // Form state
   const [templateType, setTemplateType] = useState<TemplateType>('RESTAURANT')
@@ -31,7 +31,6 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
   const loadQuote = async () => {
     try {
       setLoading(true)
-      setError(null)
       const data = await getQuoteById(quoteId)
       
       setTemplateType(data.template_type)
@@ -55,7 +54,7 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
         : [])
       setQuoteStatus(data.status)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to load quote')
     } finally {
       setLoading(false)
     }
@@ -103,24 +102,21 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
   }
 
   const handleSave = async () => {
-    setError(null)
-    setSuccess(false)
-
     // Validation
     if (!companyName.trim()) {
-      setError('Company name is required')
+      toast.error('Company name is required')
       return
     }
 
     if (!dateOfIssue) {
-      setError('Date of issue is required')
+      toast.error('Date of issue is required')
       return
     }
 
     const validItems = items.filter(item => item.description.trim())
-    
+
     if (validItems.length === 0) {
-      setError('At least one line item with description is required')
+      toast.error('At least one line item with description is required')
       return
     }
 
@@ -141,13 +137,11 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
           : undefined
       })
 
-      setSuccess(true)
-      setTimeout(() => {
-        onSuccess()
-        onClose()
-      }, 1500)
+      toast.success('Quote updated successfully!')
+      onSuccess()
+      onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update quote')
+      toast.error(err instanceof Error ? err.message : 'Failed to update quote')
     } finally {
       setSaving(false)
     }
@@ -237,18 +231,6 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
           {loading && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--accent)' }}></div>
-            </div>
-          )}
-
-          {error && (
-            <div style={{ padding: '16px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', marginBottom: 24 }}>
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div style={{ padding: '16px', borderRadius: 8, background: 'rgba(74, 222, 128, 0.1)', border: '1px solid #4ade80', color: '#4ade80', marginBottom: 24 }}>
-              Quote updated successfully!
             </div>
           )}
 

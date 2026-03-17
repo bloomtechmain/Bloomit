@@ -3,6 +3,7 @@ import { Edit2, Trash2, FileText } from 'lucide-react'
 import type { Contract } from '../types/projects'
 import { contractsApi } from '../services/projectsApi'
 import { ContractSkeleton } from './SkeletonLoader'
+import { useConfirm } from '../context/ConfirmContext'
 
 interface ContractsListProps {
   projectId: number
@@ -17,6 +18,7 @@ export const ContractsList: React.FC<ContractsListProps> = ({
   onDelete,
   onViewItems
 }) => {
+  const confirm = useConfirm()
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,16 +67,14 @@ export const ContractsList: React.FC<ContractsListProps> = ({
     }
   }
 
-  const handleDelete = (contract: Contract, e: React.MouseEvent) => {
+  const handleDelete = async (contract: Contract, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (
-      window.confirm(
-        `Are you sure you want to delete contract "${contract.contract_name}"? This will also delete all associated items.`
-      )
-    ) {
-      if (onDelete) {
-        onDelete(projectId, contract.contract_id)
-      }
+    const confirmed = await confirm(
+      `Delete contract "${contract.contract_name}"? This will also delete all associated items.`,
+      { destructive: true }
+    )
+    if (confirmed && onDelete) {
+      onDelete(projectId, contract.contract_id)
     }
   }
 

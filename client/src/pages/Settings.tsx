@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { API_URL } from '../config/api'
 import { fetchWithAuth } from '../utils/apiClient'
+import { useToast } from '../context/ToastContext'
 import { Shield, Users as UsersIcon, Key, Plus, Edit2, Trash2, Save, X, Copy, CheckCircle, User, RotateCcw } from 'lucide-react'
 import PermissionHierarchy from '../components/PermissionHierarchy'
 import { 
@@ -41,6 +42,7 @@ type User = {
 }
 
 export default function Settings({ accessToken }: { accessToken: string }) {
+  const { toast } = useToast()
   const [subTab, setSubTab] = useState<'roles' | 'permissions' | 'users' | 'profile' | 'app_settings' | 'employee_onboarding'>('roles')
   
   // Roles state
@@ -83,14 +85,11 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordChangeError, setPasswordChangeError] = useState('')
-  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState(false)
-  
+
   // Application Settings state
   const [applicationTimezone, setApplicationTimezone] = useState('America/New_York')
   const [timezoneLoading, setTimezoneLoading] = useState(false)
   const [timezoneSaving, setTimezoneSaving] = useState(false)
-  const [timezoneSaveSuccess, setTimezoneSaveSuccess] = useState(false)
-  const [timezoneSaveError, setTimezoneSaveError] = useState('')
   
   // Employee Onboarding state
   const [employees, setEmployees] = useState<EmployeeWithUserStatus[]>([])
@@ -215,26 +214,23 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   
   // Save timezone setting
   const handleSaveTimezone = async () => {
-    setTimezoneSaveError('')
-    setTimezoneSaveSuccess(false)
     setTimezoneSaving(true)
-    
+
     try {
       const r = await fetchWithAuth(`${API_URL}/settings/international_timezone`, {
         method: 'PUT',
         body: JSON.stringify({ value: applicationTimezone })
       })
-      
+
       if (r.ok) {
-        setTimezoneSaveSuccess(true)
-        setTimeout(() => setTimezoneSaveSuccess(false), 3000)
+        toast.success('Timezone updated successfully! Changes will reflect on the home page.')
       } else {
         const data = await r.json()
-        setTimezoneSaveError(data.error || 'Failed to update timezone')
+        toast.error(data.error || 'Failed to update timezone')
       }
     } catch (e) {
       console.error('Error saving timezone:', e)
-      setTimezoneSaveError('Error saving timezone')
+      toast.error('Error saving timezone')
     } finally {
       setTimezoneSaving(false)
     }
@@ -261,7 +257,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
       setOnboardingData({ ...onboardingData, employee_number: data.employeeNumber })
     } catch (e) {
       console.error('Error generating employee number:', e)
-      alert('Failed to generate employee number')
+      toast.error('Failed to generate employee number')
     } finally {
       setGeneratingNumber(false)
     }
@@ -271,12 +267,14 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   const handleOnboardEmployee = async () => {
     // Validation
     if (!onboardingData.first_name || !onboardingData.last_name || !onboardingData.email || !onboardingData.employee_number) {
-      return alert('Please fill in all required fields (First Name, Last Name, Email, Employee Number)')
+      toast.error('Please fill in all required fields (First Name, Last Name, Email, Employee Number)')
+      return
     }
     if (!onboardingData.roleIds || onboardingData.roleIds.length === 0) {
-      return alert('Please assign at least one role')
+      toast.error('Please assign at least one role')
+      return
     }
-    
+
     setSaving(true)
     try {
       const result = await onboardEmployee(onboardingData as EmployeeOnboardingData, accessToken)
@@ -285,7 +283,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
       setOnboardingData({ roleIds: [] })
       fetchEmployees()
     } catch (e: any) {
-      alert(e.message || 'Failed to onboard employee')
+      toast.error(e.message || 'Failed to onboard employee')
     } finally {
       setSaving(false)
     }
@@ -303,16 +301,16 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Handle suspend employee
   const handleSuspendEmployee = async () => {
     if (!suspendingEmployee || !suspendReason.trim()) return
-    
+
     setSaving(true)
     try {
       await suspendEmployee(suspendingEmployee.employee_id, suspendReason, accessToken)
-      alert('Employee suspended successfully')
+      toast.success('Employee suspended successfully')
       setSuspendingEmployee(null)
       setSuspendReason('')
       fetchEmployees()
     } catch (e: any) {
-      alert(e.message || 'Failed to suspend employee')
+      toast.error(e.message || 'Failed to suspend employee')
     } finally {
       setSaving(false)
     }
@@ -321,15 +319,15 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Handle reactivate employee
   const handleReactivateEmployee = async () => {
     if (!reactivatingEmployee) return
-    
+
     setSaving(true)
     try {
       await reactivateEmployee(reactivatingEmployee.employee_id, accessToken)
-      alert('Employee reactivated successfully')
+      toast.success('Employee reactivated successfully')
       setReactivatingEmployee(null)
       fetchEmployees()
     } catch (e: any) {
-      alert(e.message || 'Failed to reactivate employee')
+      toast.error(e.message || 'Failed to reactivate employee')
     } finally {
       setSaving(false)
     }
@@ -338,17 +336,17 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Handle terminate employee
   const handleTerminateEmployee = async () => {
     if (!terminatingEmployee || !terminateReason.trim() || !terminateConfirm) return
-    
+
     setSaving(true)
     try {
       const result = await terminateEmployee(terminatingEmployee.employee_id, terminateReason, accessToken)
-      alert(`Employee terminated successfully. Data will be purged on ${new Date(result.scheduledPurgeDate).toLocaleDateString()}`)
+      toast.success(`Employee terminated successfully. Data will be purged on ${new Date(result.scheduledPurgeDate).toLocaleDateString()}`)
       setTerminatingEmployee(null)
       setTerminateReason('')
       setTerminateConfirm(false)
       fetchEmployees()
     } catch (e: any) {
-      alert(e.message || 'Failed to terminate employee')
+      toast.error(e.message || 'Failed to terminate employee')
     } finally {
       setSaving(false)
     }
@@ -412,25 +410,27 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Handle save edited employee
   const handleSaveEditedEmployee = async () => {
     if (!editingEmployee) return
-    
+
     // Validation
     if (!editFormData.first_name || !editFormData.last_name || !editFormData.email || !editFormData.employee_number) {
-      return alert('Please fill in all required fields (First Name, Last Name, Email, Employee Number)')
+      toast.error('Please fill in all required fields (First Name, Last Name, Email, Employee Number)')
+      return
     }
     if (!editFormData.roleIds || editFormData.roleIds.length === 0) {
-      return alert('Please assign at least one role')
+      toast.error('Please assign at least one role')
+      return
     }
-    
+
     setSaving(true)
     try {
       const { updateEmployeeProfile } = await import('../services/employeeOnboardingApi')
       await updateEmployeeProfile(editingEmployee.employee_id, editFormData as EmployeeOnboardingData, accessToken)
-      alert('Employee updated successfully')
+      toast.success('Employee updated successfully')
       setEditingEmployee(null)
       setEditFormData({})
       fetchEmployees()
     } catch (e: any) {
-      alert(e.message || 'Failed to update employee')
+      toast.error(e.message || 'Failed to update employee')
     } finally {
       setSaving(false)
     }
@@ -455,27 +455,31 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   
   // Create role
   const handleCreateRole = async () => {
-    if (!roleName) return alert('Role name is required')
-    
+    if (!roleName) {
+      toast.error('Role name is required')
+      return
+    }
+
     setSaving(true)
     try {
       const r = await fetchWithAuth(`${API_URL}/rbac/roles`, {
         method: 'POST',
         body: JSON.stringify({ name: roleName, description: roleDescription })
       })
-      
+
       if (r.ok) {
+        toast.success('Role created successfully')
         setIsAddingRole(false)
         setRoleName('')
         setRoleDescription('')
         fetchRoles()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to create role')
+        toast.error(data.message || 'Failed to create role')
       }
     } catch (e) {
       console.error('Error creating role:', e)
-      alert('Error creating role')
+      toast.error('Error creating role')
     } finally {
       setSaving(false)
     }
@@ -484,113 +488,118 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Update role
   const handleUpdateRole = async () => {
     if (!editingRole || !roleName) return
-    
+
     setSaving(true)
     try {
       const r = await fetchWithAuth(`${API_URL}/rbac/roles/${editingRole.id}`, {
         method: 'PUT',
         body: JSON.stringify({ name: roleName, description: roleDescription })
       })
-      
+
       if (r.ok) {
+        toast.success('Role updated successfully')
         setEditingRole(null)
         setRoleName('')
         setRoleDescription('')
         fetchRoles()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to update role')
+        toast.error(data.message || 'Failed to update role')
       }
     } catch (e) {
       console.error('Error updating role:', e)
-      alert('Error updating role')
+      toast.error('Error updating role')
     } finally {
       setSaving(false)
     }
   }
-  
+
   // Delete role
   const handleDeleteRole = async (role: Role) => {
     if (!confirm(`Delete role "${role.name}"? This cannot be undone.`)) return
-    
+
     try {
       const r = await fetchWithAuth(`${API_URL}/rbac/roles/${role.id}`, {
         method: 'DELETE'
       })
-      
+
       if (r.ok) {
+        toast.success('Role deleted successfully')
         fetchRoles()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to delete role')
+        toast.error(data.message || 'Failed to delete role')
       }
     } catch (e) {
       console.error('Error deleting role:', e)
-      alert('Error deleting role')
+      toast.error('Error deleting role')
     }
   }
-  
+
   // Save permissions
   const handleSavePermissions = async () => {
     if (!selectedRole) return
-    
+
     setSaving(true)
     try {
       const r = await fetchWithAuth(`${API_URL}/rbac/roles/${selectedRole.id}/permissions`, {
         method: 'POST',
         body: JSON.stringify({ permissionIds: rolePermissions })
       })
-      
+
       if (r.ok) {
-        alert('Permissions updated successfully')
+        toast.success('Permissions updated successfully')
         fetchRoles()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to update permissions')
+        toast.error(data.message || 'Failed to update permissions')
       }
     } catch (e) {
       console.error('Error saving permissions:', e)
-      alert('Error saving permissions')
+      toast.error('Error saving permissions')
     } finally {
       setSaving(false)
     }
   }
-  
+
   // Assign roles to user
   const handleAssignRoles = async () => {
     if (!assigningUser) return
-    
+
     setSaving(true)
     try {
       const r = await fetchWithAuth(`${API_URL}/rbac/users/${assigningUser.id}/roles`, {
         method: 'PUT',
         body: JSON.stringify({ roleIds: selectedRoleIds })
       })
-      
+
       if (r.ok) {
+        toast.success('Roles assigned successfully')
         setAssigningUser(null)
         setSelectedRoleIds([])
         fetchUsers()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to assign roles')
+        toast.error(data.message || 'Failed to assign roles')
       }
     } catch (e) {
       console.error('Error assigning roles:', e)
-      alert('Error assigning roles')
+      toast.error('Error assigning roles')
     } finally {
       setSaving(false)
     }
   }
-  
+
   // Create user
   const handleCreateUser = async () => {
     if (!newUserEmail) {
-      return alert('Email is required')
+      toast.error('Email is required')
+      return
     }
-    
+
     if (newUserRoleIds.length === 0) {
-      return alert('At least one role must be selected')
+      toast.error('At least one role must be selected')
+      return
     }
     
     setSaving(true)
@@ -604,17 +613,18 @@ export default function Settings({ accessToken }: { accessToken: string }) {
         const data = await r.json()
         setCreatedUserPassword(data.temporaryPassword)
         setEmailSentStatus({ sent: data.emailSent, error: data.emailError })
+        toast.success('User created successfully')
         setIsCreatingUser(false)
         setNewUserEmail('')
         setNewUserRoleIds([])
         fetchUsers()
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to create user')
+        toast.error(data.message || 'Failed to create user')
       }
     } catch (e) {
       console.error('Error creating user:', e)
-      alert('Error creating user')
+      toast.error('Error creating user')
     } finally {
       setSaving(false)
     }
@@ -649,11 +659,11 @@ export default function Settings({ accessToken }: { accessToken: string }) {
         setResettingUser(user)
       } else {
         const data = await r.json()
-        alert(data.message || 'Failed to reset password')
+        toast.error(data.message || 'Failed to reset password')
       }
     } catch (e) {
       console.error('Error resetting password:', e)
-      alert('Error resetting password')
+      toast.error('Error resetting password')
     } finally {
       setSaving(false)
     }
@@ -671,23 +681,22 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Change own password
   const handleChangeOwnPassword = async () => {
     setPasswordChangeError('')
-    setPasswordChangeSuccess(false)
-    
+
     if (!currentPassword || !newPassword || !confirmNewPassword) {
       setPasswordChangeError('All fields are required')
       return
     }
-    
+
     if (newPassword !== confirmNewPassword) {
       setPasswordChangeError('New passwords do not match')
       return
     }
-    
+
     if (newPassword.length < 10) {
       setPasswordChangeError('Password must be at least 10 characters')
       return
     }
-    
+
     setChangingPassword(true)
     try {
       const r = await fetchWithAuth(`${API_URL}/auth/change-password`, {
@@ -697,13 +706,12 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           newPassword
         })
       })
-      
+
       if (r.ok) {
-        setPasswordChangeSuccess(true)
+        toast.success('Password changed successfully!')
         setCurrentPassword('')
         setNewPassword('')
         setConfirmNewPassword('')
-        setTimeout(() => setPasswordChangeSuccess(false), 5000)
       } else {
         const data = await r.json()
         setPasswordChangeError(data.message || 'Failed to change password')
@@ -1576,13 +1584,6 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
             <h3 style={{ marginTop: 0, marginBottom: 20 }}>Change Password</h3>
             
-            {passwordChangeSuccess && (
-              <div style={{ padding: '16px', background: '#4CAF504d', border: '1px solid #4CAF50', borderRadius: 8, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <CheckCircle size={20} color="#4CAF50" />
-                <span style={{ color: '#2e7d32', fontWeight: 500 }}>Password changed successfully!</span>
-              </div>
-            )}
-            
             <div style={{ display: 'grid', gap: 16, maxWidth: 500 }}>
               <label style={{ display: 'grid', gap: 6 }}>
                 <span style={{ fontWeight: 500 }}>Current Password *</span>
@@ -1672,19 +1673,6 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
             <h3 style={{ marginTop: 0, marginBottom: 20 }}>International Clock Configuration</h3>
-            
-            {timezoneSaveSuccess && (
-              <div style={{ padding: '16px', background: '#4CAF504d', border: '1px solid #4CAF50', borderRadius: 8, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <CheckCircle size={20} color="#4CAF50" />
-                <span style={{ color: '#2e7d32', fontWeight: 500 }}>Timezone updated successfully! Changes will reflect on the home page.</span>
-              </div>
-            )}
-            
-            {timezoneSaveError && (
-              <div style={{ padding: '16px', background: '#f443364d', border: '1px solid #f44336', borderRadius: 8, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ color: '#c62828', fontWeight: 500 }}>{timezoneSaveError}</span>
-              </div>
-            )}
             
             <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
               <div style={{ background: '#f0f7ff', border: '1px solid #2196F3', borderRadius: 8, padding: 16, fontSize: 13 }}>

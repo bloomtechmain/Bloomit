@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 type ProjectPayload = {
   project_name?: string
@@ -18,7 +17,7 @@ export const getAllProjects = async (req: Request, res: Response) => {
       FROM projects
       ORDER BY project_id DESC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ projects: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -34,7 +33,7 @@ export const getProjectById = async (req: Request, res: Response) => {
       FROM projects
       WHERE project_id = $1
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }
@@ -59,7 +58,7 @@ export const createProject = async (req: Request, res: Response) => {
       RETURNING project_id, projects_name AS project_name, customer_name, description, initial_cost_budget, extra_budget_allocation, payment_type, status AS status
     `
     const values = [project_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     return res.status(201).json({ project: result.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -83,7 +82,7 @@ export const updateProject = async (req: Request, res: Response) => {
       RETURNING project_id, projects_name AS project_name, customer_name, description, initial_cost_budget, extra_budget_allocation, payment_type, status
     `
     const values = [project_name, customer_name, description ?? null, initial_cost_budget, extra_budget_allocation, payment_type, status, id]
-    const result = await pool.query(query, values)
+    const result = await req.dbClient!.query(query, values)
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }
@@ -102,7 +101,7 @@ export const deleteProject = async (req: Request, res: Response) => {
       WHERE project_id = $1
       RETURNING project_id
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'project_not_found' })
     }
@@ -112,5 +111,3 @@ export const deleteProject = async (req: Request, res: Response) => {
     return res.status(500).json({ error: message })
   }
 }
-
-

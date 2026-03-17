@@ -9,7 +9,7 @@ exports.verifyToken = verifyToken;
 exports.decodeToken = decodeToken;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
-const JWT_EXPIRES_IN = '15m'; // Access token expires in 15 minutes
+const JWT_EXPIRES_IN = '30m'; // Access token expires in 30 minutes
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
 /**
  * Generate access token

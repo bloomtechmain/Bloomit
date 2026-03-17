@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 type QuotePayload = {
   template_type?: 'RESTAURANT' | 'RETAIL' | 'CUSTOM'
@@ -26,16 +25,16 @@ type QuotePayload = {
 export const getAllQuotes = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         q.*,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name
       FROM quotes q
       LEFT JOIN employees e1 ON q.created_by = e1.id
       LEFT JOIN employees e2 ON q.assigned_to = e2.id
       ORDER BY q.created_at DESC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
     return res.status(200).json({ quotes: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -49,17 +48,17 @@ export const getQuoteById = async (req: Request, res: Response) => {
   try {
     // Get quote
     const quoteQuery = `
-      SELECT 
+      SELECT
         q.*,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name
       FROM quotes q
       LEFT JOIN employees e1 ON q.created_by = e1.id
       LEFT JOIN employees e2 ON q.assigned_to = e2.id
       WHERE q.quote_id = $1
     `
-    const quoteResult = await pool.query(quoteQuery, [id])
-    
+    const quoteResult = await req.dbClient!.query(quoteQuery, [id])
+
     if (quoteResult.rows.length === 0) {
       return res.status(404).json({ error: 'quote_not_found' })
     }
@@ -68,13 +67,13 @@ export const getQuoteById = async (req: Request, res: Response) => {
     const itemsQuery = `
       SELECT * FROM quote_items WHERE quote_id = $1 ORDER BY item_id
     `
-    const itemsResult = await pool.query(itemsQuery, [id])
+    const itemsResult = await req.dbClient!.query(itemsQuery, [id])
 
     // Get additional services
     const servicesQuery = `
       SELECT * FROM quote_additional_services WHERE quote_id = $1 ORDER BY service_id
     `
-    const servicesResult = await pool.query(servicesQuery, [id])
+    const servicesResult = await req.dbClient!.query(servicesQuery, [id])
 
     const quote = {
       ...quoteResult.rows[0],
@@ -91,14 +90,14 @@ export const getQuoteById = async (req: Request, res: Response) => {
 
 // Create new quote
 export const createQuote = async (req: Request, res: Response) => {
-  const { 
-    template_type, 
-    company_name, 
-    company_address, 
-    date_of_issue, 
-    notes, 
-    status, 
-    assigned_to, 
+  const {
+    template_type,
+    company_name,
+    company_address,
+    date_of_issue,
+    notes,
+    status,
+    assigned_to,
     created_by,
     items = [],
     additional_services = []
@@ -108,8 +107,8 @@ export const createQuote = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'missing_fields' })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -124,23 +123,23 @@ export const createQuote = async (req: Request, res: Response) => {
     // Insert quote
     const quoteQuery = `
       INSERT INTO quotes (
-        quote_number, template_type, company_name, company_address, 
+        quote_number, template_type, company_name, company_address,
         date_of_issue, subtotal, total_due, notes, status, assigned_to, created_by
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `
     const quoteValues = [
-      quote_number, 
-      template_type, 
-      company_name, 
-      company_address || null, 
-      date_of_issue, 
-      subtotal, 
-      total_due, 
-      notes || null, 
-      status || 'DRAFT', 
-      assigned_to || null, 
+      quote_number,
+      template_type,
+      company_name,
+      company_address || null,
+      date_of_issue,
+      subtotal,
+      total_due,
+      notes || null,
+      status || 'DRAFT',
+      assigned_to || null,
       created_by || null
     ]
     const quoteResult = await client.query(quoteQuery, quoteValues)
@@ -171,21 +170,19 @@ export const createQuote = async (req: Request, res: Response) => {
     await client.query('ROLLBACK')
     const message = err instanceof Error ? err.message : 'server_error'
     return res.status(500).json({ error: message })
-  } finally {
-    client.release()
   }
 }
 
 // Update quote
 export const updateQuote = async (req: Request, res: Response) => {
   const { id } = req.params
-  const { 
-    template_type, 
-    company_name, 
-    company_address, 
-    date_of_issue, 
-    notes, 
-    status, 
+  const {
+    template_type,
+    company_name,
+    company_address,
+    date_of_issue,
+    notes,
+    status,
     assigned_to,
     items = [],
     additional_services = []
@@ -195,8 +192,8 @@ export const updateQuote = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'missing_fields' })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
@@ -207,26 +204,26 @@ export const updateQuote = async (req: Request, res: Response) => {
     // Update quote
     const quoteQuery = `
       UPDATE quotes
-      SET template_type = $1, company_name = $2, company_address = $3, 
-          date_of_issue = $4, subtotal = $5, total_due = $6, notes = $7, 
+      SET template_type = $1, company_name = $2, company_address = $3,
+          date_of_issue = $4, subtotal = $5, total_due = $6, notes = $7,
           status = $8, assigned_to = $9, updated_at = CURRENT_TIMESTAMP
       WHERE quote_id = $10
       RETURNING *
     `
     const quoteValues = [
-      template_type, 
-      company_name, 
-      company_address || null, 
-      date_of_issue, 
-      subtotal, 
-      total_due, 
-      notes || null, 
-      status || 'DRAFT', 
-      assigned_to || null, 
+      template_type,
+      company_name,
+      company_address || null,
+      date_of_issue,
+      subtotal,
+      total_due,
+      notes || null,
+      status || 'DRAFT',
+      assigned_to || null,
       id
     ]
     const quoteResult = await client.query(quoteQuery, quoteValues)
-    
+
     if (quoteResult.rows.length === 0) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'quote_not_found' })
@@ -261,8 +258,6 @@ export const updateQuote = async (req: Request, res: Response) => {
     await client.query('ROLLBACK')
     const message = err instanceof Error ? err.message : 'server_error'
     return res.status(500).json({ error: message })
-  } finally {
-    client.release()
   }
 }
 
@@ -275,15 +270,15 @@ export const updateQuoteStatus = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'status_required' })
   }
 
-  const client = await pool.connect()
-  
+  const client = req.dbClient!
+
   try {
     await client.query('BEGIN')
 
     // Get current status
     const currentQuery = 'SELECT status FROM quotes WHERE quote_id = $1'
     const currentResult = await client.query(currentQuery, [id])
-    
+
     if (currentResult.rows.length === 0) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'quote_not_found' })
@@ -293,8 +288,8 @@ export const updateQuoteStatus = async (req: Request, res: Response) => {
 
     // Update quote status
     const updateQuery = `
-      UPDATE quotes 
-      SET status = $1, updated_at = CURRENT_TIMESTAMP 
+      UPDATE quotes
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
       WHERE quote_id = $2
       RETURNING *
     `
@@ -314,27 +309,25 @@ export const updateQuoteStatus = async (req: Request, res: Response) => {
     await client.query('ROLLBACK')
     const message = err instanceof Error ? err.message : 'server_error'
     return res.status(500).json({ error: message })
-  } finally {
-    client.release()
   }
 }
 
 // Get status history for a quote
 export const getQuoteStatusHistory = async (req: Request, res: Response) => {
   const { id } = req.params
-  
+
   try {
     const query = `
-      SELECT 
+      SELECT
         qsh.*,
-        e.name as changed_by_name
+        CONCAT(e.first_name, ' ', e.last_name) as changed_by_name
       FROM quote_status_history qsh
       LEFT JOIN employees e ON qsh.changed_by = e.id
       WHERE qsh.quote_id = $1
       ORDER BY qsh.changed_at DESC
     `
-    const result = await pool.query(query, [id])
-    
+    const result = await req.dbClient!.query(query, [id])
+
     return res.status(200).json({ history: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -345,15 +338,15 @@ export const getQuoteStatusHistory = async (req: Request, res: Response) => {
 // Delete quote
 export const deleteQuote = async (req: Request, res: Response) => {
   const { id } = req.params
-  
+
   try {
     const query = 'DELETE FROM quotes WHERE quote_id = $1 RETURNING quote_id'
-    const result = await pool.query(query, [id])
-    
+    const result = await req.dbClient!.query(query, [id])
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'quote_not_found' })
     }
-    
+
     return res.status(200).json({ message: 'quote_deleted', quote_id: result.rows[0].quote_id })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -365,7 +358,7 @@ export const deleteQuote = async (req: Request, res: Response) => {
 export const getServiceSuggestions = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         service_name,
         price,
         COUNT(*) as usage_count
@@ -374,8 +367,8 @@ export const getServiceSuggestions = async (req: Request, res: Response) => {
       ORDER BY usage_count DESC, service_name ASC
       LIMIT 50
     `
-    const result = await pool.query(query)
-    
+    const result = await req.dbClient!.query(query)
+
     return res.status(200).json({ suggestions: result.rows })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -387,33 +380,33 @@ export const getServiceSuggestions = async (req: Request, res: Response) => {
 export const assignQuote = async (req: Request, res: Response) => {
   const { id } = req.params
   const { assigned_to } = req.body
-  
+
   try {
     const query = `
-      UPDATE quotes 
-      SET assigned_to = $1, updated_at = CURRENT_TIMESTAMP 
+      UPDATE quotes
+      SET assigned_to = $1, updated_at = CURRENT_TIMESTAMP
       WHERE quote_id = $2
       RETURNING *
     `
-    const result = await pool.query(query, [assigned_to || null, id])
-    
+    const result = await req.dbClient!.query(query, [assigned_to || null, id])
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'quote_not_found' })
     }
-    
+
     // Get quote with employee names joined
     const quoteQuery = `
-      SELECT 
+      SELECT
         q.*,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name
       FROM quotes q
       LEFT JOIN employees e1 ON q.created_by = e1.id
       LEFT JOIN employees e2 ON q.assigned_to = e2.id
       WHERE q.quote_id = $1
     `
-    const quoteResult = await pool.query(quoteQuery, [id])
-    
+    const quoteResult = await req.dbClient!.query(quoteQuery, [id])
+
     return res.status(200).json({ quote: quoteResult.rows[0] })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'server_error'
@@ -438,20 +431,20 @@ export const createReminder = async (req: Request, res: Response) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `
-    const result = await pool.query(query, [id, reminder_date, 'MANUAL', notes || null, created_by || null, assigned_to || null])
+    const result = await req.dbClient!.query(query, [id, reminder_date, 'MANUAL', notes || null, created_by || null, assigned_to || null])
 
     // Get reminder with employee names joined
     const reminderQuery = `
-      SELECT 
+      SELECT
         qr.*,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name
       FROM quote_reminders qr
       LEFT JOIN employees e1 ON qr.created_by = e1.id
       LEFT JOIN employees e2 ON qr.assigned_to = e2.id
       WHERE qr.reminder_id = $1
     `
-    const reminderResult = await pool.query(reminderQuery, [result.rows[0].reminder_id])
+    const reminderResult = await req.dbClient!.query(reminderQuery, [result.rows[0].reminder_id])
 
     return res.status(201).json({ reminder: reminderResult.rows[0] })
   } catch (err: unknown) {
@@ -466,17 +459,17 @@ export const getQuoteReminders = async (req: Request, res: Response) => {
 
   try {
     const query = `
-      SELECT 
+      SELECT
         qr.*,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name
       FROM quote_reminders qr
       LEFT JOIN employees e1 ON qr.created_by = e1.id
       LEFT JOIN employees e2 ON qr.assigned_to = e2.id
       WHERE qr.quote_id = $1
       ORDER BY qr.reminder_date DESC
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
 
     return res.status(200).json({ reminders: result.rows })
   } catch (err: unknown) {
@@ -489,16 +482,16 @@ export const getQuoteReminders = async (req: Request, res: Response) => {
 export const getAllPendingReminders = async (req: Request, res: Response) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         qr.*,
         q.quote_number,
         q.company_name,
         q.status as quote_status,
         q.total_due,
         q.assigned_to as quote_assigned_to,
-        e1.name as created_by_name,
-        e2.name as assigned_to_name,
-        e3.name as quote_assigned_to_name
+        CONCAT(e1.first_name, ' ', e1.last_name) as created_by_name,
+        CONCAT(e2.first_name, ' ', e2.last_name) as assigned_to_name,
+        CONCAT(e3.first_name, ' ', e3.last_name) as quote_assigned_to_name
       FROM quote_reminders qr
       INNER JOIN quotes q ON qr.quote_id = q.quote_id
       LEFT JOIN employees e1 ON qr.created_by = e1.id
@@ -507,7 +500,7 @@ export const getAllPendingReminders = async (req: Request, res: Response) => {
       WHERE qr.reminder_status = 'PENDING'
       ORDER BY qr.reminder_date ASC
     `
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
 
     // Categorize reminders by urgency
     const today = new Date()
@@ -532,7 +525,7 @@ export const getAllPendingReminders = async (req: Request, res: Response) => {
       }
     })
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       reminders: result.rows,
       categorized
     })
@@ -553,7 +546,7 @@ export const dismissReminder = async (req: Request, res: Response) => {
       WHERE reminder_id = $1
       RETURNING *
     `
-    const result = await pool.query(query, [id])
+    const result = await req.dbClient!.query(query, [id])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'reminder_not_found' })
@@ -570,7 +563,7 @@ export const dismissReminder = async (req: Request, res: Response) => {
 export const getReminderSettings = async (req: Request, res: Response) => {
   try {
     const query = 'SELECT * FROM quote_reminder_settings LIMIT 1'
-    const result = await pool.query(query)
+    const result = await req.dbClient!.query(query)
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'settings_not_found' })
@@ -590,7 +583,7 @@ export const updateReminderSettings = async (req: Request, res: Response) => {
   try {
     const query = `
       UPDATE quote_reminder_settings
-      SET 
+      SET
         days_after_sent = COALESCE($1, days_after_sent),
         days_after_follow_up = COALESCE($2, days_after_follow_up),
         enable_email_notifications = COALESCE($3, enable_email_notifications),
@@ -598,7 +591,7 @@ export const updateReminderSettings = async (req: Request, res: Response) => {
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `
-    const result = await pool.query(query, [
+    const result = await req.dbClient!.query(query, [
       days_after_sent,
       days_after_follow_up,
       enable_email_notifications,

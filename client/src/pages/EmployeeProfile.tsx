@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { User, Mail, Phone, Calendar, MapPin, Heart, Building, CreditCard, Shield, Edit, Save, X } from 'lucide-react'
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeePortalService'
 import type { EmployeeProfileData } from '../services/employeePortalService'
+import { useToast } from '../context/ToastContext'
 
 interface EmployeeProfileProps {
   employeeId: number
@@ -9,12 +10,12 @@ interface EmployeeProfileProps {
 }
 
 export default function EmployeeProfile({ employeeId, accessToken }: EmployeeProfileProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<EmployeeProfileData | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Editable fields
   const [editedPhone, setEditedPhone] = useState('')
@@ -60,7 +61,6 @@ export default function EmployeeProfile({ employeeId, accessToken }: EmployeePro
     }
     setIsEditing(!isEditing)
     setError(null)
-    setSuccessMessage(null)
   }
 
   const handleSave = async () => {
@@ -68,7 +68,6 @@ export default function EmployeeProfile({ employeeId, accessToken }: EmployeePro
 
     setSaving(true)
     setError(null)
-    setSuccessMessage(null)
 
     try {
       const result = await updateEmployeeProfile(employeeId, accessToken, {
@@ -83,10 +82,7 @@ export default function EmployeeProfile({ employeeId, accessToken }: EmployeePro
 
       setProfile(result.profile)
       setIsEditing(false)
-      setSuccessMessage('Profile updated successfully!')
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000)
+      toast.success('Profile updated successfully!')
     } catch (err) {
       console.error('Error updating profile:', err)
       setError(err instanceof Error ? err.message : 'Failed to update profile')
@@ -163,13 +159,6 @@ export default function EmployeeProfile({ employeeId, accessToken }: EmployeePro
           </div>
         )}
       </div>
-
-      {/* Success Message */}
-      {successMessage && (
-        <div style={{ padding: 16, marginBottom: 24, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 8, color: 'var(--success)' }}>
-          ✓ {successMessage}
-        </div>
-      )}
 
       {/* Error Message */}
       {error && (

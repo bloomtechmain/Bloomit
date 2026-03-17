@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPayable = exports.getAllPayables = void 0;
-const db_1 = require("../db");
 const getAllPayables = async (req, res) => {
     try {
         const query = `
@@ -11,7 +10,7 @@ const getAllPayables = async (req, res) => {
       LEFT JOIN contracts c ON p.contract_id = c.contract_id
       ORDER BY p.created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ payables: result.rows });
     }
     catch (err) {
@@ -27,7 +26,7 @@ const createPayable = async (req, res) => {
         return res.status(400).json({ error: 'missing_fields' });
     }
     const finalPayableName = payable_name || (payable_type === 'PETTY_CASH' ? 'Petty Cash Expense' : '');
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         const query = `
@@ -75,16 +74,15 @@ const createPayable = async (req, res) => {
         VALUES ('EXPENSE', $1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
       `, [amount, description || finalPayableName, newPayable.payable_id, contract_id || null, accountId]);
         }
-        // If payment details are provided, record in payable_payments
+        // If payment details are provided, record in payable_payments and deduct from bank account
         if (bank_account_id || payment_method || reference_number) {
-            const paymentQuery = `
-        INSERT INTO payable_payments (
+            const status = reference_number ? 'Paid' : 'Pending';
+            await client.query(`
+        INSERT INTO payment_payables (
           payable_id, payment_method, bank_account_id, payment_date, amount, reference_number, status
         )
         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6)
-      `;
-            const status = reference_number ? 'Paid' : 'Pending';
-            await client.query(paymentQuery, [
+      `, [
                 newPayable.payable_id,
                 payment_method || null,
                 bank_account_id || null,
@@ -92,6 +90,10 @@ const createPayable = async (req, res) => {
                 reference_number || null,
                 status
             ]);
+            // Deduct from bank account balance when a bank account is used
+            if (bank_account_id) {
+                await client.query(`UPDATE company_bank_accounts SET current_balance = current_balance - $1 WHERE id = $2`, [amount, bank_account_id]);
+            }
         }
         await client.query('COMMIT');
         return res.status(201).json({ payable: newPayable });
@@ -100,9 +102,6 @@ const createPayable = async (req, res) => {
         await client.query('ROLLBACK');
         const message = err instanceof Error ? err.message : 'server_error';
         return res.status(500).json({ error: message });
-    }
-    finally {
-        client.release();
     }
 };
 exports.createPayable = createPayable;

@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { pool } from '../db'
 
 type CreateDebitCardPayload = {
   bank_account_id?: number
@@ -30,12 +29,13 @@ export const createDebitCard = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'invalid_expiry_date' })
   }
 
+  const client = req.dbClient!
   try {
-    const acc = await pool.query('SELECT id FROM company_bank_accounts WHERE id=$1', [bank_account_id])
+    const acc = await client.query('SELECT id FROM company_bank_accounts WHERE id=$1', [bank_account_id])
     if (!acc.rows.length) {
       return res.status(404).json({ error: 'bank_account_not_found' })
     }
-    const r = await pool.query(
+    const r = await client.query(
       `INSERT INTO debit_cards (bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active, created_at`,
@@ -50,7 +50,7 @@ export const createDebitCard = async (req: Request, res: Response) => {
 
 export const getDebitCards = async (req: Request, res: Response) => {
   try {
-    const r = await pool.query(
+    const r = await req.dbClient!.query(
       `SELECT id, bank_account_id, card_number_last4, card_holder_name, expiry_date, is_active, created_at
        FROM debit_cards
        ORDER BY created_at DESC`

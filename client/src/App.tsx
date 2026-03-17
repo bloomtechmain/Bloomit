@@ -1,5 +1,5 @@
 import './App.css'
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, useRef, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -7,6 +7,10 @@ import EmployeePortal from './pages/EmployeePortal'
 import SessionExpirationWarning from './components/SessionExpirationWarning'
 import { isTokenExpired, isTokenExpiringSoon, getTimeUntilExpiry } from './utils/tokenManager'
 import { API_URL } from './config/api'
+import { ToastProvider } from './context/ToastContext'
+import { ConfirmProvider } from './context/ConfirmContext'
+import ToastContainer from './components/ui/ToastContainer'
+import ConfirmDialog from './components/ui/ConfirmDialog'
 
 type User = { 
   id: number
@@ -122,6 +126,30 @@ export default function App() {
     setShowExpirationWarning(false)
   }
   
+  // Keep a ref to the latest access token so the beforeunload handler is never stale
+  const accessTokenRef = useRef<string | null>(authState.accessToken)
+  useEffect(() => {
+    accessTokenRef.current = authState.accessToken
+  }, [authState.accessToken])
+
+  // Auto-logout when the browser tab/window is closed
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const token = accessTokenRef.current
+      if (token) {
+        fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        })
+        localStorage.removeItem('authState')
+        localStorage.removeItem('token')
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
   // Monitor token expiration
   useEffect(() => {
     if (!authState.accessToken) return
@@ -218,58 +246,67 @@ export default function App() {
     }
   }
 
-  if (!authState.user || !authState.accessToken || !authState.refreshToken) {
-    return <Login onLoggedIn={handleLogin} />
-  }
-
   // Check if user is a regular employee (not admin/manager)
-  const isRegularEmployee = authState.user.roleNames?.includes('Employee') && 
-    !authState.user.roleNames?.includes('Admin') && 
-    !authState.user.roleNames?.includes('Super Admin') &&
-    !authState.user.roleNames?.includes('Manager')
+  const isRegularEmployee = authState.user?.roleNames?.includes('Employee') &&
+    !authState.user?.roleNames?.includes('Admin') &&
+    !authState.user?.roleNames?.includes('Super Admin') &&
+    !authState.user?.roleNames?.includes('Manager')
 
   return (
-    <ErrorBoundary>
-      {/* Session Expiration Warning Modal */}
-      {showExpirationWarning && (
-        <SessionExpirationWarning
-          timeRemaining={timeRemaining}
-          onRefreshSession={handleRefreshSession}
-          onLogout={handleLogout}
-        />
-      )}
-      
-      {isRegularEmployee ? (
-        <EmployeePortal 
-          user={authState.user} 
-          accessToken={authState.accessToken}
-          onLogout={handleLogout}
-        />
-      ) : (
-        <Dashboard 
-          user={authState.user} 
-          accessToken={authState.accessToken}
-          refreshToken={authState.refreshToken}
-          onLogout={handleLogout}
-          onTokenRefresh={(newAccessToken: string) => {
-            console.log('🔄 Token refreshed via Dashboard callback')
-            setAuthState(prev => ({ ...prev, accessToken: newAccessToken }))
-            localStorage.setItem('token', newAccessToken)
-            
-            // Update authState in localStorage
-            const stored = localStorage.getItem('authState')
-            if (stored) {
-              try {
-                const parsed = JSON.parse(stored)
-                parsed.accessToken = newAccessToken
-                localStorage.setItem('authState', JSON.stringify(parsed))
-              } catch (e) {
-                console.error('Failed to update authState:', e)
-              }
-            }
-          }}
-        />
-      )}
-    </ErrorBoundary>
+    <ToastProvider>
+      <ConfirmProvider>
+        <ErrorBoundary>
+          <ToastContainer />
+          <ConfirmDialog />
+
+          {!authState.user || !authState.accessToken || !authState.refreshToken ? (
+            <Login onLoggedIn={handleLogin} />
+          ) : (
+            <>
+              {/* Session Expiration Warning Modal */}
+              {showExpirationWarning && (
+                <SessionExpirationWarning
+                  timeRemaining={timeRemaining}
+                  onRefreshSession={handleRefreshSession}
+                  onLogout={handleLogout}
+                />
+              )}
+
+              {isRegularEmployee ? (
+                <EmployeePortal
+                  user={authState.user}
+                  accessToken={authState.accessToken}
+                  onLogout={handleLogout}
+                />
+              ) : (
+                <Dashboard
+                  user={authState.user}
+                  accessToken={authState.accessToken}
+                  refreshToken={authState.refreshToken}
+                  onLogout={handleLogout}
+                  onTokenRefresh={(newAccessToken: string) => {
+                    console.log('🔄 Token refreshed via Dashboard callback')
+                    setAuthState(prev => ({ ...prev, accessToken: newAccessToken }))
+                    localStorage.setItem('token', newAccessToken)
+
+                    // Update authState in localStorage
+                    const stored = localStorage.getItem('authState')
+                    if (stored) {
+                      try {
+                        const parsed = JSON.parse(stored)
+                        parsed.accessToken = newAccessToken
+                        localStorage.setItem('authState', JSON.stringify(parsed))
+                      } catch (e) {
+                        console.error('Failed to update authState:', e)
+                      }
+                    }
+                  }}
+                />
+              )}
+            </>
+          )}
+        </ErrorBoundary>
+      </ConfirmProvider>
+    </ToastProvider>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ShoppingCart, Plus, FileText, DollarSign, CheckCircle, Clock, Download } from 'lucide-react'
 import { purchaseOrdersApi } from '../services/purchaseOrdersApi'
+import { useToast } from '../context/ToastContext'
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrders'
 import { ViewPOModal } from '../components/purchaseOrders/modals/ViewPOModal'
 import { CreateEditPOModal } from '../components/purchaseOrders/modals/CreateEditPOModal'
@@ -32,23 +33,23 @@ type Project = {
   contract_name: string
 }
 
-export default function PurchaseOrders({ 
+export default function PurchaseOrders({
   user,
   vendors = [],
   projects = [],
   accessToken = ''
-}: { 
+}: {
   user: User
   vendors?: Vendor[]
   projects?: Project[]
   accessToken?: string
 }) {
+  const { toast } = useToast()
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
   const [viewingPO, setViewingPO] = useState<PurchaseOrder | null>(null)
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Form state
   const [poNumber, setPoNumber] = useState('')
@@ -89,8 +90,8 @@ export default function PurchaseOrders({
   const [showReportMenu, setShowReportMenu] = useState(false)
 
   const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type })
-    setTimeout(() => setNotification(null), 3000)
+    if (type === 'success') toast.success(message)
+    else toast.error(message)
   }
 
   const fetchPurchaseOrders = useCallback(async () => {
@@ -454,24 +455,6 @@ export default function PurchaseOrders({
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Notification */}
-      {notification && (
-        <div style={{
-          position: 'fixed',
-          top: '2rem',
-          right: '2rem',
-          padding: '1rem 1.5rem',
-          backgroundColor: notification.type === 'success' ? '#dcfce7' : '#fee2e2',
-          border: `1px solid ${notification.type === 'success' ? '#86efac' : '#fecaca'}`,
-          borderRadius: '8px',
-          color: notification.type === 'success' ? '#166534' : '#991b1b',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          zIndex: 9999
-        }}>
-          {notification.message}
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>

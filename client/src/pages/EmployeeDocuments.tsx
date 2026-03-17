@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Download, Search, Filter, FolderOpen } from 'lucide-react'
 import { getEmployeeDocuments, downloadEmployeeDocument } from '../services/employeePortalService'
 import type { Document } from '../services/employeePortalService'
+import { useToast } from '../context/ToastContext'
 
 interface EmployeeDocumentsProps {
   employeeId: number
@@ -9,6 +10,7 @@ interface EmployeeDocumentsProps {
 }
 
 export default function EmployeeDocuments({ employeeId, accessToken }: EmployeeDocumentsProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [documents, setDocuments] = useState<Document[]>([])
@@ -56,7 +58,7 @@ export default function EmployeeDocuments({ employeeId, accessToken }: EmployeeD
       window.URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Error downloading document:', err)
-      alert(err instanceof Error ? err.message : 'Failed to download document')
+      toast.error(err instanceof Error ? err.message : 'Failed to download document')
     } finally {
       setDownloadingId(null)
     }

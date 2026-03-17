@@ -4,12 +4,12 @@ exports.getAllDocuments = getAllDocuments;
 exports.downloadDocument = downloadDocument;
 exports.uploadDocument = uploadDocument;
 exports.deleteDocument = deleteDocument;
-const db_1 = require("../db");
 // Get all documents (metadata only, not the file data)
 async function getAllDocuments(req, res) {
+    const { tenantId } = req.user;
     try {
-        const result = await db_1.pool.query(`
-      SELECT 
+        const result = await req.dbClient.query(`
+      SELECT
         d.id,
         d.document_name,
         d.original_filename,
@@ -21,8 +21,9 @@ async function getAllDocuments(req, res) {
         u.name as uploaded_by_name
       FROM documents d
       LEFT JOIN users u ON d.uploaded_by = u.id
+      WHERE d.tenant_id = $1
       ORDER BY d.upload_date DESC
-    `);
+    `, [tenantId]);
         return res.json({ documents: result.rows });
     }
     catch (error) {
@@ -32,9 +33,10 @@ async function getAllDocuments(req, res) {
 }
 // Get single document for download
 async function downloadDocument(req, res) {
+    const { tenantId } = req.user;
     try {
         const { id } = req.params;
-        const result = await db_1.pool.query('SELECT original_filename, file_type, file_data FROM documents WHERE id = $1', [id]);
+        const result = await req.dbClient.query('SELECT original_filename, file_type, file_data FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Document not found' });
         }
@@ -52,6 +54,7 @@ async function downloadDocument(req, res) {
 }
 // Upload document (requires file in req.file from multer)
 async function uploadDocument(req, res) {
+    const { tenantId } = req.user;
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -78,9 +81,9 @@ async function uploadDocument(req, res) {
             });
         }
         // Insert document into database
-        const result = await db_1.pool.query(`INSERT INTO documents 
-        (document_name, original_filename, file_type, file_size, file_data, uploaded_by, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+        const result = await req.dbClient.query(`INSERT INTO documents
+        (document_name, original_filename, file_type, file_size, file_data, uploaded_by, description, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, document_name, original_filename, file_type, file_size, upload_date`, [
             document_name,
             req.file.originalname,
@@ -88,7 +91,8 @@ async function uploadDocument(req, res) {
             req.file.size,
             req.file.buffer,
             userId,
-            description || null
+            description || null,
+            tenantId
         ]);
         return res.status(201).json({
             message: 'Document uploaded successfully',
@@ -102,9 +106,10 @@ async function uploadDocument(req, res) {
 }
 // Delete document
 async function deleteDocument(req, res) {
+    const { tenantId } = req.user;
     try {
         const { id } = req.params;
-        const result = await db_1.pool.query('DELETE FROM documents WHERE id = $1 RETURNING id', [id]);
+        const result = await req.dbClient.query('DELETE FROM documents WHERE id = $1 AND tenant_id = $2 RETURNING id', [id, tenantId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Document not found' });
         }

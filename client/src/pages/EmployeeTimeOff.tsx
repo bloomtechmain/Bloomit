@@ -4,6 +4,7 @@ import { Calendar, Filter, CheckCircle, XCircle, Clock, Plus, Trash2 } from 'luc
 import { getEmployeePTORequests, submitPTORequest, cancelPTORequest } from '../services/employeePortalService'
 import type { PTORequest } from '../services/employeePortalService'
 import PTOBalanceCard from '../components/employee/PTOBalanceCard'
+import { useToast } from '../context/ToastContext'
 
 interface EmployeeTimeOffProps {
   employeeId: number
@@ -11,18 +12,18 @@ interface EmployeeTimeOffProps {
 }
 
 export default function EmployeeTimeOff({ employeeId, accessToken }: EmployeeTimeOffProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requests, setRequests] = useState<PTORequest[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  
+
   // PTO Submission Form
   const [showSubmitForm, setShowSubmitForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     fromDate: '',
     toDate: '',
@@ -135,12 +136,11 @@ export default function EmployeeTimeOff({ employeeId, accessToken }: EmployeeTim
 
     setSubmitting(true)
     setSubmitError(null)
-    setSubmitSuccess(null)
 
     try {
       const result = await submitPTORequest(employeeId, accessToken, formData)
-      
-      setSubmitSuccess(result.message + (result.balanceWarning ? ' ' + result.balanceWarning : ''))
+
+      toast.success(result.message + (result.balanceWarning ? ' ' + result.balanceWarning : ''))
       setShowSubmitForm(false)
       setFormData({
         fromDate: '',
@@ -148,12 +148,9 @@ export default function EmployeeTimeOff({ employeeId, accessToken }: EmployeeTim
         absenceType: 'Vacation',
         description: ''
       })
-      
+
       // Refresh the requests list
       fetchRequests()
-      
-      // Clear success message after 5 seconds
-      setTimeout(() => setSubmitSuccess(null), 5000)
     } catch (err) {
       console.error('Error submitting PTO request:', err)
       setSubmitError(err instanceof Error ? err.message : 'Failed to submit PTO request')
@@ -178,14 +175,11 @@ export default function EmployeeTimeOff({ employeeId, accessToken }: EmployeeTim
     setCancellingId(requestId)
     try {
       const result = await cancelPTORequest(employeeId, requestId, accessToken)
-      setSubmitSuccess(result.message)
+      toast.success(result.message)
       setShowCancelDialog(null)
-      
+
       // Refresh the requests list
       fetchRequests()
-      
-      // Clear success message after 5 seconds
-      setTimeout(() => setSubmitSuccess(null), 5000)
     } catch (err) {
       console.error('Error cancelling PTO request:', err)
       setSubmitError(err instanceof Error ? err.message : 'Failed to cancel PTO request')
@@ -223,13 +217,6 @@ export default function EmployeeTimeOff({ employeeId, accessToken }: EmployeeTim
           Submit New Request
         </button>
       </div>
-
-      {/* Success Message */}
-      {submitSuccess && (
-        <div style={{ padding: 16, marginBottom: 24, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 8, color: 'var(--success)' }}>
-          ✓ {submitSuccess}
-        </div>
-      )}
 
       {/* PTO Balance Card - Phase 5 */}
       <div style={{ marginBottom: 24 }}>

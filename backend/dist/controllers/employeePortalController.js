@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMyEmployeeRecord = getMyEmployeeRecord;
 exports.getDashboard = getDashboard;
 exports.getStats = getStats;
 exports.updateProfile = updateProfile;
@@ -73,6 +74,78 @@ const employeeAuditLog_1 = require("../utils/employeeAuditLog");
  * Phase 1 implementation - basic dashboard and stats.
  */
 /**
+ * GET /api/employee-portal/me
+ *
+ * Get current authenticated user's employee record
+ * This is the primary endpoint for employees to access their own data
+ *
+ * Security: Uses JWT token to identify user and returns their employee record
+ * No special permissions needed - employees can always access their own data
+ */
+async function getMyEmployeeRecord(req, res) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                error: 'unauthorized',
+                message: 'Authentication required'
+            });
+        }
+        const userId = req.user.userId;
+        // Get employee record by user_id
+        const sqlQuery = `
+      SELECT 
+        id,
+        employee_number,
+        first_name,
+        last_name,
+        email,
+        phone,
+        designation,
+        employee_department,
+        user_id,
+        is_active,
+        created_at
+      FROM employees
+      WHERE user_id = $1
+    `;
+        const result = await (0, db_1.query)(sqlQuery, [userId], req.dbClient);
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: 'employee_not_found',
+                message: 'No employee record found for this user account. Please contact HR.'
+            });
+        }
+        const employee = result.rows[0];
+        // Check if employee is active
+        if (!employee.is_active) {
+            return res.status(403).json({
+                error: 'account_inactive',
+                message: 'Your employee account is inactive. Please contact HR.'
+            });
+        }
+        console.log(`✅ Employee record retrieved for user ${req.user.email}: Employee ID ${employee.id}`);
+        return res.status(200).json({
+            employee: {
+                id: employee.id,
+                employeeNumber: employee.employee_number,
+                firstName: employee.first_name,
+                lastName: employee.last_name,
+                email: employee.email,
+                phone: employee.phone,
+                position: employee.designation,
+                department: employee.employee_department
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching employee record:', error);
+        return res.status(500).json({
+            error: 'server_error',
+            message: 'Failed to fetch employee record'
+        });
+    }
+}
+/**
  * GET /api/employee-portal/dashboard/:employeeId
  *
  * Get comprehensive dashboard data for an employee including:
@@ -101,7 +174,7 @@ async function getDashboard(req, res) {
       FROM employees
       WHERE id = $1
     `;
-        const employeeResult = await db_1.pool.query(employeeQuery, [employeeId]);
+        const employeeResult = await (0, db_1.query)(employeeQuery, [employeeId], req.dbClient);
         if (employeeResult.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -123,33 +196,33 @@ async function getDashboard(req, res) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `;
-        const ptoResult = await db_1.pool.query(ptoBalanceQuery, [employeeId]);
+        const ptoResult = await (0, db_1.query)(ptoBalanceQuery, [employeeId], req.dbClient);
         const ptoData = ptoResult.rows[0];
         // Get employee's PTO allowance from their record
         const ptoAllowanceQuery = 'SELECT pto_allowance FROM employees WHERE id = $1';
-        const ptoAllowanceResult = await db_1.pool.query(ptoAllowanceQuery, [employeeId]);
+        const ptoAllowanceResult = await (0, db_1.query)(ptoAllowanceQuery, [employeeId], req.dbClient);
         const totalPtoAllowance = ptoAllowanceResult.rows[0]?.pto_allowance || 20;
         const ptoBalance = totalPtoAllowance - parseInt(ptoData.days_used);
         // Get time entries for current week
         const timeEntriesQuery = `
       SELECT 
         COUNT(*) as entry_count,
-        COALESCE(SUM(hours), 0) as total_hours
+        COALESCE(SUM(total_hours), 0) as total_hours
       FROM time_entries
       WHERE employee_id = $1
-        AND entry_date >= date_trunc('week', CURRENT_DATE)
-        AND entry_date < date_trunc('week', CURRENT_DATE) + interval '1 week'
+        AND date >= date_trunc('week', CURRENT_DATE)
+        AND date < date_trunc('week', CURRENT_DATE) + interval '1 week'
     `;
-        const timeResult = await db_1.pool.query(timeEntriesQuery, [employeeId]);
+        const timeResult = await (0, db_1.query)(timeEntriesQuery, [employeeId], req.dbClient);
         const timeData = timeResult.rows[0];
         // Get pending time entries (not yet approved)
         const pendingTimeQuery = `
       SELECT COUNT(*) as pending_count
       FROM time_entries
       WHERE employee_id = $1
-        AND approval_status = 'pending'
+        AND status = 'pending'
     `;
-        const pendingTimeResult = await db_1.pool.query(pendingTimeQuery, [employeeId]);
+        const pendingTimeResult = await (0, db_1.query)(pendingTimeQuery, [employeeId], req.dbClient);
         const pendingTimeCount = parseInt(pendingTimeResult.rows[0].pending_count);
         // Get recent announcements (last 5, active only)
         const announcementsQuery = `
@@ -168,7 +241,7 @@ async function getDashboard(req, res) {
       ORDER BY priority DESC, created_at DESC
       LIMIT 5
     `;
-        const announcementsResult = await db_1.pool.query(announcementsQuery);
+        const announcementsResult = await (0, db_1.query)(announcementsQuery, [], req.dbClient);
         // Get recent notifications (last 10, unread first)
         const notificationsQuery = `
       SELECT 
@@ -187,7 +260,7 @@ async function getDashboard(req, res) {
       ORDER BY is_read ASC, created_at DESC
       LIMIT 10
     `;
-        const notificationsResult = await db_1.pool.query(notificationsQuery, [employeeId]);
+        const notificationsResult = await (0, db_1.query)(notificationsQuery, [employeeId], req.dbClient);
         // Count unread notifications
         const unreadNotificationsQuery = `
       SELECT COUNT(*) as unread_count
@@ -197,7 +270,7 @@ async function getDashboard(req, res) {
         AND is_archived = false
         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
     `;
-        const unreadResult = await db_1.pool.query(unreadNotificationsQuery, [employeeId]);
+        const unreadResult = await (0, db_1.query)(unreadNotificationsQuery, [employeeId], req.dbClient);
         const unreadCount = parseInt(unreadResult.rows[0].unread_count);
         // Compile dashboard response
         const dashboardData = {
@@ -252,7 +325,7 @@ async function getStats(req, res) {
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.STATS_VIEWED, req, { resourceType: 'stats', resourceId: employeeId });
         // Get employee's PTO allowance
         const employeeQuery = 'SELECT pto_allowance FROM employees WHERE id = $1';
-        const employeeResult = await db_1.pool.query(employeeQuery, [employeeId]);
+        const employeeResult = await (0, db_1.query)(employeeQuery, [employeeId], req.dbClient);
         const totalPtoAllowance = employeeResult.rows[0]?.pto_allowance || 20;
         // PTO Statistics
         const ptoStatsQuery = `
@@ -272,33 +345,33 @@ async function getStats(req, res) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `;
-        const ptoStatsResult = await db_1.pool.query(ptoStatsQuery, [employeeId]);
+        const ptoStatsResult = await (0, db_1.query)(ptoStatsQuery, [employeeId], req.dbClient);
         const ptoStats = ptoStatsResult.rows[0];
         const ptoBalance = totalPtoAllowance - parseInt(ptoStats.days_used_this_year);
         // Time Entry Statistics
         const timeStatsQuery = `
       SELECT 
         COUNT(*) as total_entries,
-        COALESCE(SUM(hours), 0) as total_hours,
-        COUNT(*) FILTER (WHERE approval_status = 'pending') as pending_entries,
-        COUNT(*) FILTER (WHERE approval_status = 'approved') as approved_entries,
-        COUNT(*) FILTER (WHERE approval_status = 'rejected') as rejected_entries
+        COALESCE(SUM(total_hours), 0) as total_hours,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_entries,
+        COUNT(*) FILTER (WHERE status = 'approved') as approved_entries,
+        COUNT(*) FILTER (WHERE status = 'rejected') as rejected_entries
       FROM time_entries
       WHERE employee_id = $1
-        AND EXTRACT(MONTH FROM entry_date) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(YEAR FROM entry_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+        AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `;
-        const timeStatsResult = await db_1.pool.query(timeStatsQuery, [employeeId]);
+        const timeStatsResult = await (0, db_1.query)(timeStatsQuery, [employeeId], req.dbClient);
         const timeStats = timeStatsResult.rows[0];
         // Time entries this week
         const weekTimeQuery = `
-      SELECT COALESCE(SUM(hours), 0) as hours_this_week
+      SELECT COALESCE(SUM(total_hours), 0) as hours_this_week
       FROM time_entries
       WHERE employee_id = $1
-        AND entry_date >= date_trunc('week', CURRENT_DATE)
-        AND entry_date < date_trunc('week', CURRENT_DATE) + interval '1 week'
+        AND date >= date_trunc('week', CURRENT_DATE)
+        AND date < date_trunc('week', CURRENT_DATE) + interval '1 week'
     `;
-        const weekTimeResult = await db_1.pool.query(weekTimeQuery, [employeeId]);
+        const weekTimeResult = await (0, db_1.query)(weekTimeQuery, [employeeId], req.dbClient);
         const hoursThisWeek = parseFloat(weekTimeResult.rows[0].hours_this_week);
         // Notification Statistics
         const notificationStatsQuery = `
@@ -311,7 +384,7 @@ async function getStats(req, res) {
         AND is_archived = false
         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
     `;
-        const notificationStatsResult = await db_1.pool.query(notificationStatsQuery, [employeeId]);
+        const notificationStatsResult = await (0, db_1.query)(notificationStatsQuery, [employeeId], req.dbClient);
         const notificationStats = notificationStatsResult.rows[0];
         // Compile stats response
         const stats = {
@@ -382,7 +455,7 @@ async function updateProfile(req, res) {
       FROM employees
       WHERE id = $1
     `;
-        const currentProfileResult = await db_1.pool.query(currentProfileQuery, [employeeId]);
+        const currentProfileResult = await (0, db_1.query)(currentProfileQuery, [employeeId], req.dbClient);
         if (currentProfileResult.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -436,7 +509,7 @@ async function updateProfile(req, res) {
       WHERE id = $${paramCount}
       RETURNING id
     `;
-        await db_1.pool.query(updateQuery, values);
+        await (0, db_1.query)(updateQuery, values, req.dbClient);
         // Build new values object for audit log
         const newValues = {
             phone: phone !== undefined ? phone : oldValues.phone,
@@ -453,7 +526,7 @@ async function updateProfile(req, res) {
             newValue: newValues
         });
         // Fetch and return updated profile
-        const updatedProfile = await getProfileData(employeeId);
+        const updatedProfile = await getProfileData(employeeId, req.dbClient);
         return res.status(200).json({
             message: 'Profile updated successfully',
             profile: updatedProfile
@@ -475,8 +548,8 @@ async function updateProfile(req, res) {
  * Helper function to get profile data
  * Extracted for reuse in getProfile and updateProfile
  */
-async function getProfileData(employeeId) {
-    const query = `
+async function getProfileData(employeeId, dbClient) {
+    const profileQuery = `
     SELECT 
       e.id,
       e.employee_number,
@@ -506,7 +579,7 @@ async function getProfileData(employeeId) {
     LEFT JOIN employees m ON e.manager_id = m.id
     WHERE e.id = $1
   `;
-    const result = await db_1.pool.query(query, [employeeId]);
+    const result = await (0, db_1.query)(profileQuery, [employeeId], dbClient);
     if (result.rows.length === 0) {
         return null;
     }
@@ -571,8 +644,7 @@ async function getProfile(req, res) {
     try {
         // Log the profile view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PROFILE_VIEWED, req, { resourceType: 'profile', resourceId: employeeId });
-        // Use helper function to get profile data
-        const profileData = await getProfileData(employeeId);
+        const profileData = await getProfileData(employeeId, req.dbClient);
         if (!profileData) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -580,13 +652,6 @@ async function getProfile(req, res) {
     }
     catch (error) {
         console.error('Error fetching profile:', error);
-        // Log the error
-        await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PROFILE_VIEWED, req, {
-            resourceType: 'profile',
-            resourceId: employeeId,
-            status: 'failure',
-            errorMessage: error instanceof Error ? error.message : 'Unknown error'
-        });
         return res.status(500).json({ error: 'server_error', message: 'Failed to fetch profile' });
     }
 }
@@ -607,7 +672,7 @@ async function getPtoBalance(req, res) {
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PTO_BALANCE_VIEWED, req, { resourceType: 'pto_balance', resourceId: employeeId });
         // Get employee's PTO allowance
         const employeeQuery = 'SELECT pto_allowance FROM employees WHERE id = $1';
-        const employeeResult = await db_1.pool.query(employeeQuery, [employeeId]);
+        const employeeResult = await (0, db_1.query)(employeeQuery, [employeeId], req.dbClient);
         if (employeeResult.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -657,7 +722,7 @@ async function getPtoBalance(req, res) {
       WHERE employee_id = $1
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     `;
-        const ptoResult = await db_1.pool.query(ptoQuery, [employeeId]);
+        const ptoResult = await (0, db_1.query)(ptoQuery, [employeeId], req.dbClient);
         const ptoData = ptoResult.rows[0];
         const daysUsed = parseInt(ptoData.days_used);
         const daysPending = parseInt(ptoData.days_pending);
@@ -780,7 +845,7 @@ async function createPtoRequest(req, res) {
           (from_date >= $2 AND to_date <= $3)
         )
     `;
-        const overlapResult = await db_1.pool.query(overlapQuery, [employeeId, fromDate, toDate]);
+        const overlapResult = await (0, db_1.query)(overlapQuery, [employeeId, fromDate, toDate], req.dbClient);
         if (overlapResult.rows.length > 0) {
             return res.status(400).json({
                 error: 'overlapping_request',
@@ -792,7 +857,7 @@ async function createPtoRequest(req, res) {
         const balanceQuery = `
       SELECT pto_allowance FROM employees WHERE id = $1
     `;
-        const balanceResult = await db_1.pool.query(balanceQuery, [employeeId]);
+        const balanceResult = await (0, db_1.query)(balanceQuery, [employeeId], req.dbClient);
         const totalAllowance = balanceResult.rows[0]?.pto_allowance || 20;
         const usedQuery = `
       SELECT COALESCE(SUM(to_date - from_date + 1), 0) as days_used
@@ -801,7 +866,7 @@ async function createPtoRequest(req, res) {
         AND status = 'approved'
         AND EXTRACT(YEAR FROM from_date) = EXTRACT(YEAR FROM $2::date)
     `;
-        const usedResult = await db_1.pool.query(usedQuery, [employeeId, fromDate]);
+        const usedResult = await (0, db_1.query)(usedQuery, [employeeId, fromDate], req.dbClient);
         const daysUsed = parseInt(usedResult.rows[0].days_used);
         const daysRemaining = totalAllowance - daysUsed;
         // Warning if insufficient balance (but still allow submission)
@@ -812,7 +877,7 @@ async function createPtoRequest(req, res) {
         const managerQuery = `
       SELECT manager_id FROM employees WHERE id = $1
     `;
-        const managerResult = await db_1.pool.query(managerQuery, [employeeId]);
+        const managerResult = await (0, db_1.query)(managerQuery, [employeeId], req.dbClient);
         const managerId = managerResult.rows[0]?.manager_id;
         if (!managerId) {
             return res.status(400).json({
@@ -835,14 +900,14 @@ async function createPtoRequest(req, res) {
       ) VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW(), NOW())
       RETURNING *
     `;
-        const insertResult = await db_1.pool.query(insertQuery, [
+        const insertResult = await (0, db_1.query)(insertQuery, [
             employeeId,
             managerId,
             absenceType,
             fromDate,
             toDate,
             description
-        ]);
+        ], req.dbClient);
         const newRequest = insertResult.rows[0];
         // Log the action
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PTO_REQUEST_SUBMITTED, req, {
@@ -866,7 +931,7 @@ async function createPtoRequest(req, res) {
       JOIN employees emp ON emp.id = $1
       WHERE e.id = $2
     `;
-        const managerDetailsResult = await db_1.pool.query(managerDetailsQuery, [employeeId, managerId]);
+        const managerDetailsResult = await (0, db_1.query)(managerDetailsQuery, [employeeId, managerId], req.dbClient);
         if (managerDetailsResult.rows.length > 0) {
             const { manager_email, manager_name, employee_name } = managerDetailsResult.rows[0];
             // Send notification email to manager
@@ -933,7 +998,7 @@ async function getPtoRequests(req, res) {
         // Log the PTO history view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PTO_HISTORY_VIEWED, req, { resourceType: 'pto_requests', resourceId: employeeId });
         // Build query with filters
-        let query = `
+        let ptoQuery = `
       SELECT 
         pr.id,
         pr.employee_id,
@@ -964,22 +1029,22 @@ async function getPtoRequests(req, res) {
         // Apply status filter
         if (status && status !== 'all') {
             paramCount++;
-            query += ` AND pr.status = $${paramCount}`;
+            ptoQuery += ` AND pr.status = $${paramCount}`;
             params.push(status);
         }
         // Apply date range filter
         if (startDate) {
             paramCount++;
-            query += ` AND pr.from_date >= $${paramCount}`;
+            ptoQuery += ` AND pr.from_date >= $${paramCount}`;
             params.push(startDate);
         }
         if (endDate) {
             paramCount++;
-            query += ` AND pr.to_date <= $${paramCount}`;
+            ptoQuery += ` AND pr.to_date <= $${paramCount}`;
             params.push(endDate);
         }
-        query += ' ORDER BY pr.created_at DESC';
-        const result = await db_1.pool.query(query, params);
+        ptoQuery += ' ORDER BY pr.created_at DESC';
+        const result = await (0, db_1.query)(ptoQuery, params, req.dbClient);
         return res.status(200).json({
             ptoRequests: result.rows,
             total: result.rows.length
@@ -1031,7 +1096,7 @@ async function cancelPtoRequest(req, res) {
       LEFT JOIN employees m ON pr.manager_id = m.id
       WHERE pr.id = $1 AND pr.employee_id = $2
     `;
-        const verifyResult = await db_1.pool.query(verifyQuery, [requestId, employeeId]);
+        const verifyResult = await (0, db_1.query)(verifyQuery, [requestId, employeeId], req.dbClient);
         if (verifyResult.rows.length === 0) {
             return res.status(404).json({
                 error: 'request_not_found',
@@ -1053,7 +1118,7 @@ async function cancelPtoRequest(req, res) {
       SET status = 'cancelled', updated_at = NOW()
       WHERE id = $1
     `;
-        await db_1.pool.query(cancelQuery, [requestId]);
+        await (0, db_1.query)(cancelQuery, [requestId], req.dbClient);
         // Log the cancellation
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PTO_REQUEST_CANCELLED, req, {
             resourceType: 'pto_request',
@@ -1122,7 +1187,7 @@ async function getTimeEntries(req, res) {
         // Log the time entries view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.TIME_REPORT_VIEWED, req, { resourceType: 'time_entries', resourceId: employeeId });
         // Build query with filters
-        let query = `
+        let timeEntriesQuery = `
       SELECT 
         te.id,
         te.employee_id,
@@ -1155,26 +1220,26 @@ async function getTimeEntries(req, res) {
         // Apply filters
         if (start_date) {
             paramCount++;
-            query += ` AND te.date >= $${paramCount}`;
+            timeEntriesQuery += ` AND te.date >= $${paramCount}`;
             params.push(start_date);
         }
         if (end_date) {
             paramCount++;
-            query += ` AND te.date <= $${paramCount}`;
+            timeEntriesQuery += ` AND te.date <= $${paramCount}`;
             params.push(end_date);
         }
         if (project_id) {
             paramCount++;
-            query += ` AND te.project_id = $${paramCount}`;
+            timeEntriesQuery += ` AND te.project_id = $${paramCount}`;
             params.push(project_id);
         }
         if (status) {
             paramCount++;
-            query += ` AND te.status = $${paramCount}`;
+            timeEntriesQuery += ` AND te.status = $${paramCount}`;
             params.push(status);
         }
-        query += ' ORDER BY te.date DESC, te.created_at DESC';
-        const result = await db_1.pool.query(query, params);
+        timeEntriesQuery += ' ORDER BY te.date DESC, te.created_at DESC';
+        const result = await (0, db_1.query)(timeEntriesQuery, params, req.dbClient);
         return res.status(200).json({
             timeEntries: result.rows,
             total: result.rows.length
@@ -1215,7 +1280,7 @@ async function createTimeEntry(req, res) {
         });
     }
     try {
-        const query = `
+        const insertQuery = `
       INSERT INTO time_entries (
         employee_id, 
         project_id, 
@@ -1239,7 +1304,7 @@ async function createTimeEntry(req, res) {
             break_time_minutes || 0,
             description || null
         ];
-        const result = await db_1.pool.query(query, values);
+        const result = await (0, db_1.query)(insertQuery, values, req.dbClient);
         const timeEntry = result.rows[0];
         // Log the action
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.TIME_ENTRY_CREATED, req, {
@@ -1297,39 +1362,39 @@ async function getTimeReport(req, res) {
         const overallQuery = `
       SELECT 
         COUNT(*) as total_entries,
-        COALESCE(SUM(total_hours), 0) as total_hours,
-        COALESCE(AVG(total_hours), 0) as avg_hours_per_entry,
-        COALESCE(SUM(break_time_minutes), 0) as total_break_minutes
+        COALESCE(SUM(te.total_hours), 0) as total_hours,
+        COALESCE(AVG(te.total_hours), 0) as avg_hours_per_entry,
+        COALESCE(SUM(te.break_time_minutes), 0) as total_break_minutes
       FROM time_entries te
       ${whereClause}
     `;
-        const overallResult = await db_1.pool.query(overallQuery, params);
+        const overallResult = await (0, db_1.query)(overallQuery, params, req.dbClient);
         // Weekly summary (last 8 weeks)
         const weeklyQuery = `
       SELECT 
         DATE_TRUNC('week', te.date) as week_start,
         COUNT(*) as entry_count,
-        COALESCE(SUM(total_hours), 0) as total_hours
+        COALESCE(SUM(te.total_hours), 0) as total_hours
       FROM time_entries te
       ${whereClause}
       GROUP BY week_start
       ORDER BY week_start DESC
       LIMIT 8
     `;
-        const weeklyResult = await db_1.pool.query(weeklyQuery, params);
+        const weeklyResult = await (0, db_1.query)(weeklyQuery, params, req.dbClient);
         // Monthly summary (last 6 months)
         const monthlyQuery = `
       SELECT 
         DATE_TRUNC('month', te.date) as month_start,
         COUNT(*) as entry_count,
-        COALESCE(SUM(total_hours), 0) as total_hours
+        COALESCE(SUM(te.total_hours), 0) as total_hours
       FROM time_entries te
       ${whereClause}
       GROUP BY month_start
       ORDER BY month_start DESC
       LIMIT 6
     `;
-        const monthlyResult = await db_1.pool.query(monthlyQuery, params);
+        const monthlyResult = await (0, db_1.query)(monthlyQuery, params, req.dbClient);
         // Project breakdown
         const projectQuery = `
       SELECT 
@@ -1344,20 +1409,20 @@ async function getTimeReport(req, res) {
       GROUP BY p.project_id, p.project_name
       ORDER BY total_hours DESC
     `;
-        const projectResult = await db_1.pool.query(projectQuery, params);
+        const projectResult = await (0, db_1.query)(projectQuery, params, req.dbClient);
         // Daily breakdown (last 30 days)
         const dailyQuery = `
       SELECT 
         te.date,
         COUNT(*) as entry_count,
-        COALESCE(SUM(total_hours), 0) as total_hours
+        COALESCE(SUM(te.total_hours), 0) as total_hours
       FROM time_entries te
       ${whereClause}
       GROUP BY te.date
       ORDER BY te.date DESC
       LIMIT 30
     `;
-        const dailyResult = await db_1.pool.query(dailyQuery, params);
+        const dailyResult = await (0, db_1.query)(dailyQuery, params, req.dbClient);
         // Pending hours (not yet approved)
         const pendingQuery = `
       SELECT 
@@ -1366,7 +1431,7 @@ async function getTimeReport(req, res) {
       FROM time_entries
       WHERE employee_id = $1 AND status = 'pending'
     `;
-        const pendingResult = await db_1.pool.query(pendingQuery, [employeeId]);
+        const pendingResult = await (0, db_1.query)(pendingQuery, [employeeId], req.dbClient);
         // Compile report
         const report = {
             employeeId: employeeId,
@@ -1429,7 +1494,7 @@ async function getTimeReport(req, res) {
 async function getActiveTimer(req, res) {
     const employeeId = parseInt(req.params.employeeId);
     try {
-        const query = `
+        const activeTimerQuery = `
       SELECT 
         at.*,
         te.project_id,
@@ -1444,7 +1509,7 @@ async function getActiveTimer(req, res) {
       LEFT JOIN contracts c ON te.contract_id = c.contract_id
       WHERE at.employee_id = $1
     `;
-        const result = await db_1.pool.query(query, [employeeId]);
+        const result = await (0, db_1.query)(activeTimerQuery, [employeeId], req.dbClient);
         if (result.rows.length === 0) {
             return res.status(200).json({ activeTimer: null });
         }
@@ -1469,7 +1534,7 @@ async function getPayslips(req, res) {
         // Log the payslips view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PAYSLIP_VIEWED, req, { resourceType: 'payslips_list', resourceId: employeeId });
         // Build query
-        let query = `
+        let payslipsQuery = `
       SELECT 
         p.payslip_id,
         p.employee_id,
@@ -1491,11 +1556,11 @@ async function getPayslips(req, res) {
         // Filter by year if provided
         if (year) {
             paramCount++;
-            query += ` AND p.payslip_year = $${paramCount}`;
+            payslipsQuery += ` AND p.payslip_year = $${paramCount}`;
             params.push(year);
         }
-        query += ' ORDER BY p.payslip_year DESC, p.payslip_month DESC';
-        const result = await db_1.pool.query(query, params);
+        payslipsQuery += ' ORDER BY p.payslip_year DESC, p.payslip_month DESC';
+        const result = await (0, db_1.query)(payslipsQuery, params, req.dbClient);
         return res.status(200).json({
             payslips: result.rows,
             total: result.rows.length
@@ -1537,7 +1602,7 @@ async function getPayslipDetails(req, res) {
         AND p.employee_id = $2
         AND p.status IN ('PENDING_EMPLOYEE_SIGNATURE', 'COMPLETED')
     `;
-        const payslipResult = await db_1.pool.query(payslipQuery, [payslipId, employeeId]);
+        const payslipResult = await (0, db_1.query)(payslipQuery, [payslipId, employeeId], req.dbClient);
         if (payslipResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
@@ -1555,7 +1620,7 @@ async function getPayslipDetails(req, res) {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `;
-        const signaturesResult = await db_1.pool.query(signaturesQuery, [payslipId]);
+        const signaturesResult = await (0, db_1.query)(signaturesQuery, [payslipId], req.dbClient);
         // Log the view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PAYSLIP_VIEWED, req, { resourceType: 'payslip', resourceId: payslipId });
         return res.status(200).json({
@@ -1592,7 +1657,7 @@ async function downloadPayslip(req, res) {
         AND p.employee_id = $2
         AND p.status IN ('PENDING_EMPLOYEE_SIGNATURE', 'COMPLETED')
     `;
-        const verifyResult = await db_1.pool.query(verifyQuery, [payslipId, employeeId]);
+        const verifyResult = await (0, db_1.query)(verifyQuery, [payslipId, employeeId], req.dbClient);
         if (verifyResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
@@ -1600,7 +1665,7 @@ async function downloadPayslip(req, res) {
         const payslipQuery = `
       SELECT 
         p.*,
-        e.name as employee_name,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
         e.email as employee_email,
         e.employee_department,
         e.role,
@@ -1612,7 +1677,7 @@ async function downloadPayslip(req, res) {
       JOIN employees e ON p.employee_id = e.id
       WHERE p.payslip_id = $1
     `;
-        const payslipResult = await db_1.pool.query(payslipQuery, [payslipId]);
+        const payslipResult = await (0, db_1.query)(payslipQuery, [payslipId], req.dbClient);
         // Get signatures
         const signaturesQuery = `
       SELECT 
@@ -1623,7 +1688,7 @@ async function downloadPayslip(req, res) {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `;
-        const signaturesResult = await db_1.pool.query(signaturesQuery, [payslipId]);
+        const signaturesResult = await (0, db_1.query)(signaturesQuery, [payslipId], req.dbClient);
         // Log the download
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.PAYSLIP_DOWNLOADED, req, { resourceType: 'payslip', resourceId: payslipId });
         // Generate and return PDF (using existing utility)
@@ -1669,7 +1734,7 @@ async function getYtdEarnings(req, res) {
         AND payslip_year = $2 
         AND status = 'COMPLETED'
     `;
-        const summaryResult = await db_1.pool.query(summaryQuery, [employeeId, year]);
+        const summaryResult = await (0, db_1.query)(summaryQuery, [employeeId, year], req.dbClient);
         const summary = summaryResult.rows[0];
         // Get monthly breakdown
         const monthlyQuery = `
@@ -1688,7 +1753,7 @@ async function getYtdEarnings(req, res) {
         AND status = 'COMPLETED'
       ORDER BY payslip_month ASC
     `;
-        const monthlyResult = await db_1.pool.query(monthlyQuery, [employeeId, year]);
+        const monthlyResult = await (0, db_1.query)(monthlyQuery, [employeeId, year], req.dbClient);
         // Compile response
         const ytdData = {
             employeeId: employeeId,
@@ -1812,7 +1877,7 @@ async function signPayslip(req, res) {
       JOIN employees e ON p.employee_id = e.id
       WHERE p.payslip_id = $1 AND p.employee_id = $2
     `;
-        const payslipResult = await db_1.pool.query(payslipQuery, [payslipId, employeeId]);
+        const payslipResult = await (0, db_1.query)(payslipQuery, [payslipId, employeeId], req.dbClient);
         if (payslipResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found', message: 'Payslip not found' });
         }
@@ -1830,7 +1895,7 @@ async function signPayslip(req, res) {
       FROM payslip_signatures 
       WHERE payslip_id = $1 AND signer_role = 'EMPLOYEE'
     `;
-        const existingSignatureResult = await db_1.pool.query(existingSignatureQuery, [payslipId]);
+        const existingSignatureResult = await (0, db_1.query)(existingSignatureQuery, [payslipId], req.dbClient);
         if (existingSignatureResult.rows.length > 0) {
             return res.status(400).json({
                 error: 'already_signed',
@@ -1839,7 +1904,7 @@ async function signPayslip(req, res) {
         }
         // Get user ID for signature
         const userQuery = `SELECT user_id FROM employees WHERE id = $1`;
-        const userResult = await db_1.pool.query(userQuery, [employeeId]);
+        const userResult = await (0, db_1.query)(userQuery, [employeeId], req.dbClient);
         if (userResult.rows.length === 0 || !userResult.rows[0].user_id) {
             return res.status(400).json({
                 error: 'user_not_found',
@@ -1857,9 +1922,9 @@ async function signPayslip(req, res) {
       ) VALUES ($1, $2, 'EMPLOYEE', $3)
       RETURNING signature_id, signed_at
     `;
-        const signatureResult = await db_1.pool.query(signatureQuery, [payslipId, userId, signature]);
+        const signatureResult = await (0, db_1.query)(signatureQuery, [payslipId, userId, signature], req.dbClient);
         // Update payslip status to COMPLETED
-        await db_1.pool.query(`UPDATE payslips SET status = 'COMPLETED', updated_at = NOW() WHERE payslip_id = $1`, [payslipId]);
+        await (0, db_1.query)(`UPDATE payslips SET status = 'COMPLETED', updated_at = NOW() WHERE payslip_id = $1`, [payslipId], req.dbClient);
         // Mark token as used
         const ipAddress = req.headers['x-forwarded-for'] ||
             req.headers['x-real-ip'] ||
@@ -1880,7 +1945,7 @@ async function signPayslip(req, res) {
       FROM payslips
       WHERE payslip_id = $1
     `;
-        const payslipDetailsResult = await db_1.pool.query(payslipDetailsQuery, [payslipId]);
+        const payslipDetailsResult = await (0, db_1.query)(payslipDetailsQuery, [payslipId], req.dbClient);
         const details = payslipDetailsResult.rows[0];
         await sendPayslipSignedConfirmation({
             employeeName: payslip.employee_name,
@@ -1925,38 +1990,38 @@ async function getDocuments(req, res) {
         // Log the documents view
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.DOCUMENT_VIEWED, req, { resourceType: 'documents', resourceId: employeeId });
         // Build query - get documents accessible to employees
-        let query = `
+        // Note: Documents table stores files as BYTEA, not paths
+        // Showing all documents (file_type contains MIME types, not categories)
+        let documentsQuery = `
       SELECT 
-        d.document_id,
+        d.id as document_id,
         d.document_name,
-        d.document_type,
-        d.file_path,
+        d.file_type as document_type,
         d.file_size,
         d.uploaded_by,
-        d.uploaded_at,
+        d.upload_date as uploaded_at,
         d.description,
         u.name as uploaded_by_name
       FROM documents d
       LEFT JOIN users u ON d.uploaded_by = u.id
-      WHERE d.is_employee_accessible = true
-        OR d.document_type IN ('policy', 'handbook', 'form', 'template')
+      WHERE 1=1
     `;
         const params = [];
         let paramCount = 0;
         // Apply category filter
         if (category && category !== 'all') {
             paramCount++;
-            query += ` AND d.document_type = $${paramCount}`;
+            documentsQuery += ` AND d.file_type = $${paramCount}`;
             params.push(category);
         }
         // Apply search filter
         if (search) {
             paramCount++;
-            query += ` AND (d.document_name ILIKE $${paramCount} OR d.description ILIKE $${paramCount})`;
+            documentsQuery += ` AND (d.document_name ILIKE $${paramCount} OR d.description ILIKE $${paramCount})`;
             params.push(`%${search}%`);
         }
-        query += ' ORDER BY d.uploaded_at DESC';
-        const result = await db_1.pool.query(query, params);
+        documentsQuery += ' ORDER BY d.upload_date DESC';
+        const result = await (0, db_1.query)(documentsQuery, params, req.dbClient);
         return res.status(200).json({
             documents: result.rows,
             total: result.rows.length
@@ -1986,18 +2051,18 @@ async function downloadDocument(req, res) {
     const documentId = parseInt(req.params.documentId);
     try {
         // Verify document exists and is accessible
+        // Note: Documents table stores files as BYTEA, not file paths
         const docQuery = `
       SELECT 
-        d.document_id,
+        d.id as document_id,
         d.document_name,
-        d.file_path,
+        d.file_data,
         d.file_size,
-        d.document_type
+        d.file_type
       FROM documents d
-      WHERE d.document_id = $1
-        AND (d.is_employee_accessible = true OR d.document_type IN ('policy', 'handbook', 'form', 'template'))
+      WHERE d.id = $1
     `;
-        const docResult = await db_1.pool.query(docQuery, [documentId]);
+        const docResult = await (0, db_1.query)(docQuery, [documentId], req.dbClient);
         if (docResult.rows.length === 0) {
             return res.status(404).json({
                 error: 'document_not_found',
@@ -2005,31 +2070,25 @@ async function downloadDocument(req, res) {
             });
         }
         const document = docResult.rows[0];
+        // Check if file data exists
+        if (!document.file_data) {
+            return res.status(404).json({
+                error: 'file_data_missing',
+                message: 'Document file data not found'
+            });
+        }
         // Log the download
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.DOCUMENT_DOWNLOADED, req, {
             resourceType: 'document',
             resourceId: documentId,
             newValue: { documentName: document.document_name }
         });
-        // Import path and fs for file handling
-        const path = await Promise.resolve().then(() => __importStar(require('path')));
-        const fs = await Promise.resolve().then(() => __importStar(require('fs')));
-        // Construct absolute file path
-        const filePath = path.resolve(document.file_path);
-        // Check if file exists
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                error: 'file_not_found',
-                message: 'Document file not found on server'
-            });
-        }
         // Set appropriate headers
         res.setHeader('Content-Type', 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${document.document_name}"`);
-        res.setHeader('Content-Length', document.file_size || 0);
-        // Stream the file
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
+        res.setHeader('Content-Length', document.file_size || document.file_data.length);
+        // Send the file data directly
+        return res.send(document.file_data);
     }
     catch (error) {
         console.error('Error downloading document:', error);
@@ -2129,7 +2188,7 @@ async function uploadDocument(req, res) {
             description || null,
             employeeId // uploaded_by
         ];
-        const result = await db_1.pool.query(insertQuery, values);
+        const result = await (0, db_1.query)(insertQuery, values, req.dbClient);
         const document = result.rows[0];
         // Log the upload
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.DOCUMENT_UPLOADED, req, {
@@ -2184,7 +2243,7 @@ async function uploadDocument(req, res) {
 async function getPersonalDocuments(req, res) {
     const employeeId = parseInt(req.params.employeeId);
     try {
-        const query = `
+        const personalDocumentsQuery = `
       SELECT 
         document_id,
         document_type,
@@ -2197,7 +2256,7 @@ async function getPersonalDocuments(req, res) {
       WHERE employee_id = $1
       ORDER BY uploaded_at DESC
     `;
-        const result = await db_1.pool.query(query, [employeeId]);
+        const result = await (0, db_1.query)(personalDocumentsQuery, [employeeId], req.dbClient);
         return res.status(200).json({
             documents: result.rows,
             total: result.rows.length
@@ -2222,7 +2281,7 @@ async function downloadPersonalDocument(req, res) {
     const documentId = parseInt(req.params.documentId);
     try {
         // Verify document belongs to employee
-        const query = `
+        const docQuery = `
       SELECT 
         document_id,
         original_name,
@@ -2232,7 +2291,7 @@ async function downloadPersonalDocument(req, res) {
       FROM employee_documents
       WHERE document_id = $1 AND employee_id = $2
     `;
-        const result = await db_1.pool.query(query, [documentId, employeeId]);
+        const result = await (0, db_1.query)(docQuery, [documentId, employeeId], req.dbClient);
         if (result.rows.length === 0) {
             return res.status(404).json({
                 error: 'document_not_found',
@@ -2412,12 +2471,12 @@ async function getEmailPreferences(req, res) {
     const employeeId = parseInt(req.params.employeeId);
     try {
         // Check if employee has settings record
-        const query = `
+        const sqlQuery = `
       SELECT email_preferences
       FROM employee_portal_settings
       WHERE employee_id = $1
     `;
-        const result = await db_1.pool.query(query, [employeeId]);
+        const result = await (0, db_1.query)(sqlQuery, [employeeId], req.dbClient);
         let preferences;
         if (result.rows.length === 0) {
             // No settings record exists, return defaults
@@ -2475,7 +2534,7 @@ async function updateEmailPreferences(req, res) {
       FROM employee_portal_settings
       WHERE employee_id = $1
     `;
-        const checkResult = await db_1.pool.query(checkQuery, [employeeId]);
+        const checkResult = await (0, db_1.query)(checkQuery, [employeeId], req.dbClient);
         let currentPreferences = {
             pto_notifications: true,
             time_entry_reminders: true,
@@ -2493,23 +2552,23 @@ async function updateEmailPreferences(req, res) {
         };
         if (checkResult.rows.length === 0) {
             // Create new settings record
-            await db_1.pool.query(`
+            await (0, db_1.query)(`
         INSERT INTO employee_portal_settings (
           employee_id,
           email_preferences,
           created_at,
           updated_at
         ) VALUES ($1, $2, NOW(), NOW())
-        `, [employeeId, JSON.stringify(updatedPreferences)]);
+        `, [employeeId, JSON.stringify(updatedPreferences)], req.dbClient);
         }
         else {
             // Update existing record
-            await db_1.pool.query(`
+            await (0, db_1.query)(`
         UPDATE employee_portal_settings
         SET email_preferences = $1,
             updated_at = NOW()
         WHERE employee_id = $2
-        `, [JSON.stringify(updatedPreferences), employeeId]);
+        `, [JSON.stringify(updatedPreferences), employeeId], req.dbClient);
         }
         // Log the preference update
         await (0, employeeAuditLog_1.logEmployeeActionFromRequest)(employeeId, employeeAuditLog_1.EmployeeAuditActions.SETTINGS_UPDATED, req, {
@@ -2562,7 +2621,7 @@ async function getEmployeeDirectory(req, res) {
     const { search, department, role } = req.query;
     try {
         // Build query with privacy and filters
-        let query = `
+        let directoryQuery = `
       SELECT 
         e.id,
         e.employee_number,
@@ -2585,31 +2644,27 @@ async function getEmployeeDirectory(req, res) {
         // Search filter (searches both first and last name)
         if (search && typeof search === 'string' && search.trim().length > 0) {
             paramCount++;
-            query += ` AND (
-        e.first_name ILIKE $${paramCount} OR 
-        e.last_name ILIKE $${paramCount} OR
-        CONCAT(e.first_name, ' ', e.last_name) ILIKE $${paramCount}
-      )`;
+            directoryQuery += ` AND (\n        e.first_name ILIKE $${paramCount} OR \n        e.last_name ILIKE $${paramCount} OR\n        CONCAT(e.first_name, ' ', e.last_name) ILIKE $${paramCount}\n      )`;
             params.push(`%${search.trim()}%`);
         }
         // Department filter
         if (department && typeof department === 'string' && department !== 'all') {
             paramCount++;
-            query += ` AND e.employee_department = $${paramCount}`;
+            directoryQuery += ` AND e.employee_department = $${paramCount}`;
             params.push(department);
         }
         // Role filter (searches both role and designation)
         if (role && typeof role === 'string' && role !== 'all') {
             paramCount++;
-            query += ` AND (e.role = $${paramCount} OR e.designation ILIKE $${paramCount})`;
+            directoryQuery += ` AND (e.role = $${paramCount} OR e.designation ILIKE $${paramCount})`;
             params.push(role);
         }
         // Order by name
-        query += ` ORDER BY e.first_name ASC, e.last_name ASC`;
+        directoryQuery += ` ORDER BY e.first_name ASC, e.last_name ASC`;
         // Execute query
-        const result = await db_1.pool.query(query, params);
+        const result = await (0, db_1.query)(directoryQuery, params, req.dbClient);
         // Process results - mask phone if privacy setting enabled
-        const employees = result.rows.map(emp => ({
+        const employees = result.rows.map((emp) => ({
             id: emp.id,
             employeeNumber: emp.employee_number,
             firstName: emp.first_name,
@@ -2630,8 +2685,8 @@ async function getEmployeeDirectory(req, res) {
         AND employee_department != ''
       ORDER BY employee_department ASC
     `;
-        const departmentsResult = await db_1.pool.query(departmentsQuery);
-        const departments = departmentsResult.rows.map(row => row.employee_department);
+        const departmentsResult = await (0, db_1.query)(departmentsQuery, [], req.dbClient);
+        const departments = departmentsResult.rows.map((row) => row.employee_department);
         const rolesQuery = `
       SELECT DISTINCT designation 
       FROM employees 
@@ -2639,8 +2694,8 @@ async function getEmployeeDirectory(req, res) {
         AND designation != ''
       ORDER BY designation ASC
     `;
-        const rolesResult = await db_1.pool.query(rolesQuery);
-        const roles = rolesResult.rows.map(row => row.designation);
+        const rolesResult = await (0, db_1.query)(rolesQuery, [], req.dbClient);
+        const roles = rolesResult.rows.map((row) => row.designation);
         // Log directory access (for security auditing)
         // Note: We don't have req.user.employeeId here, so we'll log generically
         if (req.user) {

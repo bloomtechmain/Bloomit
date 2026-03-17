@@ -16,6 +16,15 @@ const timeEntriesController_1 = require("../controllers/timeEntriesController");
 const router = (0, express_1.Router)();
 // Apply employee role requirement to all routes
 router.use(employeeAuth_1.requireEmployeeRole);
+// ==================== EMPLOYEE RECORD ====================
+/**
+ * GET /api/employee-portal/me
+ * Get current authenticated user's employee record
+ *
+ * This is the primary endpoint for employees to get their own employee ID
+ * Security: Uses JWT token to identify user, no special permissions needed
+ */
+router.get('/me', employeePortalController_1.getMyEmployeeRecord);
 // ==================== DASHBOARD ====================
 /**
  * GET /api/employee-portal/dashboard/:employeeId

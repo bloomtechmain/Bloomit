@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.terminateEmployee = exports.reactivateEmployee = exports.suspendEmployee = exports.generateEmployeeNumber = exports.updateEmployeeProfile = exports.linkEmployeeToUser = exports.getFullEmployeeProfile = exports.getAllEmployeesWithUserStatus = exports.onboardEmployee = void 0;
-const db_1 = require("../db");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const passwordGenerator_1 = require("../utils/passwordGenerator");
 const emailService_1 = require("../utils/emailService");
@@ -15,6 +14,7 @@ const passwordHistory_1 = require("../utils/passwordHistory");
  */
 // Create complete employee with user account
 const onboardEmployee = async (req, res) => {
+    const { tenantId } = req.user;
     const { 
     // Personal Information
     first_name, last_name, email, phone, dob, nic, address, 
@@ -52,11 +52,11 @@ const onboardEmployee = async (req, res) => {
             message: 'Invalid email format'
         });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Check if email already exists in users or employees
-        const existingUserCheck = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+        const existingUserCheck = await client.query('SELECT id FROM users WHERE email = $1 AND tenant_id = $2', [email, tenantId]);
         if (existingUserCheck.rows.length > 0) {
             await client.query('ROLLBACK');
             return res.status(409).json({
@@ -64,7 +64,7 @@ const onboardEmployee = async (req, res) => {
                 message: 'Email already exists in user accounts'
             });
         }
-        const existingEmployeeCheck = await client.query('SELECT id FROM employees WHERE email = $1', [email]);
+        const existingEmployeeCheck = await client.query('SELECT id FROM employees WHERE email = $1 AND tenant_id = $2', [email, tenantId]);
         if (existingEmployeeCheck.rows.length > 0) {
             await client.query('ROLLBACK');
             return res.status(409).json({
@@ -73,7 +73,7 @@ const onboardEmployee = async (req, res) => {
             });
         }
         // Check if employee number already exists
-        const existingEmployeeNumberCheck = await client.query('SELECT id FROM employees WHERE employee_number = $1', [employee_number]);
+        const existingEmployeeNumberCheck = await client.query('SELECT id FROM employees WHERE employee_number = $1 AND tenant_id = $2', [employee_number, tenantId]);
         if (existingEmployeeNumberCheck.rows.length > 0) {
             await client.query('ROLLBACK');
             return res.status(409).json({
@@ -81,8 +81,27 @@ const onboardEmployee = async (req, res) => {
                 message: 'Employee number already exists'
             });
         }
+        // Enforce plan user limit
+        const planResult = await client.query(`SELECT no_of_users FROM public.users
+       WHERE tenant_id = $1 AND no_of_users IS NOT NULL
+       LIMIT 1`, [tenantId]);
+        if (planResult.rows.length > 0 && planResult.rows[0].no_of_users !== null) {
+            const userLimit = planResult.rows[0].no_of_users;
+            const countResult = await client.query(`SELECT COUNT(*) AS total FROM public.users
+         WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`, [tenantId]);
+            const currentCount = parseInt(countResult.rows[0].total, 10);
+            if (currentCount >= userLimit) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({
+                    error: 'user_limit_reached',
+                    message: `Your plan allows a maximum of ${userLimit} user${userLimit === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
+                    limit: userLimit,
+                    current: currentCount
+                });
+            }
+        }
         // Verify all roles exist
-        const rolesResult = await client.query('SELECT id, name FROM roles WHERE id = ANY($1::int[])', [roleIds]);
+        const rolesResult = await client.query('SELECT id, name FROM roles WHERE id = ANY($1::int[]) AND tenant_id = $2', [roleIds, tenantId]);
         if (rolesResult.rows.length !== roleIds.length) {
             await client.query('ROLLBACK');
             return res.status(404).json({
@@ -94,9 +113,9 @@ const onboardEmployee = async (req, res) => {
         const temporaryPassword = (0, passwordGenerator_1.generateSecurePassword)(12);
         const passwordHash = await bcryptjs_1.default.hash(temporaryPassword, 10);
         // 1. Create user account
-        const userResult = await client.query(`INSERT INTO users (name, email, password_hash, password_must_change, created_at)
-       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)
-       RETURNING id, name, email, created_at`, [`${first_name} ${last_name}`, email, passwordHash]);
+        const userResult = await client.query(`INSERT INTO users (name, email, password_hash, password_must_change, created_at, tenant_id)
+       VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP, $4)
+       RETURNING id, name, email, created_at`, [`${first_name} ${last_name}`, email, passwordHash, tenantId]);
         const newUser = userResult.rows[0];
         const userId = newUser.id;
         // 2. Assign roles to user
@@ -105,19 +124,17 @@ const onboardEmployee = async (req, res) => {
          VALUES ($1, $2)`, [userId, roleId]);
         }
         // 3. Create employee record linked to user
-        const fullName = `${first_name} ${last_name}`;
         const employeeResult = await client.query(`INSERT INTO employees (
-        employee_number, first_name, last_name, name, email, phone, 
+        employee_number, first_name, last_name, email, phone,
         dob, nic, address, designation, employee_department, role,
-        hire_date, base_salary, epf_enabled, epf_contribution_rate, 
-        etf_enabled, allowances, pto_allowance, user_id, is_active, created_at
+        hire_date, base_salary, epf_enabled, epf_contribution_rate,
+        etf_enabled, allowances, pto_allowance, user_id, is_active, created_at, tenant_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, TRUE, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE, CURRENT_TIMESTAMP, $20)
       RETURNING id, employee_number, first_name, last_name, email, designation, employee_department, created_at`, [
             employee_number,
             first_name,
             last_name,
-            fullName,
             email,
             phone,
             dob || null,
@@ -133,7 +150,8 @@ const onboardEmployee = async (req, res) => {
             etf_enabled !== undefined ? etf_enabled : false,
             JSON.stringify(allowances || {}),
             pto_allowance || 20,
-            userId
+            userId,
+            tenantId
         ]);
         const newEmployee = employeeResult.rows[0];
         // 5. Send welcome email (non-blocking)
@@ -201,13 +219,11 @@ const onboardEmployee = async (req, res) => {
             details: error instanceof Error ? error.message : 'Unknown error'
         });
     }
-    finally {
-        client.release();
-    }
 };
 exports.onboardEmployee = onboardEmployee;
 // Get all employees with their user account status and roles
 const getAllEmployeesWithUserStatus = async (req, res) => {
+    const { tenantId } = req.user;
     try {
         const query = `
       SELECT 
@@ -247,10 +263,11 @@ const getAllEmployeesWithUserStatus = async (req, res) => {
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
+      WHERE e.tenant_id = $1
       GROUP BY e.id, u.id, u.name, u.email, u.account_status
       ORDER BY e.created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query, [tenantId]);
         return res.json({
             employees: result.rows,
             total: result.rows.length
@@ -270,7 +287,7 @@ const getFullEmployeeProfile = async (req, res) => {
     const { id } = req.params;
     try {
         // Get employee data
-        const employeeResult = await db_1.pool.query(`SELECT 
+        const employeeResult = await req.dbClient.query(`SELECT
         e.*,
         u.name as user_name,
         u.email as user_email,
@@ -288,7 +305,7 @@ const getFullEmployeeProfile = async (req, res) => {
         // Get roles if user exists
         let roles = [];
         if (employee.user_id) {
-            const rolesResult = await db_1.pool.query(`SELECT r.id, r.name, r.description, r.is_system_role
+            const rolesResult = await req.dbClient.query(`SELECT r.id, r.name, r.description, r.is_system_role
          FROM roles r
          INNER JOIN user_roles ur ON r.id = ur.role_id
          WHERE ur.user_id = $1
@@ -322,7 +339,7 @@ const linkEmployeeToUser = async (req, res) => {
     }
     try {
         // Check if employee exists
-        const employeeCheck = await db_1.pool.query('SELECT id, email, user_id FROM employees WHERE id = $1', [employeeId]);
+        const employeeCheck = await req.dbClient.query('SELECT id, email, user_id FROM employees WHERE id = $1', [employeeId]);
         if (employeeCheck.rows.length === 0) {
             return res.status(404).json({
                 error: 'not_found',
@@ -336,7 +353,7 @@ const linkEmployeeToUser = async (req, res) => {
             });
         }
         // Check if user exists
-        const userCheck = await db_1.pool.query('SELECT id, email FROM users WHERE id = $1', [userId]);
+        const userCheck = await req.dbClient.query('SELECT id, email FROM users WHERE id = $1', [userId]);
         if (userCheck.rows.length === 0) {
             return res.status(404).json({
                 error: 'not_found',
@@ -344,10 +361,10 @@ const linkEmployeeToUser = async (req, res) => {
             });
         }
         // Link employee to user
-        await db_1.pool.query('UPDATE employees SET user_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [userId, employeeId]);
+        await req.dbClient.query('UPDATE employees SET user_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [userId, employeeId]);
         // Log audit
         if (req.user) {
-            await db_1.pool.query(`INSERT INTO rbac_audit_log (user_id, action, details) 
+            await req.dbClient.query(`INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`, [
                 req.user.userId,
                 'LINK_EMPLOYEE_USER',
@@ -387,16 +404,15 @@ const updateEmployeeProfile = async (req, res) => {
         });
     }
     try {
-        const fullName = `${first_name} ${last_name}`;
-        const result = await db_1.pool.query(`UPDATE employees
-       SET first_name = $1, last_name = $2, name = $3, email = $4, phone = $5,
-           dob = $6, nic = $7, address = $8, employee_number = $9,
-           designation = $10, employee_department = $11, base_salary = $12,
-           epf_enabled = $13, epf_contribution_rate = $14, etf_enabled = $15,
-           allowances = $16, pto_allowance = $17, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $18
+        const result = await req.dbClient.query(`UPDATE employees
+       SET first_name = $1, last_name = $2, email = $3, phone = $4,
+           dob = $5, nic = $6, address = $7, employee_number = $8,
+           designation = $9, employee_department = $10, base_salary = $11,
+           epf_enabled = $12, epf_contribution_rate = $13, etf_enabled = $14,
+           allowances = $15, pto_allowance = $16, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $17
        RETURNING id, employee_number, first_name, last_name, email, designation, employee_department`, [
-            first_name, last_name, fullName, email, phone,
+            first_name, last_name, email, phone,
             dob || null, nic || null, address || null, employee_number,
             designation || null, employee_department || null, base_salary || null,
             epf_enabled, epf_contribution_rate || 8.00, etf_enabled,
@@ -427,11 +443,11 @@ exports.updateEmployeeProfile = updateEmployeeProfile;
 // Generate next available employee number
 const generateEmployeeNumber = async (req, res) => {
     try {
-        const result = await db_1.pool.query(`
-      SELECT employee_number 
-      FROM employees 
+        const result = await req.dbClient.query(`
+      SELECT employee_number
+      FROM employees
       WHERE employee_number ~ '^EMP[0-9]+$'
-      ORDER BY CAST(SUBSTRING(employee_number FROM 4) AS INTEGER) DESC 
+      ORDER BY CAST(SUBSTRING(employee_number FROM 4) AS INTEGER) DESC
       LIMIT 1
     `);
         let nextNumber = 'EMP00001';
@@ -463,7 +479,7 @@ const suspendEmployee = async (req, res) => {
             message: 'Suspension reason is required'
         });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Check if employee exists and get user_id
@@ -501,14 +517,14 @@ const suspendEmployee = async (req, res) => {
         }
         const currentUserId = req.user?.userId;
         // Update user account status
-        await client.query(`UPDATE users 
-       SET account_status = 'suspended', 
+        await client.query(`UPDATE users
+       SET account_status = 'suspended',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = $2
        WHERE id = $3`, [currentUserId, reason, employee.user_id]);
         // Update employee record
-        await client.query(`UPDATE employees 
+        await client.query(`UPDATE employees
        SET is_active = FALSE,
            suspended_at = CURRENT_TIMESTAMP,
            suspended_by = $1,
@@ -516,7 +532,7 @@ const suspendEmployee = async (req, res) => {
        WHERE id = $3`, [currentUserId, reason, id]);
         // Log audit trail
         if (currentUserId) {
-            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details) 
+            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`, [
                 currentUserId,
                 'SUSPEND_EMPLOYEE',
@@ -530,7 +546,7 @@ const suspendEmployee = async (req, res) => {
             ]);
         }
         await client.query('COMMIT');
-        console.log(`⚠️ Employee suspended: ${employee.email} (Employee ID: ${id})`);
+        console.log(`Employee suspended: ${employee.email} (Employee ID: ${id})`);
         return res.json({
             success: true,
             message: 'Employee account suspended successfully',
@@ -546,15 +562,12 @@ const suspendEmployee = async (req, res) => {
             details: error instanceof Error ? error.message : 'Unknown error'
         });
     }
-    finally {
-        client.release();
-    }
 };
 exports.suspendEmployee = suspendEmployee;
 // Reactivate suspended employee account
 const reactivateEmployee = async (req, res) => {
     const { id } = req.params;
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Check if employee exists and get user_id
@@ -592,14 +605,14 @@ const reactivateEmployee = async (req, res) => {
         }
         const currentUserId = req.user?.userId;
         // Update user account status
-        await client.query(`UPDATE users 
-       SET account_status = 'active', 
+        await client.query(`UPDATE users
+       SET account_status = 'active',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = 'Account reactivated'
        WHERE id = $2`, [currentUserId, employee.user_id]);
         // Update employee record
-        await client.query(`UPDATE employees 
+        await client.query(`UPDATE employees
        SET is_active = TRUE,
            suspended_at = NULL,
            suspended_by = NULL,
@@ -607,7 +620,7 @@ const reactivateEmployee = async (req, res) => {
        WHERE id = $1`, [id]);
         // Log audit trail
         if (currentUserId) {
-            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details) 
+            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`, [
                 currentUserId,
                 'REACTIVATE_EMPLOYEE',
@@ -620,7 +633,7 @@ const reactivateEmployee = async (req, res) => {
             ]);
         }
         await client.query('COMMIT');
-        console.log(`✅ Employee reactivated: ${employee.email} (Employee ID: ${id})`);
+        console.log(`Employee reactivated: ${employee.email} (Employee ID: ${id})`);
         return res.json({
             success: true,
             message: 'Employee account reactivated successfully',
@@ -636,9 +649,6 @@ const reactivateEmployee = async (req, res) => {
             details: error instanceof Error ? error.message : 'Unknown error'
         });
     }
-    finally {
-        client.release();
-    }
 };
 exports.reactivateEmployee = reactivateEmployee;
 // Terminate employee account (permanent, soft delete with 2-year retention)
@@ -651,7 +661,7 @@ const terminateEmployee = async (req, res) => {
             message: 'Termination reason is required'
         });
     }
-    const client = await db_1.pool.connect();
+    const client = req.dbClient;
     try {
         await client.query('BEGIN');
         // Check if employee exists and get user_id
@@ -685,14 +695,14 @@ const terminateEmployee = async (req, res) => {
         const purgeDate = new Date();
         purgeDate.setFullYear(purgeDate.getFullYear() + 2); // 2 years from now
         // Update user account status to terminated
-        await client.query(`UPDATE users 
-       SET account_status = 'terminated', 
+        await client.query(`UPDATE users
+       SET account_status = 'terminated',
            status_changed_at = CURRENT_TIMESTAMP,
            status_changed_by = $1,
            status_reason = $2
        WHERE id = $3`, [currentUserId, reason, employee.user_id]);
         // Update employee record with termination details
-        await client.query(`UPDATE employees 
+        await client.query(`UPDATE employees
        SET is_active = FALSE,
            terminated_at = $1,
            terminated_by = $2,
@@ -704,7 +714,7 @@ const terminateEmployee = async (req, res) => {
        WHERE id = $5`, [terminationDate, currentUserId, reason, purgeDate, id]);
         // Log audit trail
         if (currentUserId) {
-            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details) 
+            await client.query(`INSERT INTO rbac_audit_log (user_id, action, details)
          VALUES ($1, $2, $3)`, [
                 currentUserId,
                 'TERMINATE_EMPLOYEE',
@@ -720,8 +730,8 @@ const terminateEmployee = async (req, res) => {
             ]);
         }
         await client.query('COMMIT');
-        console.log(`🔴 Employee terminated: ${employee.email} (Employee ID: ${id})`);
-        console.log(`   Scheduled for purge on: ${purgeDate.toISOString().split('T')[0]}`);
+        console.log(`Employee terminated: ${employee.email} (Employee ID: ${id})`);
+        console.log(`Scheduled for purge on: ${purgeDate.toISOString().split('T')[0]}`);
         return res.json({
             success: true,
             message: 'Employee account terminated successfully',
@@ -738,9 +748,6 @@ const terminateEmployee = async (req, res) => {
             message: 'Failed to terminate employee',
             details: error instanceof Error ? error.message : 'Unknown error'
         });
-    }
-    finally {
-        client.release();
     }
 };
 exports.terminateEmployee = terminateEmployee;

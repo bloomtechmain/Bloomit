@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Settings, Mail, Save, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Settings, Mail, Save, X } from 'lucide-react'
+import { useToast } from '../context/ToastContext'
 
 interface EmailPreferences {
   pto_notifications: boolean
@@ -13,10 +14,10 @@ interface EmployeeSettingsProps {
 }
 
 export default function EmployeeSettings({ employeeId, accessToken }: EmployeeSettingsProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [emailPreferences, setEmailPreferences] = useState<EmailPreferences>({
     pto_notifications: true,
     time_entry_reminders: true,
@@ -93,8 +94,7 @@ export default function EmployeeSettings({ employeeId, accessToken }: EmployeeSe
   const savePreferences = async () => {
     setSaving(true)
     setError(null)
-    setSuccessMessage(null)
-    
+
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/employee-portal/settings/${employeeId}/email-preferences`,
@@ -114,10 +114,7 @@ export default function EmployeeSettings({ employeeId, accessToken }: EmployeeSe
 
       await response.json()
       setOriginalPreferences(emailPreferences)
-      setSuccessMessage('Settings saved successfully!')
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000)
+      toast.success('Settings saved successfully!')
     } catch (err) {
       console.error('Error saving preferences:', err)
       setError(err instanceof Error ? err.message : 'Failed to save settings')
@@ -130,7 +127,6 @@ export default function EmployeeSettings({ employeeId, accessToken }: EmployeeSe
   const cancelChanges = () => {
     setEmailPreferences(originalPreferences)
     setError(null)
-    setSuccessMessage(null)
   }
 
   // Toggle preference
@@ -168,25 +164,6 @@ export default function EmployeeSettings({ employeeId, accessToken }: EmployeeSe
           Manage your account preferences and notifications
         </p>
       </div>
-
-      {/* Success Message */}
-      {successMessage && (
-        <div 
-          className="glass-panel" 
-          style={{ 
-            padding: 16, 
-            marginBottom: 24,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            borderLeft: '4px solid #10b981'
-          }}
-        >
-          <CheckCircle size={24} style={{ color: '#10b981', flexShrink: 0 }} />
-          <span style={{ color: '#10b981', fontWeight: 500 }}>{successMessage}</span>
-        </div>
-      )}
 
       {/* Error Message */}
       {error && (

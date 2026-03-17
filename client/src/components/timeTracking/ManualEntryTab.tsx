@@ -3,20 +3,21 @@ import { Save } from 'lucide-react'
 import { timeEntriesApi } from '../../services/timeEntriesApi'
 import { contractsApi } from '../../services/projectsApi'
 import type { Project, Contract } from '../../types/projects'
+import { useToast } from '../../context/ToastContext'
 
 type ManualEntryTabProps = {
   userId: number
   projects: Project[]
   onSuccess: () => void
-  showNotification: (message: string, type: 'success' | 'error') => void
+  showNotification?: (message: string, type: 'success' | 'error') => void
 }
 
 export default function ManualEntryTab({
   userId,
   projects,
-  onSuccess,
-  showNotification
+  onSuccess
 }: ManualEntryTabProps) {
+  const { toast } = useToast()
   const [selectedProject, setSelectedProject] = useState<number | ''>('')
   const [selectedContract, setSelectedContract] = useState<number | ''>('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -39,19 +40,19 @@ export default function ManualEntryTab({
 
   const handleSubmit = async () => {
     if (!selectedProject || !totalHours || !date) {
-      showNotification('Please fill in all required fields', 'error')
+      toast.error('Please fill in all required fields')
       return
     }
 
     const hours = parseFloat(totalHours)
     if (isNaN(hours) || hours <= 0 || hours > 24) {
-      showNotification('Please enter valid hours (0-24)', 'error')
+      toast.error('Please enter valid hours (0-24)')
       return
     }
 
     const breaks = parseInt(breakMinutes)
     if (isNaN(breaks) || breaks < 0) {
-      showNotification('Please enter valid break minutes', 'error')
+      toast.error('Please enter valid break minutes')
       return
     }
 
@@ -75,9 +76,10 @@ export default function ManualEntryTab({
       setBreakMinutes('0')
       setDescription('')
       
+      toast.success('Time entry created successfully')
       onSuccess()
     } catch (error: any) {
-      showNotification(error.response?.data?.error || 'Failed to create time entry', 'error')
+      toast.error(error.response?.data?.error || 'Failed to create time entry')
     } finally {
       setLoading(false)
     }

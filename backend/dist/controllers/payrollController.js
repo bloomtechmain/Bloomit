@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getEmployeePayrollHistory = exports.downloadPayslip = exports.getMonthlyReport = exports.getArchive = exports.rejectPayslip = exports.employeeSign = exports.adminApprove = exports.staffApprove = exports.submitForReview = exports.deletePayslip = exports.updatePayslip = exports.createPayslip = exports.getPayslipById = exports.getAllPayslips = exports.updateEmployeePayrollData = exports.getEmployeePayrollData = exports.getAllEmployeesWithPayroll = void 0;
-const db_1 = require("../db");
 const crypto_1 = __importDefault(require("crypto"));
 const emailService_1 = require("../utils/emailService");
 const payslipPdfGenerator_1 = require("../utils/payslipPdfGenerator");
@@ -52,15 +51,15 @@ function generateSignatureHash(userId, payslipId, role) {
 const getAllEmployeesWithPayroll = async (req, res) => {
     try {
         const query = `
-      SELECT 
-        id as employee_id, name, email, phone, 
-        role, department, hire_date, salary, is_active,
+      SELECT
+        id as employee_id, CONCAT(first_name, ' ', last_name) as name, email, phone,
+        role, employee_department as department, hire_date, salary, is_active,
         base_salary, allowances, epf_enabled, epf_contribution_rate, etf_enabled,
         employee_department, created_at, updated_at
       FROM employees
       ORDER BY created_at DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ employees: result.rows });
     }
     catch (err) {
@@ -74,13 +73,13 @@ const getEmployeePayrollData = async (req, res) => {
     const { id } = req.params;
     try {
         const query = `
-      SELECT 
-        id as employee_id, name, email, employee_department,
+      SELECT
+        id as employee_id, CONCAT(first_name, ' ', last_name) as name, email, employee_department,
         base_salary, allowances, epf_enabled, epf_contribution_rate, etf_enabled
       FROM employees
       WHERE id = $1
     `;
-        const result = await db_1.pool.query(query, [id]);
+        const result = await req.dbClient.query(query, [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -99,7 +98,7 @@ const updateEmployeePayrollData = async (req, res) => {
     try {
         const query = `
       UPDATE employees
-      SET 
+      SET
         base_salary = COALESCE($1, base_salary),
         allowances = COALESCE($2, allowances),
         epf_enabled = COALESCE($3, epf_enabled),
@@ -110,7 +109,7 @@ const updateEmployeePayrollData = async (req, res) => {
       RETURNING id as employee_id, base_salary, allowances, epf_enabled, epf_contribution_rate, etf_enabled, employee_department
     `;
         const values = [base_salary, allowances, epf_enabled, epf_contribution_rate, etf_enabled, employee_department, id];
-        const result = await db_1.pool.query(query, values);
+        const result = await req.dbClient.query(query, values);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -138,9 +137,9 @@ const getAllPayslips = async (req, res) => {
     `;
         // Build data query
         let dataQuery = `
-      SELECT 
+      SELECT
         p.*,
-        e.name as employee_name, e.email as employee_email, e.employee_department,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.email as employee_email, e.employee_department,
         e.first_name, e.last_name, e.employee_number, e.designation,
         u.name as created_by_name
       FROM payslips p
@@ -180,12 +179,12 @@ const getAllPayslips = async (req, res) => {
             paramCount++;
         }
         // Get total count
-        const countResult = await db_1.pool.query(countQuery, params);
+        const countResult = await req.dbClient.query(countQuery, params);
         const total = parseInt(countResult.rows[0].total);
         // Add pagination to data query
         dataQuery += ` ORDER BY p.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
         params.push(limitNum, offset);
-        const result = await db_1.pool.query(dataQuery, params);
+        const result = await req.dbClient.query(dataQuery, params);
         return res.status(200).json({
             payslips: result.rows,
             pagination: {
@@ -209,9 +208,9 @@ const getPayslipById = async (req, res) => {
     try {
         // Get payslip data
         const payslipQuery = `
-      SELECT 
+      SELECT
         p.*,
-        e.name as employee_name, e.email as employee_email, e.employee_department, e.role,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.email as employee_email, e.employee_department, e.role,
         e.first_name, e.last_name, e.employee_number, e.designation,
         u.name as created_by_name
       FROM payslips p
@@ -219,13 +218,13 @@ const getPayslipById = async (req, res) => {
       JOIN users u ON p.created_by_user_id = u.id
       WHERE p.payslip_id = $1
     `;
-        const payslipResult = await db_1.pool.query(payslipQuery, [id]);
+        const payslipResult = await req.dbClient.query(payslipQuery, [id]);
         if (payslipResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
         // Get signatures
         const signaturesQuery = `
-      SELECT 
+      SELECT
         s.*,
         u.name as signer_name, u.email as signer_email
       FROM payslip_signatures s
@@ -233,7 +232,7 @@ const getPayslipById = async (req, res) => {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `;
-        const signaturesResult = await db_1.pool.query(signaturesQuery, [id]);
+        const signaturesResult = await req.dbClient.query(signaturesQuery, [id]);
         return res.status(200).json({
             payslip: payslipResult.rows[0],
             signatures: signaturesResult.rows
@@ -259,7 +258,7 @@ const createPayslip = async (req, res) => {
       FROM employees
       WHERE id = $1
     `;
-        const empResult = await db_1.pool.query(empQuery, [employee_id]);
+        const empResult = await req.dbClient.query(empQuery, [employee_id]);
         if (empResult.rows.length === 0) {
             return res.status(404).json({ error: 'employee_not_found' });
         }
@@ -300,7 +299,7 @@ const createPayslip = async (req, res) => {
             totalDeductions, epfEmployerContribution, etfEmployerContribution,
             netSalary, 'DRAFT', userId
         ];
-        const result = await db_1.pool.query(insertQuery, values);
+        const result = await req.dbClient.query(insertQuery, values);
         return res.status(201).json({ payslip: result.rows[0] });
     }
     catch (err) {
@@ -319,7 +318,7 @@ const updatePayslip = async (req, res) => {
     try {
         // Get current payslip
         const currentQuery = `SELECT * FROM payslips WHERE payslip_id = $1`;
-        const currentResult = await db_1.pool.query(currentQuery, [id]);
+        const currentResult = await req.dbClient.query(currentQuery, [id]);
         if (currentResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
@@ -343,7 +342,7 @@ const updatePayslip = async (req, res) => {
         const netSalary = grossSalary - totalDeductions;
         const updateQuery = `
       UPDATE payslips
-      SET 
+      SET
         allowances = $1,
         gross_salary = $2,
         epf_employee_deduction = $3,
@@ -362,7 +361,7 @@ const updatePayslip = async (req, res) => {
             JSON.stringify(otherDeductionsData), totalDeductions, epfEmployerContribution,
             etfEmployerContribution, netSalary, id
         ];
-        const result = await db_1.pool.query(updateQuery, values);
+        const result = await req.dbClient.query(updateQuery, values);
         return res.status(200).json({ payslip: result.rows[0] });
     }
     catch (err) {
@@ -376,7 +375,7 @@ const deletePayslip = async (req, res) => {
     const { id } = req.params;
     try {
         const checkQuery = `SELECT status FROM payslips WHERE payslip_id = $1`;
-        const checkResult = await db_1.pool.query(checkQuery, [id]);
+        const checkResult = await req.dbClient.query(checkQuery, [id]);
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
@@ -384,7 +383,7 @@ const deletePayslip = async (req, res) => {
             return res.status(400).json({ error: 'can_only_delete_draft_payslips' });
         }
         const deleteQuery = `DELETE FROM payslips WHERE payslip_id = $1 RETURNING payslip_id`;
-        const result = await db_1.pool.query(deleteQuery, [id]);
+        const result = await req.dbClient.query(deleteQuery, [id]);
         return res.status(200).json({ message: 'payslip_deleted', payslip_id: result.rows[0].payslip_id });
     }
     catch (err) {
@@ -407,14 +406,14 @@ const submitForReview = async (req, res) => {
       WHERE payslip_id = $1 AND status = 'DRAFT'
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [id]);
+        const result = await req.dbClient.query(updateQuery, [id]);
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'payslip_not_found_or_not_in_draft_status' });
         }
         // Create junior accountant signature
         const signatureHash = generateSignatureHash(userId, parseInt(id), 'JUNIOR_ACCOUNTANT');
         const ipAddress = req.ip || req.socket.remoteAddress || null;
-        await db_1.pool.query(`
+        await req.dbClient.query(`
       INSERT INTO payslip_signatures (payslip_id, signer_user_id, signer_role, signature_hash, ip_address)
       VALUES ($1, $2, $3, $4, $5)
     `, [id, userId, 'JUNIOR_ACCOUNTANT', signatureHash, ipAddress]);
@@ -440,13 +439,13 @@ const staffApprove = async (req, res) => {
       WHERE payslip_id = $1 AND status = 'PENDING_STAFF_REVIEW'
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [id]);
+        const result = await req.dbClient.query(updateQuery, [id]);
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'payslip_not_found_or_not_pending_staff_review' });
         }
         const signatureHash = generateSignatureHash(userId, parseInt(id), 'STAFF_ACCOUNTANT');
         const ipAddress = req.ip || req.socket.remoteAddress || null;
-        await db_1.pool.query(`
+        await req.dbClient.query(`
       INSERT INTO payslip_signatures (payslip_id, signer_user_id, signer_role, signature_hash, ip_address)
       VALUES ($1, $2, $3, $4, $5)
     `, [id, userId, 'STAFF_ACCOUNTANT', signatureHash, ipAddress]);
@@ -472,13 +471,13 @@ const adminApprove = async (req, res) => {
       WHERE payslip_id = $1 AND status = 'PENDING_ADMIN_APPROVAL'
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [id]);
+        const result = await req.dbClient.query(updateQuery, [id]);
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'payslip_not_found_or_not_pending_admin_approval' });
         }
         const signatureHash = generateSignatureHash(userId, parseInt(id), 'ADMIN');
         const ipAddress = req.ip || req.socket.remoteAddress || null;
-        await db_1.pool.query(`
+        await req.dbClient.query(`
       INSERT INTO payslip_signatures (payslip_id, signer_user_id, signer_role, signature_hash, ip_address)
       VALUES ($1, $2, $3, $4, $5)
     `, [id, userId, 'ADMIN', signatureHash, ipAddress]);
@@ -486,13 +485,13 @@ const adminApprove = async (req, res) => {
         try {
             // Get employee and admin details
             const employeeQuery = `
-        SELECT e.id as employee_id, e.name as employee_name, e.email, u.name as admin_name
+        SELECT e.id as employee_id, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.email, u.name as admin_name
         FROM payslips p
         JOIN employees e ON p.employee_id = e.id
         JOIN users u ON u.id = $1
         WHERE p.payslip_id = $2
       `;
-            const employeeResult = await db_1.pool.query(employeeQuery, [userId, id]);
+            const employeeResult = await req.dbClient.query(employeeQuery, [userId, id]);
             if (employeeResult.rows.length > 0) {
                 const employee = employeeResult.rows[0];
                 const payslip = result.rows[0];
@@ -547,13 +546,13 @@ const employeeSign = async (req, res) => {
       WHERE payslip_id = $1 AND status = 'PENDING_EMPLOYEE_SIGNATURE'
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [id]);
+        const result = await req.dbClient.query(updateQuery, [id]);
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'payslip_not_found_or_not_pending_employee_signature' });
         }
         const signatureHash = generateSignatureHash(userId, parseInt(id), 'EMPLOYEE');
         const ipAddress = req.ip || req.socket.remoteAddress || null;
-        await db_1.pool.query(`
+        await req.dbClient.query(`
       INSERT INTO payslip_signatures (payslip_id, signer_user_id, signer_role, signature_hash, ip_address)
       VALUES ($1, $2, $3, $4, $5)
     `, [id, userId, 'EMPLOYEE', signatureHash, ipAddress]);
@@ -576,7 +575,7 @@ const rejectPayslip = async (req, res) => {
       WHERE payslip_id = $2 AND status IN ('PENDING_STAFF_REVIEW', 'PENDING_ADMIN_APPROVAL')
       RETURNING *
     `;
-        const result = await db_1.pool.query(updateQuery, [reason, id]);
+        const result = await req.dbClient.query(updateQuery, [reason, id]);
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'payslip_not_found_or_cannot_reject_in_current_status' });
         }
@@ -592,7 +591,7 @@ exports.rejectPayslip = rejectPayslip;
 const getArchive = async (req, res) => {
     try {
         const query = `
-      SELECT 
+      SELECT
         payslip_year,
         payslip_month,
         COUNT(*) as payslip_count,
@@ -603,7 +602,7 @@ const getArchive = async (req, res) => {
       GROUP BY payslip_year, payslip_month
       ORDER BY payslip_year DESC, payslip_month DESC
     `;
-        const result = await db_1.pool.query(query);
+        const result = await req.dbClient.query(query);
         return res.status(200).json({ archive: result.rows });
     }
     catch (err) {
@@ -620,7 +619,7 @@ const getMonthlyReport = async (req, res) => {
     }
     try {
         const query = `
-      SELECT 
+      SELECT
         COUNT(*) as total_employees,
         SUM(basic_salary) as total_basic_salary,
         SUM(gross_salary) as total_gross_salary,
@@ -632,10 +631,10 @@ const getMonthlyReport = async (req, res) => {
       FROM payslips
       WHERE payslip_year = $1 AND payslip_month = $2 AND status = 'COMPLETED'
     `;
-        const result = await db_1.pool.query(query, [year, month]);
+        const result = await req.dbClient.query(query, [year, month]);
         // Department-wise breakdown
         const deptQuery = `
-      SELECT 
+      SELECT
         e.employee_department,
         COUNT(*) as employee_count,
         SUM(p.gross_salary) as total_gross,
@@ -646,7 +645,7 @@ const getMonthlyReport = async (req, res) => {
       GROUP BY e.employee_department
       ORDER BY total_gross DESC
     `;
-        const deptResult = await db_1.pool.query(deptQuery, [year, month]);
+        const deptResult = await req.dbClient.query(deptQuery, [year, month]);
         return res.status(200).json({
             summary: result.rows[0],
             by_department: deptResult.rows
@@ -664,21 +663,21 @@ const downloadPayslip = async (req, res) => {
     try {
         // Get payslip data
         const payslipQuery = `
-      SELECT 
+      SELECT
         p.*,
-        e.name as employee_name, e.email as employee_email, e.employee_department, e.role,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.email as employee_email, e.employee_department, e.role,
         e.first_name, e.last_name, e.employee_number, e.designation
       FROM payslips p
       JOIN employees e ON p.employee_id = e.id
       WHERE p.payslip_id = $1
     `;
-        const payslipResult = await db_1.pool.query(payslipQuery, [id]);
+        const payslipResult = await req.dbClient.query(payslipQuery, [id]);
         if (payslipResult.rows.length === 0) {
             return res.status(404).json({ error: 'payslip_not_found' });
         }
         // Get signatures
         const signaturesQuery = `
-      SELECT 
+      SELECT
         s.*,
         u.name as signer_name
       FROM payslip_signatures s
@@ -686,7 +685,7 @@ const downloadPayslip = async (req, res) => {
       WHERE s.payslip_id = $1
       ORDER BY s.signed_at ASC
     `;
-        const signaturesResult = await db_1.pool.query(signaturesQuery, [id]);
+        const signaturesResult = await req.dbClient.query(signaturesQuery, [id]);
         // Generate PDF
         await (0, payslipPdfGenerator_1.generatePayslipPdf)(payslipResult.rows[0], signaturesResult.rows, res);
     }
@@ -703,19 +702,19 @@ const getEmployeePayrollHistory = async (req, res) => {
     try {
         // Get all payslips for the employee
         const query = `
-      SELECT 
+      SELECT
         p.*,
-        e.name as employee_name, e.email as employee_email, e.employee_department
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.email as employee_email, e.employee_department
       FROM payslips p
       JOIN employees e ON p.employee_id = e.id
       WHERE p.employee_id = $1
       ORDER BY p.payslip_year DESC, p.payslip_month DESC
     `;
-        const result = await db_1.pool.query(query, [id]);
+        const result = await req.dbClient.query(query, [id]);
         // Calculate YTD totals (current year)
         const currentYear = new Date().getFullYear();
         const ytdQuery = `
-      SELECT 
+      SELECT
         SUM(gross_salary) as ytd_gross,
         SUM(net_salary) as ytd_net,
         SUM(total_deductions) as ytd_deductions,
@@ -725,7 +724,7 @@ const getEmployeePayrollHistory = async (req, res) => {
       FROM payslips
       WHERE employee_id = $1 AND payslip_year = $2 AND status = 'COMPLETED'
     `;
-        const ytdResult = await db_1.pool.query(ytdQuery, [id, currentYear]);
+        const ytdResult = await req.dbClient.query(ytdQuery, [id, currentYear]);
         return res.status(200).json({
             payslips: result.rows,
             ytd_totals: ytdResult.rows[0]

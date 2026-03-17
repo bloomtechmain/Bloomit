@@ -70,7 +70,10 @@ logger_1.default.system('🔐 CORS Configuration:', {
     frontend_url: process.env.FRONTEND_URL || 'NOT_SET'
 });
 app.use((0, cors_1.default)(corsOptions));
+const tenant_schema_1 = require("./middleware/tenant-schema");
+const db_client_1 = require("./middleware/db-client");
 app.use(express_1.default.json());
+app.use(db_client_1.dbClientMiddleware);
 // Root endpoint for Railway health checks
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -87,77 +90,98 @@ app.get('/health', (req, res) => {
         environment: process.env.NODE_ENV
     });
 });
-app.use('/employees', employees_1.default);
-app.use('/projects-old', projects_1.default); // Legacy endpoint for backward compatibility
-app.use('/projects', newProjects_1.default); // New 3-level hierarchy
-app.use('/accounts', accounts_1.default);
-app.use('/vendors', vendors_1.default);
-app.use('/payables', payables_1.default);
-app.use('/petty-cash', pettyCash_1.default);
-app.use('/receivables', receivables_1.default);
-app.use('/assets', assets_1.default);
-app.use('/analytics', analytics_1.default);
-app.use('/notes', notes_1.default);
-app.use('/todos', todos_1.default);
+app.use('/employees', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, employees_1.default);
+app.use('/projects-old', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, projects_1.default); // Legacy endpoint for backward compatibility
+app.use('/projects', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, newProjects_1.default); // New 3-level hierarchy
+app.use('/accounts', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, accounts_1.default);
+app.use('/vendors', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, vendors_1.default);
+app.use('/payables', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, payables_1.default);
+app.use('/petty-cash', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, pettyCash_1.default);
+app.use('/receivables', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, receivables_1.default);
+app.use('/assets', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, assets_1.default);
+app.use('/analytics', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, analytics_1.default);
+app.use('/notes', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, notes_1.default);
+app.use('/todos', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, todos_1.default);
 app.use('/rbac', rbac_1.default);
-app.use('/settings', settings_1.default);
-app.use('/time-entries', timeEntries_1.default);
-app.use('/pto-requests', ptoRequests_1.default);
-app.use('/subscriptions', subscriptions_1.default);
-app.use('/documents', documents_1.default);
-app.use('/quotes', quotes_1.default);
-app.use('/purchase-orders', purchaseOrders_1.default);
-app.use('/payroll', auth_1.requireAuth, payroll_1.default);
-app.use('/api/employee-portal', auth_1.requireAuth, employeePortal_1.default);
-app.use('/api/employee-onboarding', employeeOnboarding_1.default);
-app.use('/loans', loans_1.default);
+app.use('/api/settings', settings_1.default);
+app.use('/time-entries', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, timeEntries_1.default);
+app.use('/pto-requests', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, ptoRequests_1.default);
+app.use('/subscriptions', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, subscriptions_1.default);
+app.use('/documents', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, documents_1.default);
+app.use('/quotes', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, quotes_1.default);
+app.use('/purchase-orders', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, purchaseOrders_1.default);
+app.use('/payroll', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, payroll_1.default);
+app.use('/api/employee-portal', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, employeePortal_1.default);
+app.use('/api/employee-onboarding', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, employeeOnboarding_1.default);
+app.use('/loans', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, loans_1.default);
 app.post('/auth/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, force } = req.body;
     if (!email || !password)
         return res.status(400).json({ error: 'missing_fields' });
     try {
         // Get user
-        const r = await db_1.pool.query(`
-      SELECT u.id, u.name, u.email, u.password_hash, 
-             COALESCE(u.password_must_change, FALSE) as password_must_change
+        const r = await (0, db_1.query)(`
+      SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id,
+             COALESCE(u.password_must_change, FALSE) as password_must_change,
+             COALESCE(u.source, '') as source
       FROM users u
       WHERE u.email = $1 OR u.name = $1
       LIMIT 1
-    `, [email]);
+    `, [email], req.dbClient);
         if (!r.rows.length)
             return res.status(401).json({ error: 'invalid_credentials' });
         const u = r.rows[0];
         const ok = await bcryptjs_1.default.compare(password, u.password_hash);
         if (!ok)
             return res.status(401).json({ error: 'invalid_credentials' });
+        // Enforce single active session — block if already logged in elsewhere
+        await (0, db_1.query)(`DELETE FROM public.active_sessions WHERE user_id = $1 AND expires_at <= NOW()`, [u.id], req.dbClient);
+        const existingSession = await (0, db_1.query)(`SELECT id FROM public.active_sessions WHERE user_id = $1 AND expires_at > NOW() LIMIT 1`, [u.id], req.dbClient);
+        if (existingSession.rows.length > 0) {
+            if (!force) {
+                return res.status(409).json({
+                    error: 'already_logged_in',
+                    message: 'This account is already active in another session. Sign in anyway to end that session.'
+                });
+            }
+            // Force flag set — clear the existing session and continue
+            await (0, db_1.query)(`DELETE FROM public.active_sessions WHERE user_id = $1`, [u.id], req.dbClient);
+        }
+        // Create a new session (expires with the refresh token — 7 days)
+        const sessionResult = await (0, db_1.query)(`INSERT INTO public.active_sessions (user_id, expires_at, ip_address, user_agent)
+       VALUES ($1, NOW() + INTERVAL '7 days', $2, $3)
+       RETURNING session_token`, [u.id, req.ip, req.headers['user-agent'] || null], req.dbClient);
+        const sessionToken = sessionResult.rows[0].session_token;
         // Get user's roles
-        const rolesResult = await db_1.pool.query(`
+        const rolesResult = await (0, db_1.query)(`
       SELECT r.id, r.name
       FROM roles r
       INNER JOIN user_roles ur ON r.id = ur.role_id
       WHERE ur.user_id = $1
       ORDER BY r.name
-    `, [u.id]);
+    `, [u.id], req.dbClient);
         const roleIds = rolesResult.rows.map((r) => r.id);
         const roleNames = rolesResult.rows.map((r) => r.name);
         // Get union of all permissions from all roles
         const permissions = [];
         if (roleIds.length > 0) {
-            const permResult = await db_1.pool.query(`
+            const permResult = await (0, db_1.query)(`
         SELECT DISTINCT p.resource, p.action
         FROM permissions p
         INNER JOIN role_permissions rp ON p.id = rp.permission_id
         WHERE rp.role_id = ANY($1::int[])
-      `, [roleIds]);
+      `, [roleIds], req.dbClient);
             permissions.push(...permResult.rows.map((p) => `${p.resource}:${p.action}`));
         }
-        // Generate JWT tokens
+        // Generate JWT tokens (session token embedded so middleware can validate it)
         const payload = {
             userId: u.id,
+            tenantId: u.tenant_id,
             email: u.email,
             roleIds,
             roleNames,
-            permissions
+            permissions,
+            sessionToken
         };
         console.log('🔐 LOGIN DEBUG - User:', u.email);
         console.log('📋 LOGIN DEBUG - Permissions count:', permissions.length);
@@ -172,7 +196,9 @@ app.post('/auth/login', async (req, res) => {
                 roleIds,
                 roleNames,
                 permissions,
-                password_must_change: u.password_must_change
+                password_must_change: u.password_must_change,
+                source: u.source || null,
+                is_super_user: u.source === 'marketing_site'
             },
             accessToken,
             refreshToken
@@ -180,6 +206,18 @@ app.post('/auth/login', async (req, res) => {
     }
     catch (e) {
         logger_1.default.error('/auth/login error', e);
+        return res.status(500).json({ error: 'server_error' });
+    }
+});
+// Logout — invalidates the active session
+app.post('/auth/logout', auth_1.requireAuth, async (req, res) => {
+    try {
+        const { userId, sessionToken } = req.user;
+        await db_1.pool.query(`DELETE FROM public.active_sessions WHERE user_id = $1 AND session_token = $2`, [userId, sessionToken]);
+        return res.json({ success: true, message: 'Logged out successfully' });
+    }
+    catch (e) {
+        logger_1.default.error('/auth/logout error', e);
         return res.status(500).json({ error: 'server_error' });
     }
 });
@@ -247,9 +285,20 @@ app.post('/auth/refresh', async (req, res) => {
         if (!decoded) {
             return res.status(401).json({ error: 'invalid_refresh_token' });
         }
+        // Validate session is still active
+        if (decoded.sessionToken) {
+            const sessionCheck = await db_1.pool.query(`SELECT id FROM public.active_sessions
+         WHERE user_id = $1 AND session_token = $2 AND expires_at > NOW()`, [decoded.userId, decoded.sessionToken]);
+            if (sessionCheck.rows.length === 0) {
+                return res.status(401).json({
+                    error: 'session_invalidated',
+                    message: 'Your session is no longer valid. Please log in again.'
+                });
+            }
+        }
         // Generate new access token with current permissions
         const r = await db_1.pool.query(`
-      SELECT u.id, u.name, u.email
+      SELECT u.id, u.name, u.email, u.tenant_id
       FROM users u
       WHERE u.id = $1
     `, [decoded.userId]);
@@ -280,10 +329,12 @@ app.post('/auth/refresh', async (req, res) => {
         }
         const payload = {
             userId: u.id,
+            tenantId: u.tenant_id,
             email: u.email,
             roleIds,
             roleNames,
-            permissions
+            permissions,
+            sessionToken: decoded.sessionToken
         };
         const newAccessToken = (0, jwt_1.generateAccessToken)(payload);
         return res.json({ accessToken: newAccessToken });
