@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, ListChecks, UserCheck, BarChart3 } from 'lucide-react'
+import { Clock, ListChecks, BarChart3, Calendar, FileText } from 'lucide-react'
 import { timeEntriesApi } from '../services/timeEntriesApi'
 import { projectsApi } from '../services/projectsApi'
 import type { ActiveTimer } from '../types/timeEntries'
@@ -11,11 +11,20 @@ import ManagerApprovalTab from '../components/timeTracking/ManagerApprovalTab'
 import SummaryTab from '../components/timeTracking/SummaryTab'
 import { useToast } from '../context/ToastContext'
 
-type TabType = 'timer' | 'manual' | 'entries' | 'approval' | 'summary'
+export type ProjectTimeTabType = 'timer' | 'manual' | 'entries' | 'approval' | 'summary'
 
-export default function ProjectTime({ userId, isManager }: { userId: number; isManager?: boolean }) {
+export default function ProjectTime({
+  userId,
+  isManager,
+  activeTab,
+  setActiveTab,
+}: {
+  userId: number
+  isManager?: boolean
+  activeTab: ProjectTimeTabType
+  setActiveTab: (tab: ProjectTimeTabType) => void
+}) {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<TabType>('timer')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [projects, setProjects] = useState<Project[]>([])
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
@@ -64,127 +73,16 @@ export default function ProjectTime({ userId, isManager }: { userId: number; isM
   }, [fetchActiveTimer])
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>
-          Project Time Tracking
-        </h1>
-        <p style={{ fontSize: '1rem', color: '#6b7280', margin: 0 }}>
-          Track your work hours with timer or manual entry
-        </p>
+    <div style={{ padding: '0.75rem 1.5rem', maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        <Clock size={520} strokeWidth={0.6} style={{ position: 'absolute', right: -120, top: -100, opacity: 0.07, color: '#3b82f6', transform: 'rotate(-12deg)' }} />
+        <Calendar size={380} strokeWidth={0.6} style={{ position: 'absolute', left: -80, bottom: -60, opacity: 0.06, color: '#6366f1', transform: 'rotate(10deg)' }} />
+        <ListChecks size={320} strokeWidth={0.6} style={{ position: 'absolute', left: '42%', top: '22%', opacity: 0.05, color: '#3b82f6', transform: 'translateX(-50%) rotate(-5deg)' }} />
+        <BarChart3 size={240} strokeWidth={0.6} style={{ position: 'absolute', left: '3%', top: '6%', opacity: 0.06, color: '#818cf8', transform: 'rotate(-8deg)' }} />
+        <Clock size={260} strokeWidth={0.6} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.05, color: '#6366f1', transform: 'rotate(-10deg)' }} />
+        <Calendar size={240} strokeWidth={0.6} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.06, color: '#3b82f6', transform: 'rotate(7deg)' }} />
+        <FileText size={200} strokeWidth={0.6} style={{ position: 'absolute', left: '22%', bottom: '12%', opacity: 0.05, color: '#818cf8', transform: 'rotate(-15deg)' }} />
       </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '2px solid #e5e7eb', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setActiveTab('timer')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'timer' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'timer' ? '#fff' : '#6b7280',
-            border: 'none',
-            borderBottom: activeTab === 'timer' ? '3px solid #3b82f6' : '3px solid transparent',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s'
-          }}
-        >
-          <Clock size={18} />
-          Live Timer
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('manual')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'manual' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'manual' ? '#fff' : '#6b7280',
-            border: 'none',
-            borderBottom: activeTab === 'manual' ? '3px solid #3b82f6' : '3px solid transparent',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s'
-          }}
-        >
-          <ListChecks size={18} />
-          Manual Entry
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('entries')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'entries' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'entries' ? '#fff' : '#6b7280',
-            border: 'none',
-            borderBottom: activeTab === 'entries' ? '3px solid #3b82f6' : '3px solid transparent',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s'
-          }}
-        >
-          <ListChecks size={18} />
-          My Time Entries
-        </button>
-
-        {isManager && (
-          <button
-            onClick={() => setActiveTab('approval')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'approval' ? '#3b82f6' : 'transparent',
-              color: activeTab === 'approval' ? '#fff' : '#6b7280',
-              border: 'none',
-              borderBottom: activeTab === 'approval' ? '3px solid #3b82f6' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s'
-            }}
-          >
-            <UserCheck size={18} />
-            Approval
-          </button>
-        )}
-
-        <button
-          onClick={() => setActiveTab('summary')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'summary' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'summary' ? '#fff' : '#6b7280',
-            border: 'none',
-            borderBottom: activeTab === 'summary' ? '3px solid #3b82f6' : '3px solid transparent',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s'
-          }}
-        >
-          <BarChart3 size={18} />
-          Summary
-        </button>
-      </div>
-
       {/* Tab Content */}
       <div>
         {activeTab === 'timer' && (

@@ -301,127 +301,83 @@ export default function TodosWidget({ userId, accessToken }: { userId: number; a
   return (
     <div className="glass-card" style={{ padding: 24, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <CheckSquare size={24} color="var(--primary)" />
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>To-Do List</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckSquare size={16} color="#34d399" />
+          </div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>To-Do List</h2>
         </div>
-        <button 
+        <button
           onClick={() => setIsAdding(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 6, 
-            padding: '8px 16px', 
-            borderRadius: 8, 
-            background: 'var(--primary)', 
-            color: '#fff', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontWeight: 600
-          }}
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '13px' }}
         >
-          <Plus size={16} /> Add Task
+          <Plus size={14} /> Add Task
         </button>
       </div>
 
       {isAdding ? (
-        // Inline form view with dark blue styling
-        <div style={{ 
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)', 
-          borderRadius: 12, 
-          padding: 24,
+        <div style={{
+          background: 'var(--surface-2)',
+          borderRadius: 12,
+          padding: 20,
+          border: '1px solid var(--border)',
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto'
         }}>
-          <h3 style={{ marginTop: 0, color: '#ff6b3d', fontSize: 18, fontWeight: 700 }}>
+          <h3 style={{ marginTop: 0, color: 'var(--text-main)', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
             {editingTodo ? 'Edit Task' : 'New Task'}
           </h3>
-          <div style={{ display: 'grid', gap: 16, flex: 1 }}>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Title *</span>
-              <input 
+          <div style={{ display: 'grid', gap: 14, flex: 1 }}>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Title *</span>
+              <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Task title"
-                style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff' }}
                 autoFocus
               />
             </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Description</span>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Description</span>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Task description..."
-                rows={4}
-                style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff', resize: 'vertical' }}
+                rows={3}
+                style={{ resize: 'vertical' }}
               />
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500, color: '#fff' }}>Status</span>
-                <select
-                  value={status}
-                  onChange={e => setStatus(e.target.value as 'pending' | 'in_progress' | 'completed')}
-                  style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff' }}
-                >
+              <label style={{ display: 'grid', gap: 5 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</span>
+                <select value={status} onChange={e => setStatus(e.target.value as 'pending' | 'in_progress' | 'completed')}>
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
               </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500, color: '#fff' }}>Priority</span>
-                <select
-                  value={priority}
-                  onChange={e => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-                  style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff' }}
-                >
+              <label style={{ display: 'grid', gap: 5 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Priority</span>
+                <select value={priority} onChange={e => setPriority(e.target.value as 'low' | 'medium' | 'high')}>
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
               </label>
             </div>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Due Date</span>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff' }}
-              />
+            <label style={{ display: 'grid', gap: 5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Due Date</span>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
             </label>
           </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
-            <button 
-              onClick={resetForm} 
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'rgba(255,255,255,0.2)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
+          <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+            <button onClick={resetForm} className="btn-secondary" style={{ padding: '8px 18px', fontSize: 13 }}>
               Cancel
             </button>
-            <button 
-              onClick={handleSave}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
+            <button onClick={handleSave} className="btn-primary" style={{ padding: '8px 18px', fontSize: 13 }}>
               {editingTodo ? 'Update' : 'Save'}
             </button>
           </div>
@@ -431,14 +387,14 @@ export default function TodosWidget({ userId, accessToken }: { userId: number; a
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1 }}>
           {todos.map(todo => (
-            <div 
+            <div
               key={todo.id}
-              style={{ 
-                background: '#fff', 
-                borderRadius: 12, 
-                padding: 16, 
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                borderLeft: `4px solid ${getPriorityColor(todo.priority)}`,
+              style={{
+                background: 'var(--surface-2)',
+                borderRadius: 10,
+                padding: '14px 16px',
+                border: '1px solid var(--border)',
+                borderLeft: `3px solid ${getPriorityColor(todo.priority)}`,
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 12
@@ -463,15 +419,15 @@ export default function TodosWidget({ userId, accessToken }: { userId: number; a
                   fontSize: 16, 
                   fontWeight: 600, 
                   textDecoration: todo.status === 'completed' ? 'line-through' : 'none',
-                  color: todo.status === 'completed' ? '#9ca3af' : '#000'
+                  color: todo.status === 'completed' ? 'var(--text-muted)' : 'var(--text-main)'
                 }}>
                   {todo.title}
                 </h3>
                 {todo.description && (
                   <p style={{ 
-                    margin: '0 0 8px 0', 
-                    fontSize: 14, 
-                    color: '#666',
+                    margin: '0 0 8px 0',
+                    fontSize: 14,
+                    color: 'var(--text-secondary)',
                     textDecoration: todo.status === 'completed' ? 'line-through' : 'none'
                   }}>
                     {todo.description}
@@ -563,9 +519,9 @@ export default function TodosWidget({ userId, accessToken }: { userId: number; a
             </div>
           ))}
           {todos.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>
-              <CheckSquare size={48} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-              <p>No tasks yet. Click "Add Task" to create one!</p>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <CheckSquare size={40} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+              <p style={{ margin: 0, fontSize: 13 }}>No tasks yet. Click "Add Task" to create one!</p>
             </div>
           )}
         </div>

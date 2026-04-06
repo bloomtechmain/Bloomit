@@ -492,7 +492,7 @@ export const getTimeSummary = async (req: Request, res: Response) => {
   try {
     const { employee_id, project_id, start_date, end_date } = req.query
 
-    let whereClause = "WHERE te.status = 'approved'"
+    let whereClause = "WHERE te.status != 'rejected'"
     const params: any[] = []
     let paramCount = 0
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { DollarSign, TrendingUp } from 'lucide-react'
 import type { PurchaseOrderItem } from '../../../types/purchaseOrders'
 
 interface POFinancialSummaryProps {
@@ -12,6 +13,20 @@ interface POFinancialSummaryProps {
   readOnly?: boolean
 }
 
+const fmtUSD = (v: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(v)
+
+const fo = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+}
+const bl = (e: React.FocusEvent<HTMLInputElement>) => {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
+
 export const POFinancialSummary: React.FC<POFinancialSummaryProps> = ({
   lineItems,
   salesTax,
@@ -22,289 +37,107 @@ export const POFinancialSummary: React.FC<POFinancialSummaryProps> = ({
   onBankingFeeChange,
   readOnly = false
 }) => {
-  // Calculate subtotal from line items
-  const subtotal = useMemo(() => {
-    return lineItems.reduce((sum, item) => {
-      const itemTotal = item.quantity * item.unit_price
-      return sum + itemTotal
-    }, 0)
-  }, [lineItems])
+  const subtotal = useMemo(() => lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0), [lineItems])
+  const grandTotal = useMemo(() => subtotal + salesTax + shippingHandling + bankingFee, [subtotal, salesTax, shippingHandling, bankingFee])
 
-  // Calculate grand total
-  const grandTotal = useMemo(() => {
-    return subtotal + salesTax + shippingHandling + bankingFee
-  }, [subtotal, salesTax, shippingHandling, bankingFee])
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount)
+  const handleNum = (val: string, cb: (n: number) => void) => {
+    if (val === '') { cb(0); return }
+    const n = parseFloat(val)
+    if (!isNaN(n) && n >= 0) cb(n)
   }
 
-  const handleNumberInput = (
-    value: string,
-    onChange: (value: number) => void
-  ) => {
-    // Allow empty string or valid numbers
-    if (value === '') {
-      onChange(0)
-      return
-    }
-    
-    const numValue = parseFloat(value)
-    if (!isNaN(numValue) && numValue >= 0) {
-      onChange(numValue)
-    }
-  }
+  const feeRow = (
+    label: string,
+    id: string,
+    value: number,
+    onChange: (n: number) => void
+  ) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+      <span style={{ fontSize: 13, color: '#475569', fontWeight: 500, flexShrink: 0 }}>{label}</span>
+      {readOnly ? (
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{fmtUSD(value)}</span>
+      ) : (
+        <div style={{ position: 'relative', width: 140 }}>
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#94a3b8', pointerEvents: 'none', fontWeight: 600 }}>$</span>
+          <input
+            id={id}
+            type="number"
+            value={value || ''}
+            onChange={e => handleNum(e.target.value, onChange)}
+            disabled={readOnly}
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            style={{
+              width: '100%',
+              padding: '8px 10px 8px 24px',
+              borderRadius: 8,
+              border: '1.5px solid #e2e8f0',
+              background: '#f8fafc',
+              fontSize: 13,
+              color: '#1e293b',
+              outline: 'none',
+              textAlign: 'right',
+              fontWeight: 600,
+              boxSizing: 'border-box' as const,
+              transition: 'all 0.2s',
+            }}
+            onFocus={fo}
+            onBlur={bl}
+          />
+        </div>
+      )}
+    </div>
+  )
 
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
-      <h3 style={{ 
-        fontSize: '1rem', 
-        fontWeight: '600', 
-        color: '#374151', 
-        marginBottom: '1rem',
-        paddingBottom: '0.5rem',
-        borderBottom: '2px solid #e5e7eb'
-      }}>
-        Financial Summary
-      </h3>
+    <div style={{ marginBottom: 24 }}>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <DollarSign size={13} color="#f59e0b" />
+        </div>
+        <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Financial Summary</span>
+      </div>
 
-      <div style={{
-        backgroundColor: '#f9fafb',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '1.25rem'
-      }}>
-        {/* Subtotal - Read-only, auto-calculated */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '0.875rem',
-          paddingBottom: '0.875rem',
-          borderBottom: '1px solid #e5e7eb'
-        }}>
-          <label style={{
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#6b7280'
-          }}>
-            Subtotal (from line items)
-          </label>
-          <span style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            {formatCurrency(subtotal)}
-          </span>
+      <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '16px 18px' }}>
+        {/* Subtotal row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Subtotal (line items)</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{fmtUSD(subtotal)}</span>
         </div>
 
-        {/* Sales Tax Input */}
+        {feeRow('Sales Tax', 'sales_tax', salesTax, onSalesTaxChange)}
+        {feeRow('Shipping & Handling', 'shipping_handling', shippingHandling, onShippingHandlingChange)}
+        {feeRow('Banking Fee', 'banking_fee', bankingFee, onBankingFeeChange)}
+
+        {/* Grand total highlight */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '0.875rem',
-          gap: '1rem'
+          marginTop: 12,
+          paddingTop: 14,
+          borderTop: '2px solid #e2e8f0',
+          background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
+          borderRadius: 10,
+          padding: '14px 16px',
+          marginLeft: -2,
+          marginRight: -2,
         }}>
-          <label
-            htmlFor="sales_tax"
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              flex: '0 0 auto'
-            }}
-          >
-            Sales Tax
-          </label>
-          <div style={{ flex: '0 0 150px', position: 'relative' }}>
-            <span style={{
-              position: 'absolute',
-              left: '0.625rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              pointerEvents: 'none'
-            }}>
-              $
-            </span>
-            <input
-              type="number"
-              id="sales_tax"
-              value={salesTax || ''}
-              onChange={(e) => handleNumberInput(e.target.value, onSalesTaxChange)}
-              disabled={readOnly}
-              min="0"
-              step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.625rem 0.5rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: readOnly ? '#f3f4f6' : '#ffffff',
-                textAlign: 'right',
-                fontWeight: '500',
-                color: '#374151',
-                cursor: readOnly ? 'not-allowed' : 'text'
-              }}
-              placeholder="0.00"
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <TrendingUp size={16} color="#059669" />
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#065f46' }}>Grand Total</span>
           </div>
-        </div>
-
-        {/* Shipping & Handling Input */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '0.875rem',
-          gap: '1rem'
-        }}>
-          <label
-            htmlFor="shipping_handling"
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              flex: '0 0 auto'
-            }}
-          >
-            Shipping & Handling
-          </label>
-          <div style={{ flex: '0 0 150px', position: 'relative' }}>
-            <span style={{
-              position: 'absolute',
-              left: '0.625rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              pointerEvents: 'none'
-            }}>
-              $
-            </span>
-            <input
-              type="number"
-              id="shipping_handling"
-              value={shippingHandling || ''}
-              onChange={(e) => handleNumberInput(e.target.value, onShippingHandlingChange)}
-              disabled={readOnly}
-              min="0"
-              step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.625rem 0.5rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: readOnly ? '#f3f4f6' : '#ffffff',
-                textAlign: 'right',
-                fontWeight: '500',
-                color: '#374151',
-                cursor: readOnly ? 'not-allowed' : 'text'
-              }}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        {/* Banking Fee Input */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1rem',
-          gap: '1rem'
-        }}>
-          <label
-            htmlFor="banking_fee"
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              flex: '0 0 auto'
-            }}
-          >
-            Banking Fee
-          </label>
-          <div style={{ flex: '0 0 150px', position: 'relative' }}>
-            <span style={{
-              position: 'absolute',
-              left: '0.625rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              pointerEvents: 'none'
-            }}>
-              $
-            </span>
-            <input
-              type="number"
-              id="banking_fee"
-              value={bankingFee || ''}
-              onChange={(e) => handleNumberInput(e.target.value, onBankingFeeChange)}
-              disabled={readOnly}
-              min="0"
-              step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.625rem 0.5rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: readOnly ? '#f3f4f6' : '#ffffff',
-                textAlign: 'right',
-                fontWeight: '500',
-                color: '#374151',
-                cursor: readOnly ? 'not-allowed' : 'text'
-              }}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        {/* Grand Total - Read-only, auto-calculated */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: '1rem',
-          borderTop: '2px solid #d1d5db'
-        }}>
-          <label style={{
-            fontSize: '1rem',
-            fontWeight: '700',
-            color: '#111827'
-          }}>
-            Grand Total
-          </label>
-          <span style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: '#059669'
-          }}>
-            {formatCurrency(grandTotal)}
+          <span style={{ fontSize: 22, fontWeight: 800, color: '#059669', letterSpacing: '-0.5px' }}>
+            {fmtUSD(grandTotal)}
           </span>
         </div>
       </div>
 
       {!readOnly && (
-        <p style={{ 
-          fontSize: '0.75rem', 
-          color: '#6b7280',
-          marginTop: '0.5rem',
-          marginBottom: 0
-        }}>
-          Subtotal and Grand Total are calculated automatically based on line items and fees
+        <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0', textAlign: 'right' }}>
+          Subtotal and Grand Total are auto-calculated from line items
         </p>
       )}
     </div>

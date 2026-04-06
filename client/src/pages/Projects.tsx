@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FolderOpen, ClipboardList, Briefcase, FileText } from 'lucide-react'
 import type { Project, Contract, ContractItem } from '../types/projects'
 import { projectsApi, contractsApi, itemsApi } from '../services/projectsApi'
 import { ProjectsList } from '../components/ProjectsList'
@@ -9,7 +9,11 @@ import { ItemModal } from '../components/ItemModal'
 import { ItemsModal } from '../components/ItemsModal'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 
-export default function Projects() {
+interface ProjectsProps {
+  onRegisterCreate?: (handler: () => void) => void
+}
+
+export default function Projects({ onRegisterCreate }: ProjectsProps) {
 
   // State for data refresh
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -52,6 +56,11 @@ export default function Projects() {
     setSelectedProject(null)
     setProjectModalOpen(true)
   }
+
+  useEffect(() => {
+    onRegisterCreate?.(handleCreateProject)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleEditProject = (project: Project) => {
     setProjectMode('edit')
@@ -157,7 +166,16 @@ export default function Projects() {
 
   return (
     <ErrorBoundary>
-      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+        <FolderOpen size={520} strokeWidth={0.6} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.07, color: '#3b82f6', transform: 'rotate(-12deg)' }} />
+        <ClipboardList size={380} strokeWidth={0.6} style={{ position: 'absolute', left: -60, bottom: -60, opacity: 0.06, color: '#6366f1', transform: 'rotate(10deg)' }} />
+        <Briefcase size={300} strokeWidth={0.6} style={{ position: 'absolute', left: '42%', top: '22%', opacity: 0.05, color: '#3b82f6', transform: 'translateX(-50%) rotate(-5deg)' }} />
+        <FolderOpen size={240} strokeWidth={0.6} style={{ position: 'absolute', left: '3%', top: '6%', opacity: 0.06, color: '#818cf8', transform: 'rotate(-8deg)' }} />
+        <ClipboardList size={260} strokeWidth={0.6} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.05, color: '#6366f1', transform: 'rotate(-10deg)' }} />
+        <Briefcase size={240} strokeWidth={0.6} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.06, color: '#3b82f6', transform: 'rotate(7deg)' }} />
+        <FileText size={200} strokeWidth={0.6} style={{ position: 'absolute', left: '22%', bottom: '12%', opacity: 0.05, color: '#818cf8', transform: 'rotate(-15deg)' }} />
+      </div>
       {/* Notification */}
       {notification && (
         <div
@@ -178,45 +196,6 @@ export default function Projects() {
           {notification.message}
         </div>
       )}
-
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>
-            Projects & Contracts
-          </h1>
-          <p style={{ fontSize: '1rem', color: '#6b7280', margin: 0 }}>
-            Manage your projects and contracts
-          </p>
-        </div>
-        <button
-          onClick={handleCreateProject}
-          style={{
-            padding: '0.75rem 1.5rem',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-            transition: 'background-color 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#2563eb'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#3b82f6'
-          }}
-        >
-          <Plus size={20} />
-          Create Project
-        </button>
-      </div>
 
       {/* Projects List */}
       <ProjectsList

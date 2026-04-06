@@ -57,21 +57,52 @@ interface EmployeeHistory {
   ytd_totals: YTDTotals
 }
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-]
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+const card: React.CSSProperties = {
+  background: '#fff',
+  border: '1.5px solid #e2e8f0',
+  borderRadius: 12,
+  padding: 24,
+  boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+}
+
+const inp: React.CSSProperties = {
+  padding: '10px 14px',
+  border: '1.5px solid #e2e8f0',
+  borderRadius: 10,
+  fontSize: 13.5,
+  background: '#f8fafc',
+  outline: 'none',
+  transition: 'all 0.2s',
+  fontFamily: 'inherit',
+  color: '#1e293b',
+}
+
+const fo = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+}
+const bl = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
+
+const formatCurrency = (amount: string | number) => {
+  const n = typeof amount === 'string' ? parseFloat(amount) : amount
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0)
+}
 
 export default function PayrollReports() {
   const [activeTab, setActiveTab] = useState<'monthly' | 'employee'>('monthly')
-  
-  // Monthly Report State
+
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1)
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(null)
   const [loadingMonthly, setLoadingMonthly] = useState(false)
 
-  // Employee History State
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null)
   const [employeeHistory, setEmployeeHistory] = useState<EmployeeHistory | null>(null)
@@ -79,44 +110,22 @@ export default function PayrollReports() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Generate year options (current year and past 5 years)
   const currentYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i)
 
-  // Fetch employees on component mount
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  // Fetch monthly report when year/month changes
-  useEffect(() => {
-    if (activeTab === 'monthly') {
-      fetchMonthlyReport()
-    }
-  }, [selectedYear, selectedMonth, activeTab])
-
-  // Fetch employee history when employee changes
-  useEffect(() => {
-    if (selectedEmployee && activeTab === 'employee') {
-      fetchEmployeeHistory(selectedEmployee)
-    }
-  }, [selectedEmployee, activeTab])
+  useEffect(() => { fetchEmployees() }, [])
+  useEffect(() => { if (activeTab === 'monthly') fetchMonthlyReport() }, [selectedYear, selectedMonth, activeTab])
+  useEffect(() => { if (selectedEmployee && activeTab === 'employee') fetchEmployeeHistory(selectedEmployee) }, [selectedEmployee, activeTab])
 
   const fetchEmployees = async () => {
     try {
       setLoadingEmployees(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/payroll/employees`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
+      const response = await fetch(`${API_URL}/payroll/employees`, { headers: { Authorization: `Bearer ${token}` } })
       if (response.ok) {
         const data = await response.json()
         setEmployees(data.employees)
-        // Auto-select first employee
-        if (data.employees.length > 0) {
-          setSelectedEmployee(data.employees[0].employee_id)
-        }
+        if (data.employees.length > 0) setSelectedEmployee(data.employees[0].employee_id)
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
@@ -129,17 +138,8 @@ export default function PayrollReports() {
     try {
       setLoadingMonthly(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(
-        `${API_URL}/payroll/reports/monthly?year=${selectedYear}&month=${selectedMonth}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setMonthlyReport(data)
-      } else {
-        setMonthlyReport(null)
-      }
+      const response = await fetch(`${API_URL}/payroll/reports/monthly?year=${selectedYear}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } })
+      setMonthlyReport(response.ok ? (await response.json()) : null)
     } catch (error) {
       console.error('Error fetching monthly report:', error)
       setMonthlyReport(null)
@@ -152,17 +152,8 @@ export default function PayrollReports() {
     try {
       setLoadingHistory(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(
-        `${API_URL}/payroll/reports/employee/${employeeId}/history`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setEmployeeHistory(data)
-      } else {
-        setEmployeeHistory(null)
-      }
+      const response = await fetch(`${API_URL}/payroll/reports/employee/${employeeId}/history`, { headers: { Authorization: `Bearer ${token}` } })
+      setEmployeeHistory(response.ok ? (await response.json()) : null)
     } catch (error) {
       console.error('Error fetching employee history:', error)
       setEmployeeHistory(null)
@@ -171,254 +162,131 @@ export default function PayrollReports() {
     }
   }
 
-  const formatCurrency = (amount: string | number) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(numAmount || 0)
-  }
-
   const filteredEmployees = employees.filter(emp => {
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      emp.name.toLowerCase().includes(searchLower) ||
-      emp.email.toLowerCase().includes(searchLower) ||
-      (emp.employee_department && emp.employee_department.toLowerCase().includes(searchLower))
-    )
+    const s = searchTerm.toLowerCase()
+    return emp.name.toLowerCase().includes(s) || emp.email.toLowerCase().includes(s) || (emp.employee_department && emp.employee_department.toLowerCase().includes(s))
   })
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: 24 }}>
+    <div style={{ width: '100%', display: 'grid', gap: 20 }}>
       {/* Tab Selector */}
-      <div className="glass-panel" style={{ padding: 8, display: 'flex', gap: 8 }}>
-        <button
-          onClick={() => setActiveTab('monthly')}
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '12px 20px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeTab === 'monthly' ? 'var(--primary)' : 'transparent',
-            color: '#fff',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: 14,
-            transition: 'all 0.2s'
-          }}
-        >
-          <BarChart3 size={18} />
-          <span>Monthly Summary</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('employee')}
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '12px 20px',
-            borderRadius: 8,
-            border: 'none',
-            background: activeTab === 'employee' ? 'var(--primary)' : 'transparent',
-            color: '#fff',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: 14,
-            transition: 'all 0.2s'
-          }}
-        >
-          <Users size={18} />
-          <span>Employee History</span>
-        </button>
+      <div style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 8, display: 'flex', gap: 6, boxShadow: '0 2px 8px rgba(15,23,42,0.06)' }}>
+        {([
+          { key: 'monthly', label: 'Monthly Summary', icon: <BarChart3 size={15} /> },
+          { key: 'employee', label: 'Employee History', icon: <Users size={15} /> },
+        ] as { key: 'monthly' | 'employee'; label: string; icon: React.ReactNode }[]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px 16px', borderRadius: 9, border: 'none', background: activeTab === tab.key ? '#3b82f6' : '#f1f5f9', color: activeTab === tab.key ? '#fff' : '#64748b', cursor: 'pointer', fontWeight: 600, fontSize: 13.5, transition: 'all 0.2s', boxShadow: activeTab === tab.key ? '0 2px 8px rgba(59,130,246,0.3)' : 'none' }}
+            onMouseEnter={e => { if (activeTab !== tab.key) e.currentTarget.style.background = '#e2e8f0' }}
+            onMouseLeave={e => { if (activeTab !== tab.key) e.currentTarget.style.background = '#f1f5f9' }}
+          >
+            {tab.icon}<span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Monthly Summary Tab */}
       {activeTab === 'monthly' && (
-        <div style={{ display: 'grid', gap: 24 }}>
-          {/* Month/Year Selector */}
-          <div className="glass-panel" style={{ padding: 24 }}>
-            <h3 style={{ margin: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Calendar size={20} />
-              Select Period
-            </h3>
+        <div style={{ display: 'grid', gap: 20 }}>
+          {/* Period Selector */}
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Calendar size={13} color="#3b82f6" />
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Select Period</span>
+            </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  background: '#fff'
-                }}
-              >
-                {MONTHS.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>
-                    {month}
-                  </option>
-                ))}
+              <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} style={{ ...inp, flex: 1, appearance: 'none', cursor: 'pointer' }} onFocus={fo} onBlur={bl}>
+                {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  background: '#fff'
-                }}
-              >
-                {yearOptions.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
+              <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} style={{ ...inp, flex: 1, appearance: 'none', cursor: 'pointer' }} onFocus={fo} onBlur={bl}>
+                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
           </div>
 
           {loadingMonthly ? (
-            <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#666' }}>Loading report...</div>
+            <div style={{ ...card, padding: 40, textAlign: 'center' }}>
+              <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: 14 }}>Loading report...</p>
             </div>
           ) : !monthlyReport || monthlyReport.summary.total_employees === '0' ? (
-            <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-              <BarChart3 size={64} style={{ color: '#ccc', marginBottom: 16 }} />
-              <h3 style={{ margin: 0, marginBottom: 8 }}>No Data Available</h3>
-              <p style={{ margin: 0, color: '#666' }}>
-                No completed payslips found for {MONTHS[selectedMonth - 1]} {selectedYear}
-              </p>
+            <div style={{ ...card, padding: 40, textAlign: 'center' }}>
+              <BarChart3 size={48} style={{ color: '#cbd5e1', marginBottom: 12 }} />
+              <h3 style={{ margin: '0 0 6px', color: '#475569' }}>No Data Available</h3>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: 13.5 }}>No completed payslips found for {MONTHS[selectedMonth - 1]} {selectedYear}</p>
             </div>
           ) : (
             <>
               {/* Summary Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                <div className="glass-panel" style={{ padding: 20, textAlign: 'center' }}>
-                  <Users size={24} style={{ color: '#3b82f6', marginBottom: 8 }} />
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Total Employees</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: '#3b82f6' }}>
-                    {monthlyReport.summary.total_employees}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                {[
+                  { icon: <Users size={22} color="#3b82f6" />, label: 'Total Employees', value: monthlyReport.summary.total_employees, color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', isCurrency: false },
+                  { icon: <DollarSign size={22} color="#8b5cf6" />, label: 'Gross Salary', value: monthlyReport.summary.total_gross_salary, color: '#8b5cf6', bg: 'rgba(139,92,246,0.06)', isCurrency: true },
+                  { icon: <TrendingUp size={22} color="#10b981" />, label: 'Net Salary', value: monthlyReport.summary.total_net_salary, color: '#10b981', bg: 'rgba(16,185,129,0.06)', isCurrency: true },
+                  { icon: <BarChart3 size={22} color="#f59e0b" />, label: 'Total Payroll Cost', value: monthlyReport.summary.total_payroll_cost, color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', isCurrency: true },
+                ].map(stat => (
+                  <div key={stat.label} style={{ background: stat.bg, border: '1.5px solid #e2e8f0', borderRadius: 12, padding: 20, textAlign: 'center' }}>
+                    <div style={{ marginBottom: 8 }}>{stat.icon}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>{stat.label}</div>
+                    <div style={{ fontSize: stat.isCurrency ? 20 : 28, fontWeight: 700, color: stat.color }}>
+                      {stat.isCurrency ? formatCurrency(stat.value) : stat.value}
+                    </div>
                   </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: 20, textAlign: 'center' }}>
-                  <DollarSign size={24} style={{ color: '#8b5cf6', marginBottom: 8 }} />
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Gross Salary</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6' }}>
-                    {formatCurrency(monthlyReport.summary.total_gross_salary)}
-                  </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: 20, textAlign: 'center' }}>
-                  <TrendingUp size={24} style={{ color: '#10b981', marginBottom: 8 }} />
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Net Salary</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>
-                    {formatCurrency(monthlyReport.summary.total_net_salary)}
-                  </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: 20, textAlign: 'center' }}>
-                  <BarChart3 size={24} style={{ color: '#f59e0b', marginBottom: 8 }} />
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Total Payroll Cost</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>
-                    {formatCurrency(monthlyReport.summary.total_payroll_cost)}
-                  </div>
-                </div>
+                ))}
               </div>
 
               {/* Detailed Breakdown */}
-              <div className="glass-panel" style={{ padding: 24 }}>
-                <h3 style={{ margin: 0, marginBottom: 20 }}>Detailed Breakdown</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-                  <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>Basic Salary</div>
-                    <div style={{ fontSize: 20, fontWeight: 600 }}>
-                      {formatCurrency(monthlyReport.summary.total_basic_salary)}
-                    </div>
+              <div style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <BarChart3 size={13} color="#3b82f6" />
                   </div>
-                  <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>Total Deductions</div>
-                    <div style={{ fontSize: 20, fontWeight: 600 }}>
-                      {formatCurrency(monthlyReport.summary.total_deductions)}
+                  <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Detailed Breakdown</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {[
+                    { label: 'Basic Salary', value: monthlyReport.summary.total_basic_salary },
+                    { label: 'Total Deductions', value: monthlyReport.summary.total_deductions },
+                    { label: 'EPF Employer Contribution', value: monthlyReport.summary.total_epf_employer },
+                    { label: 'ETF Employer Contribution', value: monthlyReport.summary.total_etf_employer },
+                  ].map(item => (
+                    <div key={item.label} style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #f1f5f9' }}>
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>{item.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>{formatCurrency(item.value)}</div>
                     </div>
-                  </div>
-                  <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>EPF Employer Contribution</div>
-                    <div style={{ fontSize: 20, fontWeight: 600 }}>
-                      {formatCurrency(monthlyReport.summary.total_epf_employer)}
-                    </div>
-                  </div>
-                  <div style={{ padding: 16, background: '#f9fafb', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>ETF Employer Contribution</div>
-                    <div style={{ fontSize: 20, fontWeight: 600 }}>
-                      {formatCurrency(monthlyReport.summary.total_etf_employer)}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
               {/* Department Breakdown */}
               {monthlyReport.by_department.length > 0 && (
-                <div className="glass-panel" style={{ padding: 24 }}>
-                  <h3 style={{ margin: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Building2 size={20} />
-                    Department Breakdown
-                  </h3>
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    {/* Header */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                        gap: 12,
-                        padding: '12px 16px',
-                        background: '#f3f4f6',
-                        borderRadius: 8,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#666'
-                      }}
-                    >
+                <div style={card}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Building2 size={13} color="#6366f1" />
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Department Breakdown</span>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12, padding: '10px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       <div>Department</div>
                       <div style={{ textAlign: 'center' }}>Employees</div>
-                      <div style={{ textAlign: 'right' }}>Gross Salary</div>
-                      <div style={{ textAlign: 'right' }}>Net Salary</div>
+                      <div style={{ textAlign: 'right' }}>Gross</div>
+                      <div style={{ textAlign: 'right' }}>Net</div>
                     </div>
-
-                    {/* Department Rows */}
-                    {monthlyReport.by_department.map((dept, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                          gap: 12,
-                          padding: '16px',
-                          background: '#fff',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          fontSize: 14
-                        }}
+                    {monthlyReport.by_department.map((dept, i) => (
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12, padding: '13px 16px', background: '#fff', border: '1.5px solid #f1f5f9', borderRadius: 9, alignItems: 'center', fontSize: 13.5, transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fafcff' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#f1f5f9'; e.currentTarget.style.background = '#fff' }}
                       >
-                        <div style={{ fontWeight: 600 }}>{dept.employee_department || 'Unassigned'}</div>
-                        <div style={{ textAlign: 'center', color: '#666' }}>{dept.employee_count}</div>
-                        <div style={{ textAlign: 'right', fontWeight: 500 }}>
-                          {formatCurrency(dept.total_gross)}
-                        </div>
-                        <div style={{ textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
-                          {formatCurrency(dept.total_net)}
-                        </div>
+                        <div style={{ fontWeight: 700, color: '#1e293b' }}>{dept.employee_department || 'Unassigned'}</div>
+                        <div style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{dept.employee_count}</div>
+                        <div style={{ textAlign: 'right', fontWeight: 500, color: '#374151' }}>{formatCurrency(dept.total_gross)}</div>
+                        <div style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>{formatCurrency(dept.total_net)}</div>
                       </div>
                     ))}
                   </div>
@@ -431,54 +299,43 @@ export default function PayrollReports() {
 
       {/* Employee History Tab */}
       {activeTab === 'employee' && (
-        <div style={{ display: 'grid', gap: 24 }}>
+        <div style={{ display: 'grid', gap: 20 }}>
           {/* Employee Selector */}
-          <div className="glass-panel" style={{ padding: 24 }}>
-            <h3 style={{ margin: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Users size={20} />
-              Select Employee
-            </h3>
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={13} color="#3b82f6" />
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Select Employee</span>
+            </div>
 
-            {/* Search bar */}
-            <div style={{ position: 'relative', marginBottom: 12 }}>
-              <Search
-                size={18}
-                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#999' }}
-              />
+            <div style={{ position: 'relative', marginBottom: 10 }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
               <input
                 type="text"
                 placeholder="Search employees..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 40px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  fontSize: 14
-                }}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ ...inp, width: '100%', paddingLeft: 34, boxSizing: 'border-box' as const }}
+                onFocus={fo}
+                onBlur={bl}
               />
             </div>
 
             {loadingEmployees ? (
-              <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Loading employees...</div>
+              <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Loading employees...</div>
             ) : (
               <select
                 value={selectedEmployee || ''}
-                onChange={(e) => setSelectedEmployee(parseInt(e.target.value))}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  background: '#fff'
-                }}
+                onChange={e => setSelectedEmployee(parseInt(e.target.value))}
+                style={{ ...inp, width: '100%', appearance: 'none', cursor: 'pointer', boxSizing: 'border-box' as const }}
+                onFocus={fo}
+                onBlur={bl}
               >
                 <option value="">Select an employee...</option>
-                {filteredEmployees.map((emp) => (
+                {filteredEmployees.map(emp => (
                   <option key={emp.employee_id} value={emp.employee_id}>
-                    {emp.name} {emp.employee_department ? `- ${emp.employee_department}` : ''}
+                    {emp.name}{emp.employee_department ? ` — ${emp.employee_department}` : ''}
                   </option>
                 ))}
               </select>
@@ -488,108 +345,71 @@ export default function PayrollReports() {
           {selectedEmployee && (
             <>
               {loadingHistory ? (
-                <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-                  <div style={{ fontSize: 16, color: '#666' }}>Loading history...</div>
+                <div style={{ ...card, padding: 40, textAlign: 'center' }}>
+                  <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: 14 }}>Loading history...</p>
                 </div>
               ) : !employeeHistory || employeeHistory.payslips.length === 0 ? (
-                <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-                  <Users size={64} style={{ color: '#ccc', marginBottom: 16 }} />
-                  <h3 style={{ margin: 0, marginBottom: 8 }}>No Payroll History</h3>
-                  <p style={{ margin: 0, color: '#666' }}>
-                    No payslips found for this employee.
-                  </p>
+                <div style={{ ...card, padding: 40, textAlign: 'center' }}>
+                  <Users size={48} style={{ color: '#cbd5e1', marginBottom: 12 }} />
+                  <h3 style={{ margin: '0 0 6px', color: '#475569' }}>No Payroll History</h3>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: 13.5 }}>No payslips found for this employee.</p>
                 </div>
               ) : (
                 <>
                   {/* YTD Summary */}
                   {employeeHistory.ytd_totals && (
-                    <div className="glass-panel" style={{ padding: 24 }}>
-                      <h3 style={{ margin: 0, marginBottom: 16 }}>Year-to-Date Totals ({currentYear})</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
-                        <div style={{ padding: 16, background: '#f0f9ff', borderRadius: 8, textAlign: 'center' }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>YTD Gross</div>
-                          <div style={{ fontSize: 18, fontWeight: 600, color: '#0369a1' }}>
-                            {formatCurrency(employeeHistory.ytd_totals.ytd_gross)}
-                          </div>
+                    <div style={card}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <TrendingUp size={13} color="#f59e0b" />
                         </div>
-                        <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 8, textAlign: 'center' }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>YTD Net</div>
-                          <div style={{ fontSize: 18, fontWeight: 600, color: '#16a34a' }}>
-                            {formatCurrency(employeeHistory.ytd_totals.ytd_net)}
+                        <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Year-to-Date Totals ({currentYear})</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                        {[
+                          { label: 'YTD Gross', value: employeeHistory.ytd_totals.ytd_gross, bg: '#f0f9ff', color: '#0369a1' },
+                          { label: 'YTD Net', value: employeeHistory.ytd_totals.ytd_net, bg: '#f0fdf4', color: '#16a34a' },
+                          { label: 'YTD Deductions', value: employeeHistory.ytd_totals.ytd_deductions, bg: '#fff1f2', color: '#dc2626' },
+                          { label: 'YTD EPF (Employee)', value: employeeHistory.ytd_totals.ytd_epf_employee, bg: '#fefce8', color: '#ca8a04' },
+                        ].map(item => (
+                          <div key={item.label} style={{ padding: 14, background: item.bg, borderRadius: 10, textAlign: 'center', border: '1px solid #f1f5f9' }}>
+                            <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>{item.label}</div>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: item.color }}>{formatCurrency(item.value)}</div>
                           </div>
-                        </div>
-                        <div style={{ padding: 16, background: '#fef2f2', borderRadius: 8, textAlign: 'center' }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>YTD Deductions</div>
-                          <div style={{ fontSize: 18, fontWeight: 600, color: '#dc2626' }}>
-                            {formatCurrency(employeeHistory.ytd_totals.ytd_deductions)}
-                          </div>
-                        </div>
-                        <div style={{ padding: 16, background: '#fefce8', borderRadius: 8, textAlign: 'center' }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>YTD EPF (Employee)</div>
-                          <div style={{ fontSize: 18, fontWeight: 600, color: '#ca8a04' }}>
-                            {formatCurrency(employeeHistory.ytd_totals.ytd_epf_employee)}
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   )}
 
                   {/* Payroll History Table */}
-                  <div className="glass-panel" style={{ padding: 24 }}>
-                    <h3 style={{ margin: 0, marginBottom: 20 }}>Payroll History</h3>
-                    <div style={{ display: 'grid', gap: 12 }}>
-                      {/* Header */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
-                          gap: 12,
-                          padding: '12px 16px',
-                          background: '#f3f4f6',
-                          borderRadius: 8,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: '#666'
-                        }}
-                      >
-                        <div>Period</div>
-                        <div style={{ textAlign: 'right' }}>Basic Salary</div>
-                        <div style={{ textAlign: 'right' }}>Gross Salary</div>
-                        <div style={{ textAlign: 'right' }}>Deductions</div>
-                        <div style={{ textAlign: 'right' }}>Net Salary</div>
+                  <div style={card}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <BarChart3 size={13} color="#3b82f6" />
                       </div>
-
-                      {/* Payslip Rows */}
-                      {employeeHistory.payslips.map((payslip) => (
+                      <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Payroll History</span>
+                    </div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 12, padding: '10px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <div>Period</div>
+                        <div style={{ textAlign: 'right' }}>Basic</div>
+                        <div style={{ textAlign: 'right' }}>Gross</div>
+                        <div style={{ textAlign: 'right' }}>Deductions</div>
+                        <div style={{ textAlign: 'right' }}>Net</div>
+                      </div>
+                      {employeeHistory.payslips.map(payslip => (
                         <div
                           key={payslip.payslip_id}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
-                            gap: 12,
-                            padding: '16px',
-                            background: '#fff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: 8,
-                            alignItems: 'center',
-                            fontSize: 14
-                          }}
+                          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 12, padding: '13px 16px', background: '#fff', border: '1.5px solid #f1f5f9', borderRadius: 9, alignItems: 'center', fontSize: 13.5, transition: 'all 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fafcff' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#f1f5f9'; e.currentTarget.style.background = '#fff' }}
                         >
-                          <div style={{ fontWeight: 600 }}>
-                            {MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            {formatCurrency(payslip.basic_salary)}
-                          </div>
-                          <div style={{ textAlign: 'right', fontWeight: 500 }}>
-                            {formatCurrency(payslip.gross_salary)}
-                          </div>
-                          <div style={{ textAlign: 'right', color: '#dc2626' }}>
-                            {formatCurrency(payslip.total_deductions)}
-                          </div>
-                          <div style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>
-                            {formatCurrency(payslip.net_salary)}
-                          </div>
+                          <div style={{ fontWeight: 700, color: '#1e293b' }}>{MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}</div>
+                          <div style={{ textAlign: 'right', color: '#374151' }}>{formatCurrency(payslip.basic_salary)}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 500, color: '#374151' }}>{formatCurrency(payslip.gross_salary)}</div>
+                          <div style={{ textAlign: 'right', color: '#dc2626', fontWeight: 500 }}>{formatCurrency(payslip.total_deductions)}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>{formatCurrency(payslip.net_salary)}</div>
                         </div>
                       ))}
                     </div>

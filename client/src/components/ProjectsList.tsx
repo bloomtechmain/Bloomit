@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Edit2, Trash2, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit2, Trash2, Plus, FolderOpen, DollarSign, FileText, Calendar } from 'lucide-react'
 import type { Project, Contract } from '../types/projects'
 import { projectsApi } from '../services/projectsApi'
 import { ContractsList } from './ContractsList'
@@ -16,14 +16,30 @@ interface ProjectsListProps {
   refreshTrigger?: number
 }
 
+const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  active:    { bg: 'rgba(37,99,235,0.08)',  text: '#2563eb', dot: '#2563eb', label: 'Active' },
+  completed: { bg: 'rgba(5,150,105,0.08)',  text: '#059669', dot: '#059669', label: 'Completed' },
+  'on-hold': { bg: 'rgba(217,119,6,0.08)',  text: '#d97706', dot: '#d97706', label: 'On Hold' },
+}
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg, #1e3a8a, #2563eb)',
+  'linear-gradient(135deg, #065f46, #059669)',
+  'linear-gradient(135deg, #6d28d9, #8b5cf6)',
+  'linear-gradient(135deg, #9a3412, #ea580c)',
+  'linear-gradient(135deg, #1e40af, #4338ca)',
+]
+
+function getInitials(name: string) {
+  return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+}
+
+function getAvatarGradient(id: number) {
+  return AVATAR_GRADIENTS[id % AVATAR_GRADIENTS.length]
+}
+
 export const ProjectsList: React.FC<ProjectsListProps> = ({
-  onEdit,
-  onDelete,
-  onAddContract,
-  onEditContract,
-  onDeleteContract,
-  onViewItems,
-  refreshTrigger
+  onEdit, onDelete, onAddContract, onEditContract, onDeleteContract, onViewItems, refreshTrigger
 }) => {
   const confirm = useConfirm()
   const [projects, setProjects] = useState<Project[]>([])
@@ -38,273 +54,133 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({
       const response = await projectsApi.getAll()
       setProjects(response.data.projects || [])
     } catch (err: any) {
-      console.error('Error fetching projects:', err)
       setError(err.response?.data?.message || 'Failed to load projects')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchProjects()
-  }, [refreshTrigger])
+  useEffect(() => { fetchProjects() }, [refreshTrigger])
 
   const toggleProject = (projectId: number) => {
-    const newExpanded = new Set(expandedProjects)
-    if (newExpanded.has(projectId)) {
-      newExpanded.delete(projectId)
-    } else {
-      newExpanded.add(projectId)
-    }
-    setExpandedProjects(newExpanded)
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { bg: '#dcfce7', text: '#166534', border: '#86efac' }
-      case 'completed':
-        return { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' }
-      case 'on-hold':
-        return { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' }
-      default:
-        return { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' }
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'Active'
-      case 'completed':
-        return 'Completed'
-      case 'on-hold':
-        return 'On Hold'
-      default:
-        return status
-    }
+    const next = new Set(expandedProjects)
+    next.has(projectId) ? next.delete(projectId) : next.add(projectId)
+    setExpandedProjects(next)
   }
 
   const handleDelete = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation()
-    const confirmed = await confirm(
-      `Delete project "${project.project_name}"?`,
-      { destructive: true }
-    )
+    const confirmed = await confirm(`Delete project "${project.project_name}"?`, { destructive: true })
     if (confirmed) onDelete(project)
   }
 
-  if (loading) {
-    return (
-      <div>
-        {[1, 2, 3].map((i) => (
-          <ProjectSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
+  if (loading) return <div>{[1, 2, 3].map(i => <ProjectSkeleton key={i} />)}</div>
 
-  if (error) {
-    return (
-      <div
-        style={{
-          padding: '1rem',
-          backgroundColor: '#fee2e2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px',
-          color: '#dc2626'
-        }}
-      >
-        {error}
-      </div>
-    )
-  }
+  if (error) return (
+    <div style={{ padding: '1rem', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626' }}>{error}</div>
+  )
 
-  if (projects.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '3rem',
-          textAlign: 'center',
-          backgroundColor: '#f9fafb',
-          borderRadius: '12px',
-          border: '2px dashed #d1d5db'
-        }}
-      >
-        <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
-          No Projects Yet
-        </div>
-        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-          Create your first project to get started
-        </div>
-      </div>
-    )
-  }
+  if (projects.length === 0) return (
+    <div style={{ padding: '3rem', textAlign: 'center', background: 'rgba(255,255,255,0.6)', borderRadius: 16, border: '2px dashed rgba(37,99,235,0.2)' }}>
+      <FolderOpen size={40} color="#93c5fd" style={{ marginBottom: 12 }} />
+      <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>No Projects Yet</div>
+      <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Create your first project to get started</div>
+    </div>
+  )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, alignItems: 'start' }}>
       {projects.map((project) => {
         const isExpanded = expandedProjects.has(project.project_id)
-        const statusStyle = getStatusColor(project.status)
+        const status = STATUS_CONFIG[project.status] || STATUS_CONFIG['on-hold']
+        const initials = getInitials(project.project_name)
+        const avatarGradient = getAvatarGradient(project.project_id)
 
         return (
           <div
             key={project.project_id}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              overflow: 'hidden'
-            }}
+            style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(6,48,98,0.08)', boxShadow: '0 2px 12px rgba(6,48,98,0.07)', overflow: 'hidden', transition: 'box-shadow 0.2s', gridColumn: isExpanded ? 'span 2' : 'span 1' }}
+            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 24px rgba(6,48,98,0.13)')}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 12px rgba(6,48,98,0.07)')}
           >
-            {/* Project Header */}
+            {/* Card Header */}
             <div
-              style={{
-                padding: '1.25rem',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-                backgroundColor: isExpanded ? '#f9fafb' : 'white'
-              }}
+              style={{ padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, background: isExpanded ? '#f8fafc' : '#fff', transition: 'background 0.2s' }}
               onClick={() => toggleProject(project.project_id)}
-              onMouseEnter={(e) => {
-                if (!isExpanded) e.currentTarget.style.backgroundColor = '#f9fafb'
-              }}
-              onMouseLeave={(e) => {
-                if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'
-              }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                {/* Expand/Collapse Icon */}
-                <div style={{ paddingTop: '0.25rem' }}>
-                  {isExpanded ? (
-                    <ChevronDown size={20} color="#6b7280" />
-                  ) : (
-                    <ChevronRight size={20} color="#6b7280" />
-                  )}
-                </div>
+              {/* Avatar */}
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: avatarGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                {initials}
+              </div>
 
-                {/* Project Info */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1f2937', margin: 0 }}>
-                      {project.project_name}
-                    </h3>
-                    <span
-                      style={{
-                        padding: '0.25rem 0.75rem',
-                        backgroundColor: statusStyle.bg,
-                        color: statusStyle.text,
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        border: `1px solid ${statusStyle.border}`
-                      }}
-                    >
-                      {getStatusLabel(project.status)}
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 700, color: '#1e293b', letterSpacing: '-0.2px' }}>
+                    {project.project_name}
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: status.bg, color: status.text, fontSize: 11.5, fontWeight: 600 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: status.dot, display: 'inline-block' }} />
+                    {status.label}
+                  </span>
+                </div>
+                {project.project_description && (
+                  <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '0 0 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 480 }}>
+                    {project.project_description}
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
+                    <FileText size={12} color="#94a3b8" />
+                    <span style={{ fontWeight: 600, color: '#334155' }}>{project.contract_count || 0}</span> contracts
+                  </span>
+                  {project.total_budget !== undefined && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
+                      <DollarSign size={12} color="#94a3b8" />
+                      <span style={{ fontWeight: 600, color: '#334155' }}>Rs. {project.total_budget.toLocaleString()}</span>
                     </span>
-                  </div>
-
-                  {project.project_description && (
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.75rem 0' }}>
-                      {project.project_description}
-                    </p>
                   )}
-
-                  {/* Project Metadata */}
-                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.875rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span style={{ color: '#6b7280' }}>Contracts:</span>
-                      <span style={{ fontWeight: '600', color: '#1f2937' }}>
-                        {project.contract_count || 0}
-                      </span>
-                    </div>
-                    {project.total_budget !== undefined && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <span style={{ color: '#6b7280' }}>Total Budget:</span>
-                        <span style={{ fontWeight: '600', color: '#1f2937' }}>
-                          Rs. {project.total_budget.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span style={{ color: '#6b7280' }}>Created:</span>
-                      <span style={{ fontWeight: '500', color: '#1f2937' }}>
-                        {new Date(project.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
+                    <Calendar size={12} color="#94a3b8" />
+                    {new Date(project.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
                 </div>
+              </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onAddContract(project.project_id)
-                    }}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '0.875rem',
-                      color: '#374151'
-                    }}
-                    title="Add Contract"
-                  >
-                    <Plus size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(project)
-                    }}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Edit Project"
-                  >
-                    <Edit2 size={16} color="#3b82f6" />
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(project, e)}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #fecaca',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Delete Project"
-                  >
-                    <Trash2 size={16} color="#ef4444" />
-                  </button>
-                </div>
+              {/* Chevron */}
+              <div style={{ flexShrink: 0 }}>
+                {isExpanded ? <ChevronDown size={18} color="#94a3b8" /> : <ChevronRight size={18} color="#94a3b8" />}
               </div>
             </div>
 
-            {/* Expanded Content - Contracts List */}
-            {isExpanded && (
-              <div
-                style={{
-                  borderTop: '1px solid #e5e7eb',
-                  backgroundColor: '#f9fafb',
-                  padding: '1.25rem'
-                }}
+            {/* Action bar */}
+            <div className="emp-card-actions" onClick={e => e.stopPropagation()}>
+              <button
+                className="emp-btn-view"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8 }}
+                onClick={() => onAddContract(project.project_id)}
               >
+                <Plus size={12} strokeWidth={2.5} /> Add Contract
+              </button>
+              <button
+                className="emp-btn-edit"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8 }}
+                onClick={() => onEdit(project)}
+              >
+                <Edit2 size={12} /> Edit
+              </button>
+              <button
+                className="emp-btn-delete"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8 }}
+                onClick={e => handleDelete(project, e)}
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
+
+            {/* Expanded Contracts */}
+            {isExpanded && (
+              <div style={{ borderTop: '1px solid rgba(6,48,98,0.06)', background: '#f8fafc', padding: '16px 20px' }}>
                 <ContractsList
                   projectId={project.project_id}
                   onEdit={onEditContract}

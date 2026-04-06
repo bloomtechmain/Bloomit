@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config/api'
-import { Plus, DollarSign, TrendingUp, CheckCircle } from 'lucide-react'
+import { Plus, DollarSign, TrendingUp, CheckCircle, TrendingDown, Scale, Landmark } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 
 type Loan = {
@@ -275,10 +275,18 @@ export default function Loans() {
   const totalCompletedLoans = loans.filter(l => l.status === 'PAID_OFF').length
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ marginTop: 0, fontSize: 28 }}>Loan Tracker</h1>
-        <button 
+    <div style={{ width: '100%', display: 'grid', gap: 16, position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+        <DollarSign size={520} strokeWidth={0.7} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.13, color: 'var(--primary)', transform: 'rotate(-12deg)' }} />
+        <TrendingDown size={380} strokeWidth={0.7} style={{ position: 'absolute', left: -60, bottom: -40, opacity: 0.11, color: 'var(--primary)', transform: 'rotate(10deg)' }} />
+        <Scale size={300} strokeWidth={0.7} style={{ position: 'absolute', left: '38%', top: '30%', opacity: 0.07, color: 'var(--primary)', transform: 'translateX(-50%)' }} />
+        <Landmark size={200} strokeWidth={0.7} style={{ position: 'absolute', left: '5%', top: '5%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(-6deg)' }} />
+        <TrendingUp size={220} strokeWidth={0.7} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.08, color: 'var(--primary)', transform: 'rotate(-8deg)' }} />
+        <CheckCircle size={240} strokeWidth={0.7} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(6deg)' }} />
+        <DollarSign size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.07, color: 'var(--primary)' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+        <button
           onClick={() => setAddModalOpen(true)}
           style={{ 
             display: 'flex', 
@@ -333,7 +341,7 @@ export default function Loans() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#f8f9fa', padding: 12, borderRadius: 8 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface)', padding: 12, borderRadius: 8 }}>
         <input 
           type="text"
           placeholder="Search by borrower, account #, or bank..."
@@ -357,7 +365,7 @@ export default function Loans() {
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center' }}>Loading loans...</div>
       ) : filteredLoans.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', background: '#f5f5f5', borderRadius: 12 }}>
+        <div style={{ padding: 40, textAlign: 'center', background: 'var(--surface)', borderRadius: 12 }}>
           <div style={{ fontSize: 32, marginBottom: 16 }}>💰</div>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#333' }}>No loans found</div>
           <p style={{ color: '#666', marginTop: 8 }}>Create your first loan to get started</p>
@@ -509,7 +517,7 @@ export default function Loans() {
                 <h2 style={{ marginTop: 0, marginBottom: 8 }}>Loan Details</h2>
                 <div style={{ fontSize: 14, color: '#666' }}>Account: {selectedLoan.loan_account_number}</div>
               </div>
-              <button onClick={() => setDetailsModalOpen(false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>Close</button>
+              <button onClick={() => setDetailsModalOpen(false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer' }}>Close</button>
             </div>
 
             {/* Loan Information */}

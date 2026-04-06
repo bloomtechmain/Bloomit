@@ -1,4 +1,4 @@
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, ShoppingCart } from 'lucide-react'
 
 interface POFormActionsProps {
   onSubmit: () => Promise<void>
@@ -19,98 +19,62 @@ export const POFormActions: React.FC<POFormActionsProps> = ({
 }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isValid && !isSubmitting) {
-      await onSubmit()
-    }
+    if (isValid && !isSubmitting) await onSubmit()
   }
 
   return (
-    <div style={{ 
-      borderTop: '2px solid #e5e7eb',
-      paddingTop: '1.5rem',
-      marginTop: '1.5rem'
-    }}>
-      {/* Validation Errors Display */}
+    <div style={{ flexShrink: 0 }}>
+      {/* Validation errors — shown above footer */}
       {validationErrors.length > 0 && (
         <div style={{
-          padding: '1rem',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px',
-          marginBottom: '1rem'
+          padding: '10px 24px',
+          background: '#fff1f2',
+          borderTop: '1px solid #fecdd3',
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle 
-              size={20} 
-              style={{ 
-                color: '#ef4444', 
-                marginTop: '0.125rem',
-                flexShrink: 0 
-              }} 
-            />
-            <div style={{ flex: 1 }}>
-              <h4 style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#991b1b',
-                margin: '0 0 0.5rem 0'
-              }}>
-                Please fix the following errors:
-              </h4>
-              <ul style={{
-                margin: 0,
-                paddingLeft: '1.25rem',
-                fontSize: '0.875rem',
-                color: '#dc2626',
-                listStyleType: 'disc'
-              }}>
-                {validationErrors.map((error, index) => (
-                  <li key={index} style={{ marginBottom: '0.25rem' }}>
-                    {error}
-                  </li>
-                ))}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <AlertCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#991b1b', margin: '0 0 4px' }}>Please fix the following:</p>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#dc2626' }}>
+                {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
             </div>
           </div>
         </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Footer */}
       <div style={{
+        padding: '14px 24px',
+        borderTop: '1px solid #f1f5f9',
+        background: '#fff',
         display: 'flex',
+        gap: 10,
         justifyContent: 'flex-end',
-        gap: '0.75rem'
+        alignItems: 'center',
       }}>
+        {!isValid && validationErrors.length === 0 && (
+          <span style={{ fontSize: 11.5, color: '#94a3b8', marginRight: 'auto' }}>Fill in all required fields to submit</span>
+        )}
+
         <button
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
           style={{
-            padding: '0.625rem 1.5rem',
-            backgroundColor: '#ffffff',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            fontWeight: '500',
+            padding: '10px 20px',
+            borderRadius: 10,
+            border: '1.5px solid #e2e8f0',
+            background: 'transparent',
+            color: '#64748b',
+            fontSize: 13.5,
+            fontWeight: 600,
             cursor: isSubmitting ? 'not-allowed' : 'pointer',
             opacity: isSubmitting ? 0.6 : 1,
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
           }}
-          onMouseEnter={(e) => {
-            if (!isSubmitting) {
-              e.currentTarget.style.backgroundColor = '#f9fafb'
-              e.currentTarget.style.borderColor = '#9ca3af'
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff'
-            e.currentTarget.style.borderColor = '#d1d5db'
-          }}
+          onMouseEnter={e => { if (!isSubmitting) { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1' } }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = '#e2e8f0' }}
         >
           Cancel
         </button>
@@ -122,62 +86,31 @@ export const POFormActions: React.FC<POFormActionsProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1.5rem',
-            backgroundColor: !isValid || isSubmitting ? '#9ca3af' : '#3b82f6',
-            color: '#ffffff',
+            gap: 8,
+            padding: '10px 24px',
+            borderRadius: 10,
             border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            fontWeight: '500',
+            background: !isValid || isSubmitting
+              ? '#e2e8f0'
+              : 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+            color: !isValid || isSubmitting ? '#94a3b8' : '#fff',
+            fontSize: 13.5,
+            fontWeight: 600,
             cursor: !isValid || isSubmitting ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s'
+            boxShadow: !isValid || isSubmitting ? 'none' : '0 4px 14px rgba(59,130,246,0.35)',
+            transition: 'all 0.2s',
           }}
-          onMouseEnter={(e) => {
-            if (isValid && !isSubmitting) {
-              e.currentTarget.style.backgroundColor = '#2563eb'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isValid && !isSubmitting) {
-              e.currentTarget.style.backgroundColor = '#3b82f6'
-            }
-          }}
+          onMouseEnter={e => { if (isValid && !isSubmitting) e.currentTarget.style.boxShadow = '0 6px 20px rgba(59,130,246,0.45)' }}
+          onMouseLeave={e => { if (isValid && !isSubmitting) e.currentTarget.style.boxShadow = '0 4px 14px rgba(59,130,246,0.35)' }}
         >
-          {isSubmitting && (
-            <Loader2 
-              size={16} 
-              style={{ 
-                animation: 'spin 1s linear infinite'
-              }} 
-            />
-          )}
-          {isSubmitting 
-            ? (mode === 'create' ? 'Creating...' : 'Updating...') 
-            : (mode === 'create' ? 'Create Purchase Order' : 'Update Purchase Order')
+          {isSubmitting
+            ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> {mode === 'create' ? 'Creating...' : 'Updating...'}</>
+            : <><ShoppingCart size={15} /> {mode === 'create' ? 'Create Purchase Order' : 'Update Purchase Order'}</>
           }
         </button>
       </div>
 
-      {/* Helper text */}
-      {!isValid && validationErrors.length === 0 && (
-        <p style={{
-          fontSize: '0.75rem',
-          color: '#6b7280',
-          textAlign: 'right',
-          marginTop: '0.5rem',
-          marginBottom: 0
-        }}>
-          Please fill in all required fields to submit
-        </p>
-      )}
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

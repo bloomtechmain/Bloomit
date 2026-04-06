@@ -1,3 +1,4 @@
+import { FileText, User, Tag, Building2, Hash, FolderOpen } from 'lucide-react'
 import type { PurchaseOrder } from '../../../types/purchaseOrders'
 
 type User = {
@@ -36,6 +37,31 @@ interface POBasicInfoSectionProps {
   mode: 'create' | 'edit'
 }
 
+const inp: React.CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1.5px solid #e2e8f0',
+  background: '#f8fafc',
+  fontSize: 13.5,
+  color: '#1e293b',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+  transition: 'all 0.2s',
+  fontFamily: 'inherit',
+}
+
+const fo = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+}
+const bl = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
+
 export const POBasicInfoSection: React.FC<POBasicInfoSectionProps> = ({
   formData,
   currentUser,
@@ -45,274 +71,158 @@ export const POBasicInfoSection: React.FC<POBasicInfoSectionProps> = ({
   mode
 }) => {
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
-      <h3 style={{ 
-        fontSize: '1rem', 
-        fontWeight: '600', 
-        color: '#374151', 
-        marginBottom: '1rem',
-        paddingBottom: '0.5rem',
-        borderBottom: '2px solid #e5e7eb'
-      }}>
-        Basic Information
-      </h3>
-
-      {/* PO Number Display (Read-only) */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          PO Number
-        </label>
-        <input
-          type="text"
-          value={formData.po_number || ''}
-          disabled
-          readOnly
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#f9fafb',
-            color: '#3b82f6',
-            fontWeight: '600',
-            cursor: 'not-allowed'
-          }}
-          placeholder="Auto-generated"
-        />
+    <div style={{ marginBottom: 24 }}>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <FileText size={13} color="#3b82f6" />
+        </div>
+        <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Basic Information</span>
       </div>
 
-      {/* Date Created (for edit mode) */}
-      {mode === 'edit' && formData.created_at && (
-        <div style={{ marginBottom: '1.25rem' }}>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
-            }}
-          >
-            Date Created
-          </label>
+      {/* Two-column grid for top fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        {/* PO Number */}
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+            <Hash size={11} color="#94a3b8" /> PO Number
+          </span>
           <input
             type="text"
-            value={new Date(formData.created_at).toLocaleString()}
+            value={formData.po_number || ''}
             disabled
             readOnly
-            style={{
-              width: '100%',
-              padding: '0.625rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              backgroundColor: '#f9fafb',
-              color: '#6b7280',
-              cursor: 'not-allowed'
-            }}
+            style={{ ...inp, background: '#f1f5f9', color: '#3b82f6', fontWeight: 700, cursor: 'not-allowed' }}
+            placeholder="Auto-generated"
           />
+        </label>
+
+        {/* Date Created (edit mode) */}
+        {mode === 'edit' && formData.created_at ? (
+          <label style={{ display: 'grid', gap: 5 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+              <Tag size={11} color="#94a3b8" /> Date Created
+            </span>
+            <input
+              type="text"
+              value={new Date(formData.created_at).toLocaleString()}
+              disabled
+              readOnly
+              style={{ ...inp, background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
+            />
+          </label>
+        ) : (
+          /* Requested By Title */
+          <label style={{ display: 'grid', gap: 5 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+              <Tag size={11} color="#94a3b8" /> Requested By Title
+            </span>
+            <input
+              type="text"
+              value={formData.requested_by_title || ''}
+              onChange={(e) => onChange('requested_by_title', e.target.value)}
+              style={inp}
+              placeholder="e.g. Project Manager"
+              onFocus={fo}
+              onBlur={bl}
+            />
+          </label>
+        )}
+      </div>
+
+      {/* Requested By */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+            <User size={11} color="#94a3b8" /> Requested By <span style={{ color: '#ef4444' }}>*</span>
+          </span>
+          <input
+            type="text"
+            value={formData.requested_by_name || currentUser.name}
+            disabled
+            readOnly
+            style={{ ...inp, background: '#f1f5f9', color: '#374151', fontWeight: 600, cursor: 'not-allowed' }}
+          />
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>Your name is automatically used as the requester</span>
+        </label>
+      </div>
+
+      {/* Title field for edit mode */}
+      {mode === 'edit' && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'grid', gap: 5 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+              <Tag size={11} color="#94a3b8" /> Requested By Title
+            </span>
+            <input
+              type="text"
+              value={formData.requested_by_title || ''}
+              onChange={(e) => onChange('requested_by_title', e.target.value)}
+              style={inp}
+              placeholder="e.g. Project Manager"
+              onFocus={fo}
+              onBlur={bl}
+            />
+          </label>
         </div>
       )}
 
-      {/* Requested By Name (Read-only, auto-filled from current user) */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          Requested By <span style={{ color: '#ef4444' }}>*</span>
+      {/* Vendor + Invoice Number */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+            <Building2 size={11} color="#94a3b8" /> Vendor
+          </span>
+          <select
+            value={formData.vendor_id || ''}
+            onChange={(e) => onChange('vendor_id', e.target.value ? Number(e.target.value) : undefined)}
+            style={{ ...inp, cursor: 'pointer', appearance: 'none' }}
+            onFocus={fo}
+            onBlur={bl}
+          >
+            <option value="">— Select Vendor —</option>
+            {vendors.map((v) => (
+              <option key={v.vendor_id} value={v.vendor_id}>{v.vendor_name}</option>
+            ))}
+          </select>
         </label>
-        <input
-          type="text"
-          value={formData.requested_by_name || currentUser.name}
-          disabled
-          readOnly
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#f9fafb',
-            color: '#374151',
-            fontWeight: '500',
-            cursor: 'not-allowed'
-          }}
-        />
-        <p style={{ 
-          fontSize: '0.75rem', 
-          color: '#6b7280', 
-          marginTop: '0.25rem',
-          marginBottom: 0 
-        }}>
-          Your name is automatically used as the requester
-        </p>
+
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+            <Hash size={11} color="#94a3b8" /> Vendor Invoice #
+          </span>
+          <input
+            type="text"
+            value={formData.vendor_invoice_number || ''}
+            onChange={(e) => onChange('vendor_invoice_number', e.target.value)}
+            style={inp}
+            placeholder="Invoice number (optional)"
+            onFocus={fo}
+            onBlur={bl}
+          />
+        </label>
       </div>
 
-      {/* Requested By Title (Optional) */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          htmlFor="requested_by_title"
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          Requested By Title
+      {/* Project */}
+      <div style={{ marginBottom: 4 }}>
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+            <FolderOpen size={11} color="#94a3b8" /> Project / Contract
+          </span>
+          <select
+            value={formData.project_id || ''}
+            onChange={(e) => onChange('project_id', e.target.value ? Number(e.target.value) : undefined)}
+            style={{ ...inp, cursor: 'pointer', appearance: 'none' }}
+            onFocus={fo}
+            onBlur={bl}
+          >
+            <option value="">— Select Project (Optional) —</option>
+            {projects.map((p) => (
+              <option key={p.contract_id} value={p.contract_id}>{p.contract_name}</option>
+            ))}
+          </select>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>Link this PO to a project for tracking</span>
         </label>
-        <input
-          type="text"
-          id="requested_by_title"
-          value={formData.requested_by_title || ''}
-          onChange={(e) => onChange('requested_by_title', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#ffffff'
-          }}
-          placeholder="e.g., Project Manager, Accounting Lead"
-        />
-      </div>
-
-      {/* Vendor Dropdown */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          htmlFor="vendor_id"
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          Vendor
-        </label>
-        <select
-          id="vendor_id"
-          value={formData.vendor_id || ''}
-          onChange={(e) => onChange('vendor_id', e.target.value ? Number(e.target.value) : undefined)}
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#ffffff',
-            cursor: 'pointer'
-          }}
-        >
-          <option value="">-- Select Vendor (Optional) --</option>
-          {vendors.map((vendor) => (
-            <option key={vendor.vendor_id} value={vendor.vendor_id}>
-              {vendor.vendor_name}
-            </option>
-          ))}
-        </select>
-        <p style={{ 
-          fontSize: '0.75rem', 
-          color: '#6b7280', 
-          marginTop: '0.25rem',
-          marginBottom: 0 
-        }}>
-          Select the vendor for this purchase order
-        </p>
-      </div>
-
-      {/* Vendor Invoice Number */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          htmlFor="vendor_invoice_number"
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          Vendor Invoice Number
-        </label>
-        <input
-          type="text"
-          id="vendor_invoice_number"
-          value={formData.vendor_invoice_number || ''}
-          onChange={(e) => onChange('vendor_invoice_number', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#ffffff'
-          }}
-          placeholder="Enter vendor's invoice number (optional)"
-        />
-      </div>
-
-      {/* Project Dropdown */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <label
-          htmlFor="project_id"
-          style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}
-        >
-          Project / Contract
-        </label>
-        <select
-          id="project_id"
-          value={formData.project_id || ''}
-          onChange={(e) => onChange('project_id', e.target.value ? Number(e.target.value) : undefined)}
-          style={{
-            width: '100%',
-            padding: '0.625rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            backgroundColor: '#ffffff',
-            cursor: 'pointer'
-          }}
-        >
-          <option value="">-- Select Project (Optional) --</option>
-          {projects.map((project) => (
-            <option key={project.contract_id} value={project.contract_id}>
-              {project.contract_name}
-            </option>
-          ))}
-        </select>
-        <p style={{ 
-          fontSize: '0.75rem', 
-          color: '#6b7280', 
-          marginTop: '0.25rem',
-          marginBottom: 0 
-        }}>
-          Link this purchase order to a project for tracking
-        </p>
       </div>
     </div>
   )

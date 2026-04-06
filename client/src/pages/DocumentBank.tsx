@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config/api'
-import { Upload, FileText, Download, Trash2, File, Search } from 'lucide-react'
+import { Upload, FileText, Download, Trash2, File, Search, FolderOpen } from 'lucide-react'
 
 type Document = {
   id: number
@@ -190,9 +190,17 @@ export default function DocumentBank({ user, accessToken }: { user: User; access
   )
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h1 style={{ marginTop: 0, fontSize: 28, marginBottom: 0 }}>Document Bank</h1>
+    <div style={{ width: '100%', display: 'grid', gap: 16, position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+        <FileText size={520} strokeWidth={0.7} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.13, color: 'var(--primary)', transform: 'rotate(-12deg)' }} />
+        <File size={380} strokeWidth={0.7} style={{ position: 'absolute', left: -60, bottom: -40, opacity: 0.11, color: 'var(--primary)', transform: 'rotate(10deg)' }} />
+        <FolderOpen size={300} strokeWidth={0.7} style={{ position: 'absolute', left: '38%', top: '30%', opacity: 0.07, color: 'var(--primary)', transform: 'translateX(-50%)' }} />
+        <Search size={200} strokeWidth={0.7} style={{ position: 'absolute', left: '5%', top: '5%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(-6deg)' }} />
+        <Download size={220} strokeWidth={0.7} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.08, color: 'var(--primary)', transform: 'rotate(-8deg)' }} />
+        <FileText size={240} strokeWidth={0.7} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(6deg)' }} />
+        <File size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.07, color: 'var(--primary)' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16 }}>
         {isAdmin && (
           <button
             onClick={() => setUploadModalOpen(true)}
@@ -217,7 +225,7 @@ export default function DocumentBank({ user, accessToken }: { user: User; access
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#f8f9fa', padding: 12, borderRadius: 8 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface)', padding: 12, borderRadius: 8 }}>
         <Search size={20} color="#666" />
         <input
           type="text"
@@ -231,7 +239,7 @@ export default function DocumentBank({ user, accessToken }: { user: User; access
       {loading ? (
         <div style={{ padding: 48, textAlign: 'center' }}>Loading documents...</div>
       ) : filteredDocuments.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', background: '#f5f5f5', borderRadius: 12, border: '1px dashed #ddd' }}>
+        <div style={{ padding: 48, textAlign: 'center', background: 'var(--surface)', borderRadius: 12, border: '1px dashed #ddd' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#333' }}>
             {documents.length === 0 ? 'No documents yet' : 'No matching documents'}
@@ -345,7 +353,7 @@ export default function DocumentBank({ user, accessToken }: { user: User; access
               <button
                 onClick={() => { setUploadModalOpen(false); resetUploadForm() }}
                 className="btn-secondary"
-                style={{ color: 'var(--text-main)', background: 'rgba(255,255,255,0.5)' }}
+                style={{ color: 'var(--text-main)', background: 'var(--surface)' }}
               >
                 Cancel
               </button>

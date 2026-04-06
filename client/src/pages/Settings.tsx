@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { API_URL } from '../config/api'
 import { fetchWithAuth } from '../utils/apiClient'
 import { useToast } from '../context/ToastContext'
-import { Shield, Users as UsersIcon, Key, Plus, Edit2, Trash2, Save, X, Copy, CheckCircle, User, RotateCcw } from 'lucide-react'
+import { Shield, Users as UsersIcon, Key, Plus, Edit2, Trash2, Save, X, Copy, CheckCircle, User, RotateCcw, Settings as SettingsIcon2, Lock } from 'lucide-react'
 import PermissionHierarchy from '../components/PermissionHierarchy'
 import { 
   getAllEmployeesWithUserStatus,
@@ -803,13 +803,18 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   }
   
   return (
-    <div style={{ width: '100%', display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ marginTop: 0, fontSize: 28, marginBottom: 0 }}>Settings</h1>
+    <div style={{ width: '100%', display: 'grid', gap: 16, position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+        <Shield size={520} strokeWidth={0.7} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.13, color: 'var(--primary)', transform: 'rotate(-12deg)' }} />
+        <Key size={380} strokeWidth={0.7} style={{ position: 'absolute', left: -60, bottom: -40, opacity: 0.11, color: 'var(--primary)', transform: 'rotate(10deg)' }} />
+        <Lock size={300} strokeWidth={0.7} style={{ position: 'absolute', left: '38%', top: '30%', opacity: 0.07, color: 'var(--primary)', transform: 'translateX(-50%)' }} />
+        <UsersIcon size={200} strokeWidth={0.7} style={{ position: 'absolute', left: '5%', top: '5%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(-6deg)' }} />
+        <SettingsIcon2 size={220} strokeWidth={0.7} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.08, color: 'var(--primary)', transform: 'rotate(-8deg)' }} />
+        <User size={240} strokeWidth={0.7} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(6deg)' }} />
+        <Shield size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.07, color: 'var(--primary)' }} />
       </div>
-      
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 12, borderBottom: '2px solid #e0e0e0', paddingBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 8 }}>
         <button
           onClick={() => setSubTab('roles')}
           style={{
@@ -981,7 +986,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                       padding: '10px 20px',
                       borderRadius: 8,
                       border: '1px solid #ccc',
-                      background: '#fff',
+                      background: 'var(--surface)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1197,7 +1202,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         {user.roles.length > 0 ? (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                             {user.roles.map(role => (
-                              <span key={role.id} style={{ padding: '4px 8px', borderRadius: 4, background: role.is_system_role ? '#e3f2fd' : '#f5f5f5', color: role.is_system_role ? '#1565c0' : '#666', fontSize: 12, fontWeight: 600 }}>
+                              <span key={role.id} style={{ padding: '4px 8px', borderRadius: 4, background: role.is_system_role ? '#e3f2fd' : 'var(--surface)', color: role.is_system_role ? '#1565c0' : '#666', fontSize: 12, fontWeight: 600 }}>
                                 {role.name}
                                 {role.is_system_role && ' ●'}
                               </span>
@@ -1281,7 +1286,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                     <span style={{ fontWeight: 500, marginBottom: 4 }}>Assign Roles * (select at least one)</span>
                     <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8 }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: newUserRoleIds.includes(role.id) ? '#e3f2fd' : '#f8f9fa', border: '1px solid ' + (newUserRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: newUserRoleIds.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (newUserRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
                           <input
                             type="checkbox"
                             checked={newUserRoleIds.includes(role.id)}
@@ -1327,7 +1332,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         setNewUserEmail('')
                         setNewUserRoleIds([])
                       }}
-                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
@@ -1369,9 +1374,9 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                   )}
                 </div>
                 
-                <div style={{ background: '#f8f9fa', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+                <div style={{ background: 'var(--surface)', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
                   <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#333' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
                     <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                       {createdUserPassword}
                     </code>
@@ -1438,7 +1443,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                     <span style={{ fontWeight: 500, marginBottom: 8 }}>Select Roles (you can select multiple)</span>
                     <div style={{ display: 'grid', gap: 10, maxHeight: 400, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8 }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: selectedRoleIds.includes(role.id) ? '#e3f2fd' : '#f8f9fa', border: '1px solid ' + (selectedRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: selectedRoleIds.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (selectedRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
                           <input
                             type="checkbox"
                             checked={selectedRoleIds.includes(role.id)}
@@ -1473,7 +1478,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         setAssigningUser(null)
                         setSelectedRoleIds([])
                       }}
-                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
@@ -1517,7 +1522,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                 
                 <div style={{ background: '#fff3cd', border: '2px solid #ff9800', borderRadius: 12, padding: 20, marginBottom: 20 }}>
                   <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#856404' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
                     <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                       {resetPasswordResult.password}
                     </code>
@@ -1694,7 +1699,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                     borderRadius: 8,
                     border: '1px solid #ccc',
                     fontSize: 14,
-                    background: timezoneLoading ? '#f5f5f5' : '#fff',
+                    background: timezoneLoading ? 'var(--surface)' : '#fff',
                     cursor: timezoneLoading ? 'not-allowed' : 'pointer'
                   }}
                 >
@@ -1735,7 +1740,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
               <div style={{ background: '#fff3cd', borderLeft: '4px solid #ffc107', padding: 16, borderRadius: 4, fontSize: 13 }}>
                 <strong style={{ color: '#856404' }}>🔒 Permission Required:</strong>
                 <p style={{ margin: '8px 0 0', color: '#856404' }}>
-                  Only users with <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 3 }}>settings:manage</code> permission 
+                  Only users with <code style={{ background: 'var(--surface)', padding: '2px 6px', borderRadius: 3 }}>settings:manage</code> permission 
                   can modify application settings. This is typically SuperAdmin or Admin roles.
                 </p>
               </div>
@@ -2106,7 +2111,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                           style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
                         />
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: '#fff', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={onboardingData.epf_enabled !== false}
@@ -2115,7 +2120,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         />
                         <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>EPF Enabled</span>
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: '#fff', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={onboardingData.etf_enabled !== false}
@@ -2133,9 +2138,9 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                       🔐 Access & Permissions
                     </h4>
                     <span style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, display: 'block', color: '#000' }}>Assign Roles * (select at least one)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: '#fff' }}>
+                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: 'var(--surface)' }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: onboardingData.roleIds?.includes(role.id) ? '#e3f2fd' : '#f8f9fa', border: '1px solid ' + (onboardingData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: onboardingData.roleIds?.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (onboardingData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
                           <input
                             type="checkbox"
                             checked={onboardingData.roleIds?.includes(role.id) || false}
@@ -2191,7 +2196,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         padding: '12px 24px',
                         borderRadius: 8,
                         border: '1px solid #ccc',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         cursor: 'pointer',
                         fontSize: 15,
                         fontWeight: 600
@@ -2256,7 +2261,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
                   >
                     Cancel
                   </button>
@@ -2305,7 +2310,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => setReactivatingEmployee(null)}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
                   >
                     Cancel
                   </button>
@@ -2375,7 +2380,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
                   >
                     Cancel
                   </button>
@@ -2528,9 +2533,9 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                       🔐 Access & Permissions
                     </h4>
                     <span style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, display: 'block', color: '#000' }}>Assign Roles * (select at least one)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: '#fff' }}>
+                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: 'var(--surface)' }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: editFormData.roleIds?.includes(role.id) ? '#e3f2fd' : '#f8f9fa', border: '1px solid ' + (editFormData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: editFormData.roleIds?.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (editFormData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
                           <input
                             type="checkbox"
                             checked={editFormData.roleIds?.includes(role.id) || false}
@@ -2572,7 +2577,7 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                         padding: '12px 24px',
                         borderRadius: 8,
                         border: '1px solid #ccc',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         cursor: 'pointer',
                         fontSize: 15,
                         fontWeight: 600
@@ -2625,9 +2630,9 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                   )}
                 </div>
                 
-                <div style={{ background: '#f8f9fa', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+                <div style={{ background: 'var(--surface)', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
                   <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#333' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
                     <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                       {onboardingResult.temporaryPassword}
                     </code>

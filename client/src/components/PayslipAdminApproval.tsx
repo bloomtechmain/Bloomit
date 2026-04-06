@@ -5,10 +5,18 @@ import type { Payslip, PayslipWithSignatures } from '../types/payroll'
 import { truncateSignatureHash } from '../utils/signatureHashGenerator'
 import { useToast } from '../context/ToastContext'
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-]
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+const card: React.CSSProperties = {
+  background: '#fff',
+  border: '1.5px solid #e2e8f0',
+  borderRadius: 12,
+  padding: 24,
+  boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+}
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
 
 export default function PayslipAdminApproval() {
   const { toast } = useToast()
@@ -21,9 +29,7 @@ export default function PayslipAdminApproval() {
   const [rejectionReason, setRejectionReason] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadPayslips()
-  }, [])
+  useEffect(() => { loadPayslips() }, [])
 
   const loadPayslips = async () => {
     try {
@@ -31,9 +37,8 @@ export default function PayslipAdminApproval() {
       setError(null)
       const response = await getAllPayslips({ status: 'PENDING_ADMIN_APPROVAL' })
       setPayslips(response.payslips)
-    } catch (err) {
+    } catch {
       setError('Failed to load payslips for approval')
-      console.error('Error loading payslips:', err)
     } finally {
       setLoading(false)
     }
@@ -45,15 +50,13 @@ export default function PayslipAdminApproval() {
       const data = await getPayslipById(payslipId)
       setSelectedPayslip(data)
       setViewingPayslip(true)
-    } catch (err) {
+    } catch {
       setError('Failed to load payslip details')
-      console.error('Error loading payslip:', err)
     }
   }
 
   const handleApprove = async () => {
     if (!selectedPayslip) return
-
     try {
       setProcessing(true)
       setError(null)
@@ -62,20 +65,15 @@ export default function PayslipAdminApproval() {
       setViewingPayslip(false)
       setSelectedPayslip(null)
       await loadPayslips()
-    } catch (err) {
+    } catch {
       setError('Failed to approve payslip')
-      console.error('Error approving payslip:', err)
     } finally {
       setProcessing(false)
     }
   }
 
   const handleReject = async () => {
-    if (!selectedPayslip || !rejectionReason.trim()) {
-      setError('Please provide a reason for rejection')
-      return
-    }
-
+    if (!selectedPayslip || !rejectionReason.trim()) { setError('Please provide a reason for rejection'); return }
     try {
       setProcessing(true)
       setError(null)
@@ -86,27 +84,18 @@ export default function PayslipAdminApproval() {
       setViewingPayslip(false)
       setSelectedPayslip(null)
       await loadPayslips()
-    } catch (err) {
+    } catch {
       setError('Failed to reject payslip')
-      console.error('Error rejecting payslip:', err)
     } finally {
       setProcessing(false)
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
-
   if (loading) {
     return (
-      <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-        <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
-        <p style={{ margin: 0, color: '#666' }}>Loading payslips for approval...</p>
+      <div style={{ ...card, padding: 40, textAlign: 'center' }}>
+        <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
+        <p style={{ margin: 0, color: '#94a3b8', fontSize: 14 }}>Loading payslips for approval...</p>
       </div>
     )
   }
@@ -116,254 +105,159 @@ export default function PayslipAdminApproval() {
     const signatures = selectedPayslip.signatures
 
     return (
-      <div style={{ display: 'grid', gap: 24 }}>
-        {/* Error Message */}
+      <div style={{ display: 'grid', gap: 20 }}>
         {error && (
-          <div style={{ 
-            padding: 16, 
-            background: '#f8d7da', 
-            border: '1px solid #f5c6cb', 
-            borderRadius: 8,
-            color: '#721c24',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}>
-            <AlertCircle size={20} />
-            <span>{error}</span>
+          <div style={{ padding: '12px 16px', background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: 10, color: '#991b1b', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}>
+            <AlertCircle size={15} /><span>{error}</span>
           </div>
         )}
 
-        {/* Header with Admin Badge */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <h2 style={{ margin: 0 }}>Final Approval</h2>
-              <span style={{ 
-                padding: '4px 12px', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                color: '#fff', 
-                borderRadius: 4, 
-                fontSize: 12,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4
-              }}>
-                <Shield size={14} />
-                ADMIN
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>Final Approval</h2>
+              <span style={{ padding: '3px 10px', background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', borderRadius: 6, fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Shield size={11} />ADMIN
               </span>
             </div>
-            <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-              Payslip #{payslip.payslip_id} - {MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}
-            </p>
+            <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>Payslip #{payslip.payslip_id} — {MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}</p>
           </div>
           <button
-            onClick={() => {
-              setViewingPayslip(false)
-              setSelectedPayslip(null)
-              setError(null)
-            }}
-            style={{
-              padding: '10px 20px',
-              borderRadius: 8,
-              border: '1px solid #ddd',
-              background: '#fff',
-              cursor: 'pointer',
-              fontSize: 14
-            }}
+            onClick={() => { setViewingPayslip(false); setSelectedPayslip(null); setError(null) }}
+            style={{ padding: '9px 18px', borderRadius: 9, border: '1.5px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#64748b', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e2e8f0' }}
           >
             ← Back to List
           </button>
         </div>
 
         {/* Employee Information */}
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <User size={20} />
-            Employee Information
-          </h3>
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={13} color="#3b82f6" />
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Employee Information</span>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 4 }}>
-                Employee Name
-              </label>
-              <p style={{ margin: 0, fontWeight: 600 }}>
-                {payslip.first_name} {payslip.last_name}
-              </p>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 4 }}>
-                Employee Number
-              </label>
-              <p style={{ margin: 0, fontWeight: 600 }}>{payslip.employee_number}</p>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 4 }}>
-                Department
-              </label>
-              <p style={{ margin: 0, fontWeight: 600 }}>{payslip.employee_department || 'N/A'}</p>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 4 }}>
-                Designation
-              </label>
-              <p style={{ margin: 0, fontWeight: 600 }}>{payslip.designation || 'N/A'}</p>
-            </div>
+            {[
+              { label: 'Employee Name', value: `${payslip.first_name} ${payslip.last_name}` },
+              { label: 'Employee Number', value: payslip.employee_number },
+              { label: 'Department', value: payslip.employee_department || 'N/A' },
+              { label: 'Designation', value: payslip.designation || 'N/A' },
+            ].map(f => (
+              <div key={f.label}>
+                <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{f.value}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Previous Approvals - Prominently displayed */}
-        <div className="glass-panel" style={{ 
-          padding: 24, 
-          background: 'linear-gradient(to right, #f8f9fa, #e9ecef)',
-          border: '2px solid #667eea'
-        }}>
-          <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={20} />
-            Previous Approvals
-          </h3>
+        {/* Previous Approvals */}
+        <div style={{ ...card, border: '1.5px solid #bfdbfe', background: '#f8fbff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={13} color="#3b82f6" />
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Previous Approvals</span>
+          </div>
           {signatures.length > 0 ? (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {signatures.map((sig) => (
-                <div key={sig.signature_id} style={{ 
-                  padding: 16, 
-                  background: '#fff', 
-                  borderRadius: 8,
-                  borderLeft: '4px solid #28a745',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                    <div>
-                      <strong style={{ fontSize: 16 }}>{sig.signer_name}</strong>
-                      <span style={{ 
-                        marginLeft: 8, 
-                        padding: '4px 8px', 
-                        background: '#28a745', 
-                        color: '#fff',
-                        borderRadius: 4, 
-                        fontSize: 12,
-                        fontWeight: 600
-                      }}>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {signatures.map(sig => (
+                <div key={sig.signature_id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 9, borderLeft: '4px solid #22c55e', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1e293b' }}>{sig.signer_name}</span>
+                      <span style={{ padding: '2px 8px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 4, fontSize: 11.5, fontWeight: 700, color: '#166534' }}>
                         ✓ {sig.signer_role.replace(/_/g, ' ')}
                       </span>
                     </div>
-                    <span style={{ fontSize: 13, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock size={14} />
-                      {new Date(sig.signed_at).toLocaleString()}
+                    <span style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={11} />{new Date(sig.signed_at).toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#666', fontFamily: 'monospace', background: '#f8f9fa', padding: 8, borderRadius: 4 }}>
-                    Signature Hash: {truncateSignatureHash(sig.signature_hash, 10)}
+                  <div style={{ fontSize: 11.5, color: '#94a3b8', fontFamily: 'monospace', background: '#f8fafc', padding: '6px 8px', borderRadius: 5 }}>
+                    {truncateSignatureHash(sig.signature_hash, 10)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ margin: 0, color: '#666', fontStyle: 'italic' }}>No previous signatures found</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: 13.5, fontStyle: 'italic' }}>No previous signatures found</p>
           )}
         </div>
 
         {/* Salary Details */}
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DollarSign size={20} />
-            Salary Breakdown
-          </h3>
-          
-          <div style={{ display: 'grid', gap: 16 }}>
-            {/* Basic Salary */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #eee' }}>
-              <span style={{ color: '#666' }}>Basic Salary</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(payslip.basic_salary)}</span>
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DollarSign size={13} color="#f59e0b" />
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Salary Breakdown</span>
+          </div>
+          <div style={{ display: 'grid', gap: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <span style={{ color: '#64748b', fontSize: 13.5 }}>Basic Salary</span>
+              <span style={{ fontWeight: 600, color: '#1e293b' }}>{formatCurrency(payslip.basic_salary)}</span>
             </div>
 
-            {/* Allowances */}
             {Object.keys(payslip.allowances || {}).length > 0 && (
-              <div>
-                <strong style={{ display: 'block', marginBottom: 8, fontSize: 14 }}>Allowances</strong>
+              <div style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#059669', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Allowances</div>
                 {Object.entries(payslip.allowances).map(([key, value]) => (
-                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 8px 16px' }}>
-                    <span style={{ color: '#666', textTransform: 'capitalize' }}>{key}</span>
-                    <span style={{ fontWeight: 500 }}>{formatCurrency(Number(value))}</span>
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0 5px 12px' }}>
+                    <span style={{ color: '#64748b', fontSize: 13, textTransform: 'capitalize' }}>{key}</span>
+                    <span style={{ fontWeight: 500, fontSize: 13, color: '#059669' }}>{formatCurrency(Number(value))}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Gross Salary */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '12px 0', 
-              borderTop: '2px solid #ddd',
-              borderBottom: '2px solid #ddd'
-            }}>
-              <span style={{ fontWeight: 600, fontSize: 16 }}>Gross Salary</span>
-              <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--primary)' }}>
-                {formatCurrency(payslip.gross_salary)}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '2px solid #e2e8f0' }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>Gross Salary</span>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#3b82f6' }}>{formatCurrency(payslip.gross_salary)}</span>
             </div>
 
-            {/* Deductions */}
-            <div>
-              <strong style={{ display: 'block', marginBottom: 8, fontSize: 14, color: '#d9534f' }}>
-                Deductions
-              </strong>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 8px 16px' }}>
-                <span style={{ color: '#666' }}>EPF Employee Contribution ({payslip.epf_employee_rate}%)</span>
-                <span style={{ fontWeight: 500, color: '#d9534f' }}>
-                  {formatCurrency(payslip.epf_employee_deduction)}
-                </span>
+            <div style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deductions</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0 5px 12px' }}>
+                <span style={{ color: '#64748b', fontSize: 13 }}>EPF Employee ({payslip.epf_employee_rate}%)</span>
+                <span style={{ fontWeight: 500, fontSize: 13, color: '#ef4444' }}>{formatCurrency(payslip.epf_employee_deduction)}</span>
               </div>
               {Object.entries(payslip.other_deductions || {}).map(([key, value]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 8px 16px' }}>
-                  <span style={{ color: '#666', textTransform: 'capitalize' }}>{key}</span>
-                  <span style={{ fontWeight: 500, color: '#d9534f' }}>{formatCurrency(Number(value))}</span>
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0 5px 12px' }}>
+                  <span style={{ color: '#64748b', fontSize: 13, textTransform: 'capitalize' }}>{key}</span>
+                  <span style={{ fontWeight: 500, fontSize: 13, color: '#ef4444' }}>{formatCurrency(Number(value))}</span>
                 </div>
               ))}
             </div>
 
-            {/* Total Deductions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #eee' }}>
-              <span style={{ fontWeight: 600 }}>Total Deductions</span>
-              <span style={{ fontWeight: 700, color: '#d9534f' }}>
-                {formatCurrency(payslip.total_deductions)}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <span style={{ fontWeight: 600, fontSize: 13.5, color: '#1e293b' }}>Total Deductions</span>
+              <span style={{ fontWeight: 700, fontSize: 13.5, color: '#ef4444' }}>{formatCurrency(payslip.total_deductions)}</span>
             </div>
 
-            {/* Net Salary - Highlighted */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: 20,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: 8,
-              color: '#fff',
-              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
-            }}>
-              <span style={{ fontWeight: 700, fontSize: 20 }}>Net Salary</span>
-              <span style={{ fontWeight: 700, fontSize: 24 }}>
-                {formatCurrency(payslip.net_salary)}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: 18, background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)', borderRadius: 10, marginTop: 8, border: '1px solid #bbf7d0' }}>
+              <span style={{ fontWeight: 700, fontSize: 18, color: '#065f46' }}>Net Salary</span>
+              <span style={{ fontWeight: 800, fontSize: 22, color: '#059669' }}>{formatCurrency(payslip.net_salary)}</span>
             </div>
 
-            {/* Employer Contributions */}
-            <div style={{ marginTop: 16, padding: 16, background: '#f8f9fa', borderRadius: 8 }}>
-              <strong style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>
-                Employer Contributions (Company Cost)
-              </strong>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: '#666' }}>EPF Employer (12%)</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(payslip.epf_employer_contribution)}</span>
+            <div style={{ marginTop: 12, padding: 14, background: '#f8fafc', borderRadius: 10, border: '1.5px solid #e2e8f0' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Employer Contributions (Company Cost)</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#64748b', fontSize: 13 }}>EPF Employer (12%)</span>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{formatCurrency(payslip.epf_employer_contribution)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '1px solid #ddd' }}>
-                <span style={{ color: '#666' }}>ETF Employer (3%)</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(payslip.etf_employer_contribution)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #e2e8f0' }}>
+                <span style={{ color: '#64748b', fontSize: 13 }}>ETF Employer (3%)</span>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{formatCurrency(payslip.etf_employer_contribution)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
-                <span style={{ fontWeight: 600 }}>Total Payroll Cost</span>
-                <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1e293b' }}>Total Payroll Cost</span>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#3b82f6' }}>
                   {formatCurrency(payslip.gross_salary + payslip.epf_employer_contribution + payslip.etf_employer_contribution)}
                 </span>
               </div>
@@ -371,148 +265,69 @@ export default function PayslipAdminApproval() {
           </div>
         </div>
 
-        {/* Admin Action Buttons */}
-        <div className="glass-panel" style={{ 
-          padding: 24, 
-          background: 'linear-gradient(to right, #fff8e1, #fff3cd)',
-          border: '2px solid #ffc107'
-        }}>
+        {/* Admin Action Panel */}
+        <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12, padding: 20 }}>
           <div style={{ marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Shield size={18} />
-              Administrator Final Approval
-            </h4>
-            <p style={{ margin: 0, fontSize: 14, color: '#666' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield size={12} color="#b45309" />
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Administrator Final Approval</span>
+            </div>
+            <p style={{ margin: '0 0 0 31px', fontSize: 13, color: '#78350f' }}>
               By approving this payslip, the employee will be notified via email and can proceed to sign digitally.
             </p>
           </div>
-          
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button
               onClick={() => setShowRejectModal(true)}
               disabled={processing}
-              style={{
-                padding: '14px 28px',
-                borderRadius: 8,
-                border: '2px solid #d9534f',
-                background: '#fff',
-                color: '#d9534f',
-                cursor: processing ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                fontSize: 15,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                opacity: processing ? 0.5 : 1
-              }}
+              style={{ padding: '11px 22px', borderRadius: 10, border: '1.5px solid #fca5a5', background: '#fff', color: '#ef4444', cursor: processing ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 7, opacity: processing ? 0.5 : 1, transition: 'all 0.2s' }}
+              onMouseEnter={e => { if (!processing) e.currentTarget.style.background = '#fff1f2' }}
+              onMouseLeave={e => { if (!processing) e.currentTarget.style.background = '#fff' }}
             >
-              <XCircle size={20} />
-              Reject
+              <XCircle size={16} />Reject
             </button>
             <button
               onClick={handleApprove}
               disabled={processing}
-              style={{
-                padding: '14px 28px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
-                color: '#fff',
-                cursor: processing ? 'not-allowed' : 'pointer',
-                fontWeight: 700,
-                fontSize: 15,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                opacity: processing ? 0.5 : 1,
-                boxShadow: '0 4px 12px rgba(40, 167, 69, 0.3)'
-              }}
+              style={{ padding: '11px 24px', borderRadius: 10, border: 'none', background: processing ? '#e2e8f0' : 'linear-gradient(135deg, #059669, #10b981)', color: processing ? '#94a3b8' : '#fff', cursor: processing ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 7, opacity: processing ? 0.5 : 1, boxShadow: processing ? 'none' : '0 4px 14px rgba(16,185,129,0.35)', transition: 'all 0.2s' }}
             >
-              <UserCheck size={20} />
-              {processing ? 'Approving...' : 'Final Approve & Notify Employee'}
+              <UserCheck size={16} />{processing ? 'Approving...' : 'Final Approve & Notify Employee'}
             </button>
           </div>
         </div>
 
         {/* Reject Modal */}
         {showRejectModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div className="glass-panel" style={{ 
-              padding: 32, 
-              maxWidth: 500, 
-              width: '90%',
-              maxHeight: '90vh',
-              overflow: 'auto'
-            }}>
-              <h3 style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <XCircle size={24} color="#d9534f" />
-                Reject Payslip
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,15,37,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 500, width: '90%', boxShadow: '0 20px 60px rgba(4,15,37,0.25)', border: '1.5px solid #e2e8f0' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <XCircle size={20} color="#ef4444" />Reject Payslip
               </h3>
-              <p style={{ margin: '0 0 16px', color: '#666' }}>
+              <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: 13.5 }}>
                 Please provide a detailed reason for rejecting this payslip. This will help the accountant make necessary corrections.
               </p>
               <textarea
                 value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
+                onChange={e => setRejectionReason(e.target.value)}
                 placeholder="Enter rejection reason (e.g., incorrect allowances, calculation errors, missing deductions)..."
-                style={{
-                  width: '100%',
-                  minHeight: 140,
-                  padding: 12,
-                  borderRadius: 8,
-                  border: '1px solid #ddd',
-                  fontSize: 14,
-                  fontFamily: 'inherit',
-                  resize: 'vertical'
-                }}
+                rows={4}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: 13.5, fontFamily: 'inherit', resize: 'vertical', outline: 'none', boxSizing: 'border-box' as const }}
+                onFocus={e => { e.target.style.borderColor = '#3b82f6'; e.target.style.background = '#fff'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
+                onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none' }}
               />
-              <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end' }}>
                 <button
-                  onClick={() => {
-                    setShowRejectModal(false)
-                    setRejectionReason('')
-                    setError(null)
-                  }}
+                  onClick={() => { setShowRejectModal(false); setRejectionReason(''); setError(null) }}
                   disabled={processing}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: 8,
-                    border: '1px solid #ddd',
-                    background: '#fff',
-                    cursor: processing ? 'not-allowed' : 'pointer',
-                    fontSize: 14
-                  }}
-                >
-                  Cancel
-                </button>
+                  style={{ padding: '9px 18px', borderRadius: 9, border: '1.5px solid #e2e8f0', background: '#fff', cursor: processing ? 'not-allowed' : 'pointer', fontSize: 13.5, fontWeight: 600, color: '#64748b' }}
+                >Cancel</button>
                 <button
                   onClick={handleReject}
                   disabled={processing || !rejectionReason.trim()}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: '#d9534f',
-                    color: '#fff',
-                    cursor: (processing || !rejectionReason.trim()) ? 'not-allowed' : 'pointer',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    opacity: (processing || !rejectionReason.trim()) ? 0.5 : 1
-                  }}
-                >
-                  {processing ? 'Rejecting...' : 'Confirm Rejection'}
-                </button>
+                  style={{ padding: '9px 18px', borderRadius: 9, border: 'none', background: processing || !rejectionReason.trim() ? '#e2e8f0' : '#ef4444', color: processing || !rejectionReason.trim() ? '#94a3b8' : '#fff', cursor: processing || !rejectionReason.trim() ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 13.5 }}
+                >{processing ? 'Rejecting...' : 'Confirm Rejection'}</button>
               </div>
             </div>
           </div>
@@ -522,139 +337,61 @@ export default function PayslipAdminApproval() {
   }
 
   return (
-    <div className="glass-panel" style={{ padding: 24 }}>
+    <div style={card}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UserCheck size={24} />
-          Payslips Pending Administrator Approval
-          <span style={{ 
-            padding: '4px 12px', 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-            color: '#fff', 
-            borderRadius: 4, 
-            fontSize: 12,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4
-          }}>
-            <Shield size={14} />
-            ADMIN LEVEL
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserCheck size={17} color="#3b82f6" />
+          </div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Payslips Pending Administrator Approval</h2>
+          <span style={{ padding: '3px 10px', background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', borderRadius: 6, fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Shield size={11} />ADMIN LEVEL
           </span>
-        </h2>
-        <p style={{ margin: 0, color: '#666', fontSize: 14 }}>
-          Final approval stage - payslips that have been reviewed by staff accountants
-        </p>
+        </div>
+        <p style={{ margin: '0 0 0 42px', color: '#64748b', fontSize: 13.5 }}>Final approval stage — payslips reviewed by staff accountants</p>
       </div>
 
-      {/* Payslips List */}
       {error && (
-        <div style={{ 
-          padding: 16, 
-          background: '#f8d7da', 
-          border: '1px solid #f5c6cb', 
-          borderRadius: 8,
-          color: '#721c24',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <AlertCircle size={20} />
-          <span>{error}</span>
+        <div style={{ padding: '12px 16px', background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: 10, color: '#991b1b', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}>
+          <AlertCircle size={15} /><span>{error}</span>
         </div>
       )}
 
       {payslips.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>
-          <UserCheck size={64} style={{ color: '#ccc', marginBottom: 16 }} />
-          <h3 style={{ margin: '0 0 8px' }}>No Payslips Awaiting Approval</h3>
-          <p style={{ margin: 0 }}>
-            There are no payslips pending administrator approval at this time.
-          </p>
+        <div style={{ padding: 40, textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '1.5px dashed #e2e8f0' }}>
+          <UserCheck size={48} style={{ color: '#cbd5e1', marginBottom: 12 }} />
+          <h3 style={{ margin: '0 0 6px', color: '#475569' }}>No Payslips Awaiting Approval</h3>
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13.5 }}>There are no payslips pending administrator approval at this time.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {payslips.map((payslip) => (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {payslips.map(payslip => (
             <div
               key={payslip.payslip_id}
-              style={{
-                padding: 20,
-                background: '#fff',
-                borderRadius: 8,
-                border: '2px solid #667eea',
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                gap: 16,
-                alignItems: 'center',
-                transition: 'all 0.2s',
-                cursor: 'pointer'
-              }}
+              style={{ padding: '16px 20px', background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center', transition: 'all 0.2s', cursor: 'pointer' }}
               onClick={() => handleViewPayslip(payslip.payslip_id)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.3)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(59,130,246,0.1)'; e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateY(0)' }}
             >
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <h4 style={{ margin: 0, fontSize: 16 }}>
-                    {payslip.first_name} {payslip.last_name}
-                  </h4>
-                  <span style={{ 
-                    padding: '4px 8px', 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                    color: '#fff', 
-                    borderRadius: 4, 
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{payslip.first_name} {payslip.last_name}</span>
+                  <span style={{ padding: '3px 8px', background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', borderRadius: 5, fontSize: 11.5, fontWeight: 700 }}>
                     AWAITING ADMIN
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: 16, fontSize: 14, color: '#666', flexWrap: 'wrap' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Calendar size={14} />
-                    {MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Building2 size={14} />
-                    {payslip.employee_department || 'N/A'}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <DollarSign size={14} />
-                    Net: {formatCurrency(payslip.net_salary)}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Clock size={14} />
-                    {new Date(payslip.created_at).toLocaleDateString()}
-                  </span>
+                <div style={{ display: 'flex', gap: 14, fontSize: 13, color: '#64748b', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} />{MONTHS[payslip.payslip_month - 1]} {payslip.payslip_year}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Building2 size={12} />{payslip.employee_department || 'N/A'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><DollarSign size={12} />Net: {formatCurrency(payslip.net_salary)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} />{new Date(payslip.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
               <button
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
-                }}
+                style={{ padding: '9px 18px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }}
               >
-                <Eye size={16} />
-                Review & Approve
+                <Eye size={14} />Review & Approve
               </button>
             </div>
           ))}

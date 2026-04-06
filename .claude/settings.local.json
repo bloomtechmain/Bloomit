@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe:*)",
+      "Bash(done)",
+      "Bash(npx tsc:*)",
+      "Bash(sed:*)",
+      "Bash(do:*)",
+      "Bash(npm run:*)",
+      "Bash(awk NR>=2540 && NR<=2570:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

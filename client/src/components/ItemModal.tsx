@@ -105,86 +105,33 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1003,
-        padding: '1rem'
-      }}
-      onClick={handleClose}
-    >
+    <div className="modal-overlay" style={{ zIndex: 1003 }} onClick={handleClose}>
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          maxWidth: '550px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-        }}
+        className="modal-container"
+        style={{ maxWidth: '550px' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '1.5rem',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937', margin: 0 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">
             {mode === 'create' ? 'Add Contract Item' : 'Edit Contract Item'}
           </h2>
           <button
+            className="modal-close-btn"
             onClick={handleClose}
             disabled={loading}
-            style={{
-              padding: '0.5rem',
-              border: 'none',
-              backgroundColor: 'transparent',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              opacity: loading ? 0.5 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = '#f3f4f6'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
+            style={{ opacity: loading ? 0.5 : 1 }}
           >
-            <X size={20} color="#6b7280" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
+        <form onSubmit={handleSubmit} className="modal-body">
           {/* Requirements */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              htmlFor="requirements"
-              style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}
-            >
-              Requirements <span style={{ color: '#ef4444' }}>*</span>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label" htmlFor="requirements">
+              Requirements <span className="required-star">*</span>
             </label>
             <textarea
               id="requirements"
@@ -193,38 +140,20 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               disabled={loading || mode === 'edit'} // Requirements can't be changed in edit mode (used as ID)
               required
               rows={3}
-              style={{
-                width: '100%',
-                padding: '0.625rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: loading || mode === 'edit' ? '#f9fafb' : 'white',
-                cursor: loading || mode === 'edit' ? 'not-allowed' : 'text',
-                resize: 'vertical'
-              }}
+              style={{ opacity: loading || mode === 'edit' ? 0.6 : 1 }}
               placeholder="Enter item requirements"
             />
             {mode === 'edit' && (
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#7aa3d4', marginTop: '0.25rem' }}>
                 Requirements cannot be changed after creation
               </div>
             )}
           </div>
 
           {/* Service Category */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              htmlFor="service_category"
-              style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}
-            >
-              Service Category <span style={{ color: '#ef4444' }}>*</span>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label" htmlFor="service_category">
+              Service Category <span className="required-star">*</span>
             </label>
             <input
               type="text"
@@ -233,32 +162,15 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               onChange={(e) => setFormData({ ...formData, service_category: e.target.value })}
               disabled={loading}
               required
-              style={{
-                width: '100%',
-                padding: '0.625rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: loading ? '#f9fafb' : 'white',
-                cursor: loading ? 'not-allowed' : 'text'
-              }}
+              style={{ opacity: loading ? 0.6 : 1 }}
               placeholder="e.g., Development, Design, Consulting"
             />
           </div>
 
           {/* Unit Cost */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              htmlFor="unit_cost"
-              style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}
-            >
-              Unit Cost <span style={{ color: '#ef4444' }}>*</span>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label" htmlFor="unit_cost">
+              Unit Cost <span className="required-star">*</span>
             </label>
             <input
               type="number"
@@ -269,31 +181,15 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               required
               min="0"
               step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.625rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                backgroundColor: loading ? '#f9fafb' : 'white',
-                cursor: loading ? 'not-allowed' : 'text'
-              }}
+              style={{ opacity: loading ? 0.6 : 1 }}
               placeholder="0.00"
             />
           </div>
 
           {/* Requirement Type */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}
-            >
-              Requirement Type <span style={{ color: '#ef4444' }}>*</span>
+            <label className="form-label">
+              Requirement Type <span className="required-star">*</span>
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label
@@ -301,13 +197,11 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   padding: '0.75rem',
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${formData.requirement_type === 'Initial Requirement' ? '#3b82f6' : '#1e3a5f'}`,
                   borderRadius: '6px',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   backgroundColor:
-                    formData.requirement_type === 'Initial Requirement' ? '#eff6ff' : 'white',
-                  borderColor:
-                    formData.requirement_type === 'Initial Requirement' ? '#3b82f6' : '#d1d5db'
+                    formData.requirement_type === 'Initial Requirement' ? 'rgba(59,130,246,0.15)' : 'rgba(13,31,60,0.5)'
                 }}
               >
                 <input
@@ -325,8 +219,8 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   style={{ marginRight: '0.5rem' }}
                 />
                 <div>
-                  <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>Initial Requirement</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  <div style={{ fontWeight: '500', fontSize: '0.875rem', color: '#e2e8f0' }}>Initial Requirement</div>
+                  <div style={{ fontSize: '0.75rem', color: '#7aa3d4' }}>
                     Part of the original contract budget
                   </div>
                 </div>
@@ -337,13 +231,11 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   padding: '0.75rem',
-                  border: '1px solid #d1d5db',
+                  border: `1px solid ${formData.requirement_type === 'Additional Requirement' ? '#f59e0b' : '#1e3a5f'}`,
                   borderRadius: '6px',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   backgroundColor:
-                    formData.requirement_type === 'Additional Requirement' ? '#fef3c7' : 'white',
-                  borderColor:
-                    formData.requirement_type === 'Additional Requirement' ? '#f59e0b' : '#d1d5db'
+                    formData.requirement_type === 'Additional Requirement' ? 'rgba(245,158,11,0.15)' : 'rgba(13,31,60,0.5)'
                 }}
               >
                 <input
@@ -361,10 +253,10 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   style={{ marginRight: '0.5rem' }}
                 />
                 <div>
-                  <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>
+                  <div style={{ fontWeight: '500', fontSize: '0.875rem', color: '#e2e8f0' }}>
                     Additional Requirement
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#7aa3d4' }}>
                     {mode === 'create'
                       ? 'Will automatically add to extra budget allocation'
                       : 'Added to extra budget allocation'}
@@ -375,44 +267,20 @@ export const ItemModal: React.FC<ItemModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.75rem',
-              justifyContent: 'flex-end'
-            }}
-          >
+          <div className="modal-footer" style={{ padding: 0, border: 'none' }}>
             <button
               type="button"
               onClick={handleClose}
               disabled={loading}
-              style={{
-                padding: '0.625rem 1.25rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                backgroundColor: 'white',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
+              className="btn-secondary"
+              style={{ opacity: loading ? 0.5 : 1 }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              style={{
-                padding: '0.625rem 1.25rem',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: 'white',
-                backgroundColor: loading ? '#9ca3af' : '#3b82f6',
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
+              className="btn-primary"
             >
               {loading ? 'Saving...' : mode === 'create' ? 'Add Item' : 'Save Changes'}
             </button>

@@ -297,38 +297,36 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '1rem'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          handleClose()
-        }
-      }}
-    >
+    <>
+      {/* Overlay */}
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(4,15,37,0.5)',
+          backdropFilter: 'blur(3px)',
+          zIndex: 1000,
+          animation: 'empOverlayIn 0.22s ease',
+        }}
+      />
+
+      {/* Drawer panel */}
       <div
         style={{
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
-          width: '100%',
-          maxWidth: '900px',
-          maxHeight: '90vh',
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(760px, 100vw)',
+          background: '#fff',
+          zIndex: 1001,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          boxShadow: '-16px 0 56px rgba(4,15,37,0.28)',
+          animation: 'slideInFromRight 0.25s ease',
+          overflow: 'hidden',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <POModalHeader
@@ -342,7 +340,7 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '1.5rem'
+            padding: '1.5rem',
           }}
         >
           {/* Basic Info Section */}
@@ -355,6 +353,9 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
             mode={mode}
           />
 
+          {/* Section divider */}
+          <div style={{ height: 1, background: 'linear-gradient(to right, #e2e8f0, transparent)', marginBottom: 24 }} />
+
           {/* Line Items Table */}
           <POLineItemsTable
             items={lineItems}
@@ -362,6 +363,9 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
             onUpdateItem={handleUpdateLineItem}
             onRemoveItem={handleRemoveLineItem}
           />
+
+          {/* Section divider */}
+          <div style={{ height: 1, background: 'linear-gradient(to right, #e2e8f0, transparent)', marginBottom: 24 }} />
 
           {/* Financial Summary */}
           <POFinancialSummary
@@ -374,24 +378,27 @@ export const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({
             onBankingFeeChange={(value) => handleFieldChange('banking_fee', value)}
           />
 
+          {/* Section divider */}
+          <div style={{ height: 1, background: 'linear-gradient(to right, #e2e8f0, transparent)', marginBottom: 24 }} />
+
           {/* Payment Info Section */}
           <POPaymentInfoSection
             formData={formData}
             onChange={handleFieldChange}
             isAdmin={isAdmin}
           />
-
-          {/* Form Actions */}
-          <POFormActions
-            onSubmit={handleSubmit}
-            onCancel={handleClose}
-            isSubmitting={isSubmitting}
-            isValid={isValid}
-            validationErrors={validationErrors}
-            mode={mode}
-          />
         </div>
+
+        {/* Sticky footer actions */}
+        <POFormActions
+          onSubmit={handleSubmit}
+          onCancel={handleClose}
+          isSubmitting={isSubmitting}
+          isValid={isValid}
+          validationErrors={validationErrors}
+          mode={mode}
+        />
       </div>
-    </div>
+    </>
   )
 }

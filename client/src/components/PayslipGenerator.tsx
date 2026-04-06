@@ -1,9 +1,42 @@
 import { useState, useEffect } from 'react'
-import { Send, AlertCircle, FileText } from 'lucide-react'
+import { Send, AlertCircle, FileText, Users, Calendar, Search, User } from 'lucide-react'
 import PayslipForm from './PayslipForm'
 import { getAllEmployeesWithPayroll, createPayslip, submitForReview, getAllPayslips, updatePayslip } from '../services/payrollService'
 import type { EmployeePayrollData, Payslip } from '../types/payroll'
 import { useToast } from '../context/ToastContext'
+
+const card: React.CSSProperties = {
+  background: '#fff',
+  border: '1.5px solid #e2e8f0',
+  borderRadius: 12,
+  padding: 24,
+  boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
+}
+
+const inp: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1.5px solid #e2e8f0',
+  background: '#f8fafc',
+  fontSize: 14,
+  color: '#1e293b',
+  outline: 'none',
+  boxSizing: 'border-box',
+  transition: 'all 0.2s',
+  fontFamily: 'inherit',
+}
+
+const fo = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+}
+const bl = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
 
 export default function PayslipGenerator() {
   const { toast } = useToast()
@@ -18,50 +51,32 @@ export default function PayslipGenerator() {
   const [existingPayslip, setExistingPayslip] = useState<Payslip | null>(null)
   const [checkingExisting, setCheckingExisting] = useState(false)
 
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
+  useEffect(() => { fetchEmployees() }, [])
 
   const fetchEmployees = async () => {
     setLoading(true)
     try {
       const data = await getAllEmployeesWithPayroll()
       setEmployees(data.employees || [])
-    } catch (error) {
-      console.error('Error fetching employees:', error)
+    } catch {
       toast.error('Failed to fetch employees')
     } finally {
       setLoading(false)
     }
   }
 
-  // Check for existing payslip when employee or period changes
   useEffect(() => {
-    if (selectedEmployee) {
-      checkExistingPayslip()
-    } else {
-      setExistingPayslip(null)
-    }
+    if (selectedEmployee) checkExistingPayslip()
+    else setExistingPayslip(null)
   }, [selectedEmployee, selectedMonth, selectedYear])
 
   const checkExistingPayslip = async () => {
     if (!selectedEmployee) return
-    
     setCheckingExisting(true)
     try {
-      const result = await getAllPayslips({
-        employee_id: selectedEmployee.employee_id,
-        month: selectedMonth,
-        year: selectedYear
-      })
-      
-      if (result.payslips && result.payslips.length > 0) {
-        setExistingPayslip(result.payslips[0])
-      } else {
-        setExistingPayslip(null)
-      }
-    } catch (error) {
-      console.error('Error checking for existing payslip:', error)
+      const result = await getAllPayslips({ employee_id: selectedEmployee.employee_id, month: selectedMonth, year: selectedYear })
+      setExistingPayslip(result.payslips?.length > 0 ? result.payslips[0] : null)
+    } catch {
       setExistingPayslip(null)
     } finally {
       setCheckingExisting(false)
@@ -69,26 +84,14 @@ export default function PayslipGenerator() {
   }
 
   const handleSubmitForReview = async () => {
-    if (!selectedEmployee || !calculatedData) {
-      toast.error('Please select an employee and complete the form')
-      return
-    }
+    if (!selectedEmployee || !calculatedData) { toast.error('Please select an employee and complete the form'); return }
 
-    // Check if payslip already exists
     if (existingPayslip) {
       const status = existingPayslip.status
-
-      // If it's in DRAFT or REJECTED status, we can update and submit
       if (status === 'DRAFT' || status === 'REJECTED') {
-        const confirmUpdate = confirm(
-          `A ${status.toLowerCase()} payslip already exists for this employee and period. Do you want to update it and submit for review?`
-        )
-        if (!confirmUpdate) return
+        if (!confirm(`A ${status.toLowerCase()} payslip already exists for this employee and period. Do you want to update it and submit for review?`)) return
       } else {
-        // Payslip exists in a non-editable state
-        toast.error(
-          `A payslip already exists for this employee and period with status: ${status}. Please view the existing payslip in the Payslips list or select a different period.`
-        )
+        toast.error(`A payslip already exists for this employee and period with status: ${status}. Please select a different period.`)
         return
       }
     }
@@ -96,152 +99,87 @@ export default function PayslipGenerator() {
     setSaving(true)
     try {
       let payslipId: number
-
       if (existingPayslip && (existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED')) {
-        // Update existing payslip
-        const result = await updatePayslip(existingPayslip.payslip_id, {
-          allowances: calculatedData.allowances,
-          other_deductions: calculatedData.otherDeductions,
-          epf_employee_rate: calculatedData.epfEmployeeRate
-        })
+        const result = await updatePayslip(existingPayslip.payslip_id, { allowances: calculatedData.allowances, other_deductions: calculatedData.otherDeductions, epf_employee_rate: calculatedData.epfEmployeeRate })
         payslipId = result.payslip.payslip_id
       } else {
-        // Create new payslip
-        const result = await createPayslip({
-          employee_id: selectedEmployee.employee_id,
-          payslip_month: selectedMonth,
-          payslip_year: selectedYear,
-          allowances: calculatedData.allowances,
-          other_deductions: calculatedData.otherDeductions,
-          epf_employee_rate: calculatedData.epfEmployeeRate
-        })
+        const result = await createPayslip({ employee_id: selectedEmployee.employee_id, payslip_month: selectedMonth, payslip_year: selectedYear, allowances: calculatedData.allowances, other_deductions: calculatedData.otherDeductions, epf_employee_rate: calculatedData.epfEmployeeRate })
         payslipId = result.payslip.payslip_id
       }
-      
-      // Then submit it for review
       await submitForReview(payslipId)
-
       toast.success('Payslip submitted for review successfully!')
-      // Reset form
       setSelectedEmployee(null)
       setCalculatedData(null)
       setExistingPayslip(null)
     } catch (error: any) {
-      console.error('Error submitting payslip:', error)
-      const errorMessage = error.message || 'Failed to submit payslip'
-
-      if (errorMessage.includes('payslip_already_exists')) {
-        toast.error('A payslip already exists for this employee and period. Please refresh the page and try again, or select a different period.')
-      } else {
-        toast.error(errorMessage)
-      }
+      const msg = error.message || 'Failed to submit payslip'
+      if (msg.includes('payslip_already_exists')) toast.error('A payslip already exists for this period. Please refresh and try again.')
+      else toast.error(msg)
     } finally {
       setSaving(false)
     }
   }
 
   const filteredEmployees = employees.filter(emp => {
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      (emp.name || '').toLowerCase().includes(searchLower) ||
-      (emp.email || '').toLowerCase().includes(searchLower)
-    )
+    const s = searchTerm.toLowerCase()
+    return (emp.name || '').toLowerCase().includes(s) || (emp.email || '').toLowerCase().includes(s)
   })
 
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
-
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
   return (
-    <div style={{ display: 'grid', gap: 24 }}>
+    <div style={{ display: 'grid', gap: 20 }}>
+      {/* Page header */}
       <div>
-        <h2 style={{ margin: 0, marginBottom: 8, fontSize: 24 }}>Generate Payslip</h2>
-        <p style={{ margin: 0, color: '#666' }}>
-          Create payslips for employees. Select an employee, review the details, and submit for approval.
-        </p>
+        <h2 style={{ margin: 0, marginBottom: 4, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>Generate Payslip</h2>
+        <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>Select an employee, review details, and submit for approval.</p>
       </div>
 
-      {/* Month and Year Selection */}
-      <div className="glass-panel" style={{ padding: 20 }}>
-        <h3 style={{ margin: 0, marginBottom: 16 }}>Period Selection</h3>
+      {/* Period Selection */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Calendar size={13} color="#3b82f6" />
+          </div>
+          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Period Selection</span>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Month</label>
-            <select
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(Number(e.target.value))}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 15 }}
-            >
-              {months.map((month, index) => (
-                <option key={index} value={index + 1}>{month}</option>
-              ))}
+          <label style={{ display: 'grid', gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Month</span>
+            <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ ...inp, appearance: 'none', cursor: 'pointer' }} onFocus={fo} onBlur={bl}>
+              {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Year</label>
-            <select
-              value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 15 }}
-            >
-              {years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
+          </label>
+          <label style={{ display: 'grid', gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Year</span>
+            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ ...inp, appearance: 'none', cursor: 'pointer' }} onFocus={fo} onBlur={bl}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-          </div>
+          </label>
         </div>
       </div>
 
       {/* Existing Payslip Warning */}
       {existingPayslip && (
-        <div 
-          className="glass-panel" 
-          style={{ 
-            padding: 20, 
-            background: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' 
-              ? 'rgba(255, 193, 7, 0.1)' 
-              : 'rgba(244, 67, 54, 0.1)',
-            border: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' 
-              ? '2px solid rgba(255, 193, 7, 0.5)' 
-              : '2px solid rgba(244, 67, 54, 0.5)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <AlertCircle 
-              size={24} 
-              style={{ 
-                color: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' 
-                  ? '#ff9800' 
-                  : '#f44336',
-                flexShrink: 0,
-                marginTop: 2
-              }} 
-            />
-            <div style={{ flex: 1 }}>
-              <h3 style={{ margin: 0, marginBottom: 8, fontSize: 16 }}>
-                {existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' 
-                  ? 'Existing Payslip Found' 
-                  : 'Payslip Already Exists'}
-              </h3>
-              <p style={{ margin: 0, marginBottom: 12, color: '#666', fontSize: 14 }}>
-                A payslip already exists for <strong>{selectedEmployee?.name}</strong> for{' '}
-                <strong>{months[selectedMonth - 1]} {selectedYear}</strong> with status:{' '}
-                <strong style={{ color: existingPayslip.status === 'COMPLETED' ? '#4caf50' : '#ff9800' }}>
-                  {existingPayslip.status.replace(/_/g, ' ')}
-                </strong>
+        <div style={{
+          padding: 16,
+          background: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' ? '#fffbeb' : '#fff1f2',
+          border: `1.5px solid ${existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' ? '#fcd34d' : '#fecdd3'}`,
+          borderRadius: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <AlertCircle size={18} style={{ color: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' ? '#f59e0b' : '#ef4444', flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13.5, color: existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' ? '#92400e' : '#991b1b' }}>
+                {existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED' ? 'Existing Payslip Found' : 'Payslip Already Exists'}
               </p>
-              {(existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED') && (
-                <p style={{ margin: 0, color: '#666', fontSize: 13 }}>
-                  ℹ️ You can update and resubmit this payslip, or select a different period.
-                </p>
-              )}
+              <p style={{ margin: '0 0 4px', fontSize: 13, color: '#64748b' }}>
+                A payslip exists for <strong>{selectedEmployee?.name}</strong> — {months[selectedMonth - 1]} {selectedYear} with status:{' '}
+                <strong style={{ color: existingPayslip.status === 'COMPLETED' ? '#059669' : '#f59e0b' }}>{existingPayslip.status.replace(/_/g, ' ')}</strong>
+              </p>
               {existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED' && (
-                <p style={{ margin: 0, color: '#d32f2f', fontSize: 13, fontWeight: 600 }}>
-                  ⚠️ This payslip cannot be modified. Please select a different period.
-                </p>
+                <p style={{ margin: 0, fontSize: 12, color: '#ef4444', fontWeight: 600 }}>This payslip cannot be modified. Please select a different period.</p>
               )}
             </div>
           </div>
@@ -249,70 +187,74 @@ export default function PayslipGenerator() {
       )}
 
       {/* Employee Selection */}
-      <div className="glass-panel" style={{ padding: 20 }}>
-        <h3 style={{ margin: 0, marginBottom: 16 }}>Select Employee</h3>
-        
-        <input
-          type="text"
-          placeholder="Search employees by name, number, or email..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          style={{ 
-            width: '100%', 
-            padding: '10px 12px', 
-            borderRadius: 8, 
-            border: '1px solid #ccc', 
-            marginBottom: 16,
-            fontSize: 15
-          }}
-        />
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={13} color="#3b82f6" />
+          </div>
+          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Select Employee</span>
+        </div>
+
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ ...inp, paddingLeft: 36 }}
+            onFocus={fo}
+            onBlur={bl}
+          />
+        </div>
 
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center' }}>Loading employees...</div>
+          <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Loading employees...</div>
         ) : filteredEmployees.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', background: '#f5f5f5', borderRadius: 8 }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-            <div>No employees found matching your search</div>
+          <div style={{ padding: 32, textAlign: 'center', background: '#f8fafc', borderRadius: 10, border: '1.5px dashed #e2e8f0' }}>
+            <Search size={28} style={{ color: '#cbd5e1', marginBottom: 8 }} />
+            <div style={{ fontSize: 13.5, color: '#94a3b8' }}>No employees match your search</div>
           </div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-            gap: 12,
-            maxHeight: 400,
-            overflowY: 'auto',
-            padding: 4
-          }}>
-            {filteredEmployees.map(emp => (
-              <div
-                key={emp.employee_id}
-                onClick={() => setSelectedEmployee(emp)}
-                style={{
-                  padding: 16,
-                  borderRadius: 10,
-                  border: selectedEmployee?.employee_id === emp.employee_id ? '2px solid var(--primary)' : '1px solid #e0e0e0',
-                  background: selectedEmployee?.employee_id === emp.employee_id ? 'rgba(0, 97, 255, 0.05)' : '#fff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: selectedEmployee?.employee_id === emp.employee_id ? '0 4px 12px rgba(0, 97, 255, 0.15)' : '0 2px 4px rgba(0,0,0,0.05)'
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: '#1a1a1a' }}>
-                  {emp.name}
-                </div>
-                <div style={{ fontSize: 13, color: '#333', marginBottom: 2 }}>
-                  {emp.role}
-                </div>
-                <div style={{ fontSize: 12, color: '#555' }}>
-                  {emp.employee_department || emp.department || 'No Department'}
-                </div>
-                {emp.base_salary && (
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)', marginTop: 8 }}>
-                    Base: LKR {emp.base_salary.toLocaleString()}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, maxHeight: 380, overflowY: 'auto', padding: 2 }}>
+            {filteredEmployees.map(emp => {
+              const isSelected = selectedEmployee?.employee_id === emp.employee_id
+              const initials = (emp.name || '??').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+              return (
+                <div
+                  key={emp.employee_id}
+                  onClick={() => setSelectedEmployee(emp)}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: 10,
+                    border: isSelected ? '2px solid #3b82f6' : '1.5px solid #e2e8f0',
+                    background: isSelected ? 'rgba(59,130,246,0.04)' : '#fff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: isSelected ? '0 4px 12px rgba(59,130,246,0.15)' : '0 1px 3px rgba(0,0,0,0.04)',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = '#93c5fd' }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = '#e2e8f0' }}
+                >
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: isSelected ? 'rgba(59,130,246,0.12)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isSelected ? '#3b82f6' : '#64748b', flexShrink: 0 }}>
+                    {initials}
                   </div>
-                )}
-              </div>
-            ))}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: '#1e293b', marginBottom: 2 }}>{emp.name}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 1 }}>{emp.role}</div>
+                    <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{emp.employee_department || emp.department || 'No Department'}</div>
+                    {emp.base_salary && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', marginTop: 6 }}>
+                        Base: LKR {emp.base_salary.toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -320,26 +262,15 @@ export default function PayslipGenerator() {
       {/* Payslip Form */}
       {selectedEmployee && (
         <>
-          <PayslipForm
-            employee={selectedEmployee}
-            onCalculate={setCalculatedData}
-          />
+          <PayslipForm employee={selectedEmployee} onCalculate={setCalculatedData} />
 
           {/* Action Buttons */}
-          <div className="glass-panel" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ ...card, padding: '16px 24px' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
               {existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED' && (
-                <div style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 8,
-                  color: '#d32f2f',
-                  fontSize: 14,
-                  fontWeight: 600
-                }}>
-                  <FileText size={18} />
-                  Cannot submit - payslip already exists with status: {existingPayslip.status}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, fontWeight: 600 }}>
+                  <FileText size={15} />
+                  Cannot submit — payslip already exists with status: {existingPayslip.status}
                 </div>
               )}
               <button
@@ -349,19 +280,25 @@ export default function PayslipGenerator() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  padding: '12px 24px',
-                  borderRadius: 8,
+                  padding: '11px 24px',
+                  borderRadius: 10,
                   border: 'none',
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  cursor: (saving || !calculatedData || checkingExisting || (!!existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED')) ? 'not-allowed' : 'pointer',
-                  fontSize: 15,
+                  background: (saving || !calculatedData || checkingExisting || (!!existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED'))
+                    ? '#e2e8f0'
+                    : 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+                  color: (saving || !calculatedData || checkingExisting || (!!existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED'))
+                    ? '#94a3b8'
+                    : '#fff',
+                  cursor: (saving || !calculatedData || checkingExisting || (!!existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED'))
+                    ? 'not-allowed'
+                    : 'pointer',
+                  fontSize: 14,
                   fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(0, 97, 255, 0.25)',
-                  opacity: (saving || !calculatedData || checkingExisting || (!!existingPayslip && existingPayslip.status !== 'DRAFT' && existingPayslip.status !== 'REJECTED')) ? 0.5 : 1
+                  boxShadow: (saving || !calculatedData || checkingExisting) ? 'none' : '0 4px 14px rgba(59,130,246,0.35)',
+                  transition: 'all 0.2s',
                 }}
               >
-                <Send size={18} />
+                <Send size={15} />
                 {saving ? 'Submitting...' : checkingExisting ? 'Checking...' : existingPayslip && (existingPayslip.status === 'DRAFT' || existingPayslip.status === 'REJECTED') ? 'Update & Submit for Review' : 'Submit for Review'}
               </button>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ShoppingCart, Plus, FileText, DollarSign, CheckCircle, Clock, Download } from 'lucide-react'
+import { ShoppingCart, Plus, FileText, DollarSign, CheckCircle, Clock, Download, Package } from 'lucide-react'
 import { purchaseOrdersApi } from '../services/purchaseOrdersApi'
 import { useToast } from '../context/ToastContext'
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrders'
@@ -454,17 +454,16 @@ export default function PurchaseOrders({
   const isAdmin = user.roleNames?.includes('Admin') || user.roleNames?.includes('Super Admin')
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.5rem 0' }}>
-          Purchase Order System
-        </h1>
-        <p style={{ fontSize: '1rem', color: '#6b7280', margin: 0 }}>
-          Create, manage, and track purchase orders with approval workflow
-        </p>
+    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+        <ShoppingCart size={520} strokeWidth={0.7} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.06, color: '#3b82f6', transform: 'rotate(-12deg)' }} />
+        <Package size={380} strokeWidth={0.7} style={{ position: 'absolute', left: -60, bottom: -40, opacity: 0.05, color: '#60a5fa', transform: 'rotate(10deg)' }} />
+        <FileText size={300} strokeWidth={0.7} style={{ position: 'absolute', left: '38%', top: '30%', opacity: 0.04, color: '#3b82f6', transform: 'translateX(-50%)' }} />
+        <DollarSign size={200} strokeWidth={0.7} style={{ position: 'absolute', left: '5%', top: '5%', opacity: 0.05, color: '#93c5fd', transform: 'rotate(-6deg)' }} />
+        <CheckCircle size={220} strokeWidth={0.7} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.05, color: '#60a5fa', transform: 'rotate(-8deg)' }} />
+        <ShoppingCart size={240} strokeWidth={0.7} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.05, color: '#3b82f6', transform: 'rotate(6deg)' }} />
+        <Package size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.04, color: '#93c5fd' }} />
       </div>
-
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '1.5rem', borderRadius: '12px', color: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
@@ -566,80 +565,30 @@ export default function PurchaseOrders({
               left: 0,
               marginTop: '0.5rem',
               background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '10px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
               zIndex: 10,
-              minWidth: '200px'
+              minWidth: '210px',
+              overflow: 'hidden'
             }}>
-              <button
-                onClick={handleExportCSV}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  background: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  color: '#374151'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                Export to CSV
-              </button>
-              <button
-                onClick={handleExportSummaryReport}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  background: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  color: '#374151'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                Summary Report
-              </button>
-              <button
-                onClick={handleExportVendorReport}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  background: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  color: '#374151'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                Vendor Spending Report
-              </button>
-              <button
-                onClick={handleExportProjectReport}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  background: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  color: '#374151'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                Project Cost Report
-              </button>
+              {[
+                { label: 'Export to CSV', handler: handleExportCSV },
+                { label: 'Summary Report', handler: handleExportSummaryReport },
+                { label: 'Vendor Spending Report', handler: handleExportVendorReport },
+                { label: 'Project Cost Report', handler: handleExportProjectReport },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.handler}
+                  style={{ width: '100%', padding: '0.7rem 1rem', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '0.875rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Download size={14} style={{ color: '#10b981', flexShrink: 0 }} />
+                  {item.label}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -652,10 +601,13 @@ export default function PurchaseOrders({
           style={{
             flex: 1,
             minWidth: '200px',
-            padding: '0.75rem 1rem',
+            padding: '0.7rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            fontSize: '0.875rem'
+            border: '1.5px solid #e2e8f0',
+            background: '#f8fafc',
+            color: '#1e293b',
+            fontSize: '0.875rem',
+            outline: 'none'
           }}
         />
 
@@ -663,10 +615,13 @@ export default function PurchaseOrders({
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as any)}
           style={{
-            padding: '0.75rem 1rem',
+            padding: '0.7rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            fontSize: '0.875rem'
+            border: '1.5px solid #e2e8f0',
+            background: '#f8fafc',
+            color: '#1e293b',
+            fontSize: '0.875rem',
+            outline: 'none'
           }}
         >
           <option value="ALL">All Status</option>
@@ -680,10 +635,13 @@ export default function PurchaseOrders({
           value={filterVendor}
           onChange={e => setFilterVendor(e.target.value)}
           style={{
-            padding: '0.75rem 1rem',
+            padding: '0.7rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            fontSize: '0.875rem'
+            border: '1.5px solid #e2e8f0',
+            background: '#f8fafc',
+            color: '#1e293b',
+            fontSize: '0.875rem',
+            outline: 'none'
           }}
         >
           <option value="ALL">All Vendors</option>
@@ -695,133 +653,112 @@ export default function PurchaseOrders({
 
       {/* Purchase Orders List */}
       {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.95rem' }}>
           Loading purchase orders...
         </div>
       ) : purchaseOrders.length === 0 ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280', background: '#f9fafb', borderRadius: '12px', border: '2px dashed #e5e7eb' }}>
-          <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-          <p style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0' }}>
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '12px', border: '2px dashed #e2e8f0' }}>
+          <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.35, color: '#94a3b8' }} />
+          <p style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#475569' }}>
             No purchase orders yet
           </p>
-          <p style={{ margin: 0 }}>
+          <p style={{ margin: 0, fontSize: '0.875rem' }}>
             Create your first purchase order to get started.
           </p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1.5px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>PO Number</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Date</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Requested By</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Vendor</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Project</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Total Amount</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Actions</th>
+                <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>PO Number</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Date</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Requested By</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vendor</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Project</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Amount</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {purchaseOrders.map((po, idx) => (
-                  <tr key={po.id} style={{ borderBottom: idx < purchaseOrders.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#3b82f6', cursor: 'pointer' }} onClick={() => handleView(po)}>
+                  <tr key={po.id}
+                    style={{ borderBottom: idx < purchaseOrders.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', fontWeight: 700, color: '#3b82f6', cursor: 'pointer' }} onClick={() => handleView(po)}>
                       {po.po_number}
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', color: '#475569' }}>
                       {new Date(po.created_at).toLocaleDateString()}
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{po.requested_by_name}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{po.vendor_name || '-'}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{po.project_name || '-'}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', fontWeight: 600 }}>
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', color: '#1e293b' }}>{po.requested_by_name}</td>
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', color: '#475569' }}>{po.vendor_name || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', color: '#475569' }}>{po.project_name || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                    <td style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>
                       LKR {Number(po.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                    <td style={{ padding: '0.9rem 1rem', textAlign: 'center' }}>
                       <span style={{
                         padding: '0.25rem 0.75rem',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        background: 
-                          po.status === 'PENDING' ? '#fef3c7' :
-                          po.status === 'APPROVED' ? '#d1fae5' :
-                          po.status === 'REJECTED' ? '#fee2e2' :
-                          '#dbeafe',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.03em',
+                        border: '1.5px solid',
+                        background:
+                          po.status === 'PENDING' ? '#fffbeb' :
+                          po.status === 'APPROVED' ? '#f0fdf4' :
+                          po.status === 'REJECTED' ? '#fff1f2' :
+                          '#eff6ff',
                         color:
-                          po.status === 'PENDING' ? '#92400e' :
-                          po.status === 'APPROVED' ? '#065f46' :
-                          po.status === 'REJECTED' ? '#991b1b' :
-                          '#1e40af'
+                          po.status === 'PENDING' ? '#b45309' :
+                          po.status === 'APPROVED' ? '#15803d' :
+                          po.status === 'REJECTED' ? '#be123c' :
+                          '#1d4ed8',
+                        borderColor:
+                          po.status === 'PENDING' ? '#fcd34d' :
+                          po.status === 'APPROVED' ? '#86efac' :
+                          po.status === 'REJECTED' ? '#fda4af' :
+                          '#93c5fd'
                       }}>
                         {po.status}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <td style={{ padding: '0.9rem 1rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
+                          title="View"
                           onClick={() => handleView(po)}
-                          style={{
-                            padding: '0.375rem 0.75rem',
-                            borderRadius: '6px',
-                            border: '1px solid #3b82f6',
-                            background: '#3b82f6',
-                            color: '#fff',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #bfdbfe', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                         >
                           View
                         </button>
                         {po.status === 'PENDING' && (
                           <>
                             <button
+                              title="Edit"
                               onClick={() => handleEdit(po)}
-                              style={{
-                                padding: '0.375rem 0.75rem',
-                                borderRadius: '6px',
-                                border: '1px solid #059669',
-                                background: '#059669',
-                                color: '#fff',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
+                              style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                             >
                               Edit
                             </button>
                             {isAdmin && (
                               <>
                                 <button
+                                  title="Approve"
                                   onClick={() => setApprovingPO(po)}
-                                  style={{
-                                    padding: '0.375rem 0.75rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #10b981',
-                                    background: '#10b981',
-                                    color: '#fff',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                  }}
+                                  style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #6ee7b7', background: '#ecfdf5', color: '#059669', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                                 >
                                   Approve
                                 </button>
                                 <button
+                                  title="Reject"
                                   onClick={() => setRejectingPO(po)}
-                                  style={{
-                                    padding: '0.375rem 0.75rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #ef4444',
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                  }}
+                                  style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #fca5a5', background: '#fff1f2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                                 >
                                   Reject
                                 </button>
@@ -831,34 +768,18 @@ export default function PurchaseOrders({
                         )}
                         {po.status === 'APPROVED' && !po.receipt_document_url && (
                           <button
+                            title="Upload Receipt"
                             onClick={() => setUploadingReceiptPO(po)}
-                            style={{
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '6px',
-                              border: '1px solid #8b5cf6',
-                              background: '#8b5cf6',
-                              color: '#fff',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              cursor: 'pointer'
-                            }}
+                            style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #c4b5fd', background: '#faf5ff', color: '#7c3aed', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                           >
-                            Upload Receipt
+                            Receipt
                           </button>
                         )}
                         {isAdmin && (
                           <button
+                            title="Delete"
                             onClick={() => setDeletingPO(po)}
-                            style={{
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '6px',
-                              border: '1px solid #dc2626',
-                              background: '#dc2626',
-                              color: '#fff',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              cursor: 'pointer'
-                            }}
+                            style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #fca5a5', background: '#fff1f2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                           >
                             Delete
                           </button>

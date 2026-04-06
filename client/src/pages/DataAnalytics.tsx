@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { API_URL } from '../config/api'
 import { fetchWithAuth } from '../utils/apiClient'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, Users, FolderOpen, Building2, Wallet, Package, Percent, Clock, Target, Activity } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Users, FolderOpen, Building2, Wallet, Package, Percent, Clock, Target, Activity, BarChart3, PieChart as PieChartIcon } from 'lucide-react'
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
@@ -229,16 +229,19 @@ export default function DataAnalytics() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28, color: 'var(--text-main)' }}>Data Analytics</h1>
-          <p style={{ margin: '8px 0 0', color: '#666' }}>Comprehensive business insights and trends</p>
-        </div>
-        
+    <div style={{ padding: 24, maxWidth: '100%', position: 'relative' }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+        <TrendingUp size={520} strokeWidth={0.7} style={{ position: 'absolute', right: -120, top: -80, opacity: 0.13, color: 'var(--primary)', transform: 'rotate(-12deg)' }} />
+        <BarChart3 size={380} strokeWidth={0.7} style={{ position: 'absolute', left: -60, bottom: -40, opacity: 0.11, color: 'var(--primary)', transform: 'rotate(10deg)' }} />
+        <Activity size={300} strokeWidth={0.7} style={{ position: 'absolute', left: '38%', top: '30%', opacity: 0.07, color: 'var(--primary)', transform: 'translateX(-50%)' }} />
+        <PieChartIcon size={200} strokeWidth={0.7} style={{ position: 'absolute', left: '5%', top: '5%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(-6deg)' }} />
+        <DollarSign size={220} strokeWidth={0.7} style={{ position: 'absolute', right: '4%', top: '35%', opacity: 0.08, color: 'var(--primary)', transform: 'rotate(-8deg)' }} />
+        <Target size={240} strokeWidth={0.7} style={{ position: 'absolute', right: '6%', bottom: '8%', opacity: 0.09, color: 'var(--primary)', transform: 'rotate(6deg)' }} />
+        <TrendingDown size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.07, color: 'var(--primary)' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
         {/* Period Selector */}
-        <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.5)', padding: 4, borderRadius: 12, border: '1px solid #e0e0e0' }}>
+        <div style={{ display: 'flex', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)' }}>
           {(['daily', 'weekly', 'monthly', 'yearly'] as TimePeriod[]).map(p => (
             <button
               key={p}

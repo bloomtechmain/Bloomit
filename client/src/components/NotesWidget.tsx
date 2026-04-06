@@ -266,121 +266,91 @@ export default function NotesWidget({ userId, accessToken }: { userId: number; a
   return (
     <div className="glass-card" style={{ padding: 24, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <StickyNote size={24} color="var(--primary)" />
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Notes</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <StickyNote size={16} color="#fbbf24" />
+          </div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Notes</h2>
         </div>
         {!isAdding && (
-          <button 
+          <button
             onClick={() => setIsAdding(true)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 6, 
-              padding: '8px 16px', 
-              borderRadius: 8, 
-              background: 'var(--primary)', 
-              color: '#fff', 
-              border: 'none', 
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '13px' }}
           >
-            <Plus size={16} /> Add Note
+            <Plus size={14} /> Add Note
           </button>
         )}
       </div>
 
       {isAdding ? (
-        // Inline form view with dark blue styling
-        <div style={{ 
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)', 
-          borderRadius: 12, 
-          padding: 24,
+        <div style={{
+          background: 'var(--surface-2)',
+          borderRadius: 12,
+          padding: 20,
+          border: '1px solid var(--border)',
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto'
         }}>
-          <h3 style={{ marginTop: 0, color: '#ff6b3d', fontSize: 18, fontWeight: 700 }}>
+          <h3 style={{ marginTop: 0, color: 'var(--text-main)', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
             {editingNote ? 'Edit Note' : 'New Note'}
           </h3>
-          <div style={{ display: 'grid', gap: 16, flex: 1 }}>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Title *</span>
-              <input 
+          <div style={{ display: 'grid', gap: 14, flex: 1 }}>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Title *</span>
+              <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Note title"
-                style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff' }}
                 autoFocus
               />
             </label>
-            <label style={{ display: 'grid', gap: 6, flex: 1 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Content</span>
+            <label style={{ display: 'grid', gap: 5, flex: 1 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Content</span>
               <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder="Note content..."
-                style={{ padding: '10px 12px', borderRadius: 8, border: 'none', background: '#fff', resize: 'vertical', minHeight: 100, flex: 1 }}
+                style={{ minHeight: 90, resize: 'vertical' }}
               />
             </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ fontWeight: 500, color: '#fff' }}>Color</span>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Color</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 {noteColors.map(c => (
                   <button
                     key={c}
                     onClick={() => setColor(c)}
-                    style={{ 
-                      width: 40, 
-                      height: 40, 
-                      borderRadius: 8, 
-                      background: c, 
-                      border: color === c ? '3px solid #fff' : '1px solid rgba(255,255,255,0.3)',
-                      cursor: 'pointer'
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: c,
+                      border: color === c ? '3px solid #1e293b' : '1.5px solid rgba(0,0,0,0.12)',
+                      cursor: 'pointer',
+                      padding: 0
                     }}
                   />
                 ))}
               </div>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input 
+              <input
                 type="checkbox"
                 checked={isPinned}
                 onChange={e => setIsPinned(e.target.checked)}
-                style={{ width: 18, height: 18 }}
+                style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontWeight: 500, color: '#fff' }}>Pin this note</span>
+              <span style={{ fontWeight: 500, color: 'var(--text-main)', fontSize: 13 }}>Pin this note</span>
             </label>
           </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
-            <button 
-              onClick={resetForm} 
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'rgba(255,255,255,0.2)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
+          <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+            <button onClick={resetForm} className="btn-secondary" style={{ padding: '8px 18px', fontSize: 13 }}>
               Cancel
             </button>
-            <button 
-              onClick={handleSave}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
+            <button onClick={handleSave} className="btn-primary" style={{ padding: '8px 18px', fontSize: 13 }}>
               {editingNote ? 'Update' : 'Save'}
             </button>
           </div>
@@ -456,9 +426,9 @@ export default function NotesWidget({ userId, accessToken }: { userId: number; a
             </div>
           ))}
           {notes.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', gridColumn: '1 / -1', color: '#999' }}>
-              <StickyNote size={48} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-              <p>No notes yet. Click "Add Note" to create one!</p>
+            <div style={{ padding: 40, textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+              <StickyNote size={40} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+              <p style={{ margin: 0, fontSize: 13 }}>No notes yet. Click "Add Note" to create one!</p>
             </div>
           )}
         </div>
