@@ -21,80 +21,76 @@ export async function ensureRailwayAdmin(): Promise<void> {
   try {
     logger.system('🔍 Checking for Railway admin user...');
 
-    // Check if admin already exists
+    // Get or create admin user
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [adminEmail]
     );
 
+    let userId: number;
+
     if (existingUser.rows.length > 0) {
-      logger.system(`✅ Admin user ${adminEmail} already exists`);
-      return;
+      userId = existingUser.rows[0].id;
+      logger.system(`✅ Admin user ${adminEmail} exists (ID: ${userId})`);
+    } else {
+      logger.system('🔄 Admin user not found, creating...');
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const userResult = await pool.query(
+        `INSERT INTO users (name, email, password_hash, password_must_change)
+         VALUES ($1, $2, $3, FALSE)
+         RETURNING id`,
+        [adminName, adminEmail, passwordHash]
+      );
+      userId = userResult.rows[0].id;
+      logger.system(`✅ Created admin user: ${adminEmail} (ID: ${userId})`);
     }
 
-    logger.system('🔄 Admin user not found, creating...');
-
-    // Hash the password
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
-
-    // Insert admin user
-    const userResult = await pool.query(
-      `INSERT INTO users (name, email, password_hash, password_must_change)
-       VALUES ($1, $2, $3, FALSE)
-       RETURNING id`,
-      [adminName, adminEmail, passwordHash]
-    );
-
-    const userId = userResult.rows[0].id;
-    logger.system(`✅ Created admin user: ${adminEmail} (ID: ${userId})`);
-
-    // Get or create Admin role
+    // Get or create Super Admin role
     let roleResult = await pool.query(
       'SELECT id FROM roles WHERE name = $1',
-      ['Admin']
+      ['Super Admin']
     );
 
-    let adminRoleId: number;
+    let superAdminRoleId: number;
 
     if (roleResult.rows.length === 0) {
-      // Create Admin role if it doesn't exist
-      logger.system('Creating Admin role...');
+      logger.system('Creating Super Admin role...');
       const newRole = await pool.query(
-        `INSERT INTO roles (name, description)
-         VALUES ($1, $2)
+        `INSERT INTO roles (name, description, is_system_role)
+         VALUES ($1, $2, TRUE)
          RETURNING id`,
-        ['Admin', 'Full system administrator with all permissions']
+        ['Super Admin', 'Full unrestricted system access']
       );
-      adminRoleId = newRole.rows[0].id;
-      logger.system(`✅ Created Admin role (ID: ${adminRoleId})`);
+      superAdminRoleId = newRole.rows[0].id;
+      logger.system(`✅ Created Super Admin role (ID: ${superAdminRoleId})`);
     } else {
-      adminRoleId = roleResult.rows[0].id;
-      logger.system(`✅ Found existing Admin role (ID: ${adminRoleId})`);
+      superAdminRoleId = roleResult.rows[0].id;
+      logger.system(`✅ Found existing Super Admin role (ID: ${superAdminRoleId})`);
     }
 
-    // Assign Admin role to user
+    // Assign Super Admin role to user (safe to run every startup)
     await pool.query(
       `INSERT INTO user_roles (user_id, role_id)
        VALUES ($1, $2)
        ON CONFLICT (user_id, role_id) DO NOTHING`,
-      [userId, adminRoleId]
+      [userId, superAdminRoleId]
     );
 
-    logger.system(`✅ Assigned Admin role to user ${adminEmail}`);
+    logger.system(`✅ Assigned Super Admin role to user ${adminEmail}`);
 
-    // Grant all permissions to Admin role (if permissions exist)
+    // Grant all permissions to Super Admin role
     const permissionsResult = await pool.query('SELECT id FROM permissions');
-    
+
     if (permissionsResult.rows.length > 0) {
       for (const perm of permissionsResult.rows) {
         await pool.query(
           `INSERT INTO role_permissions (role_id, permission_id)
            VALUES ($1, $2)
            ON CONFLICT (role_id, permission_id) DO NOTHING`,
-          [adminRoleId, perm.id]
+          [superAdminRoleId, perm.id]
         );
       }
-      logger.system(`✅ Granted ${permissionsResult.rows.length} permissions to Admin role`);
+      logger.system(`✅ Granted ${permissionsResult.rows.length} permissions to Super Admin role`);
     }
 
     logger.system('═══════════════════════════════════════════════════════');
