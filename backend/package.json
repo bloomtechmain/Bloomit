@@ -35,7 +35,8 @@
     "db:setup-multitenancy": "ts-node src/scripts/setup-multitenancy.ts",
     "db:create-tenants-example": "ts-node src/scripts/create-tenants-example.ts",
     "migrate:marketing-columns": "ts-node src/scripts/addMarketingColumns.ts",
-    "fresh-start": "ts-node src/scripts/freshStart.ts"
+    "fresh-start": "ts-node src/scripts/freshStart.ts",
+    "setup:bloomtech": "ts-node src/scripts/setupBloomtech.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
