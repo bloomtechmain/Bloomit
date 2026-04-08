@@ -3,6 +3,33 @@ import { pool } from '../db'
 async function main() {
   console.log('🔧 Creating RBAC tables...')
 
+  // Create users table with full schema (must exist before roles FK references it)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id                   SERIAL PRIMARY KEY,
+      name                 TEXT NOT NULL,
+      email                TEXT UNIQUE NOT NULL,
+      password_hash        TEXT NOT NULL,
+      role                 TEXT DEFAULT 'user',
+      role_id              INTEGER,
+      tenant_id            INTEGER,
+      source               VARCHAR(50) DEFAULT NULL,
+      password_must_change BOOLEAN DEFAULT FALSE,
+      account_status       VARCHAR(20) DEFAULT 'active',
+      created_at           TIMESTAMP DEFAULT now()
+    );
+  `)
+  // Patch existing users tables that may be missing columns
+  await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS role_id              INTEGER,
+      ADD COLUMN IF NOT EXISTS tenant_id            INTEGER,
+      ADD COLUMN IF NOT EXISTS source               VARCHAR(50) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS password_must_change BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS account_status       VARCHAR(20) DEFAULT 'active';
+  `)
+  console.log('✅ Users table ready')
+
   // Create roles table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS roles (
