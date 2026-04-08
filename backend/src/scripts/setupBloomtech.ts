@@ -171,6 +171,15 @@ async function setup() {
         created_at          TIMESTAMP DEFAULT now()
       );
     `)
+    // Patch existing tables that may be missing columns
+    await client.query(`
+      ALTER TABLE public.users
+        ADD COLUMN IF NOT EXISTS role_id             INTEGER,
+        ADD COLUMN IF NOT EXISTS tenant_id           INTEGER,
+        ADD COLUMN IF NOT EXISTS source              VARCHAR(50) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS password_must_change BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS account_status      VARCHAR(20) DEFAULT 'active';
+    `)
     console.log('   ✅ public.users ready')
 
     // ── 2. Tenants ────────────────────────────────────────────────────────────
