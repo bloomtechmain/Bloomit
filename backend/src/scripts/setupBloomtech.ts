@@ -206,11 +206,32 @@ async function setup() {
         name          VARCHAR(50) NOT NULL,
         description   TEXT,
         is_system_role BOOLEAN DEFAULT FALSE,
-        tenant_id     INTEGER REFERENCES public.tenants(id) ON DELETE CASCADE,
+        tenant_id     INTEGER,
         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (name, tenant_id)
+        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `)
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='roles' AND column_name='tenant_id'
+        ) THEN
+          ALTER TABLE public.roles ADD COLUMN tenant_id INTEGER;
+        END IF;
+      END $$;
+    `)
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_roles_tenant'
+        ) THEN
+          ALTER TABLE public.roles
+            ADD CONSTRAINT fk_roles_tenant
+            FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
     `)
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.permissions (
