@@ -11,6 +11,10 @@ import path from 'path';
 // Prevent individual scripts from closing the shared pool during init
 ;(pool as any).end = () => Promise.resolve();
 
+// Prevent individual scripts from killing the process during init
+const _originalExit = process.exit.bind(process);
+(process as any).exit = () => { /* suppressed during init */ };
+
 async function runSqlFile(filePath: string): Promise<void> {
   console.log(`\n📄 Executing SQL file: ${path.basename(filePath)}`);
   const sql = fs.readFileSync(filePath, 'utf8');
@@ -219,11 +223,11 @@ if (require.main === module) {
   initRailwayDatabase()
     .then(() => {
       console.log('✅ Done!');
-      process.exit(0);
+      _originalExit(0);
     })
     .catch((err) => {
       console.error('❌ Failed:', err);
-      process.exit(1);
+      _originalExit(1);
     });
 }
 
