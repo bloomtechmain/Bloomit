@@ -8,6 +8,9 @@ import path from 'path';
  * Does NOT import any data - only creates tables and schema
  */
 
+// Prevent individual scripts from closing the shared pool during init
+;(pool as any).end = () => Promise.resolve();
+
 async function runSqlFile(filePath: string): Promise<void> {
   console.log(`\n📄 Executing SQL file: ${path.basename(filePath)}`);
   const sql = fs.readFileSync(filePath, 'utf8');
