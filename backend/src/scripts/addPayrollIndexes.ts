@@ -81,17 +81,27 @@ async function addPayrollIndexes() {
     `)
     console.log('✓ Created index on employees.employee_department')
 
-    // Index on epf_enabled for quick filtering
+    // Index on epf_enabled for quick filtering (only if column exists)
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_employees_epf_enabled 
-      ON employees(epf_enabled)
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='epf_enabled') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='employees' AND indexname='idx_employees_epf_enabled') THEN
+            CREATE INDEX idx_employees_epf_enabled ON employees(epf_enabled);
+          END IF;
+        END IF;
+      END $$
     `)
     console.log('✓ Created index on employees.epf_enabled')
 
-    // Index on etf_enabled for quick filtering
+    // Index on etf_enabled for quick filtering (only if column exists)
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_employees_etf_enabled 
-      ON employees(etf_enabled)
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='employees' AND column_name='etf_enabled') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='employees' AND indexname='idx_employees_etf_enabled') THEN
+            CREATE INDEX idx_employees_etf_enabled ON employees(etf_enabled);
+          END IF;
+        END IF;
+      END $$
     `)
     console.log('✓ Created index on employees.etf_enabled')
 
@@ -126,4 +136,8 @@ async function addPayrollIndexes() {
   }
 }
 
-addPayrollIndexes()
+if (require.main === module) {
+  addPayrollIndexes()
+    .then(() => process.exit(0))
+    .catch((e) => { console.error(e); process.exit(1) })
+}

@@ -267,9 +267,29 @@ CREATE TABLE IF NOT EXISTS employees (
     designation VARCHAR(150),
     employee_department VARCHAR(100),
     tax VARCHAR(100),
+    hire_date DATE,
+    manager_id INTEGER,
     user_id INTEGER,
     tenant_id INTEGER,
     is_active BOOLEAN DEFAULT TRUE,
+
+    -- Payroll
+    base_salary DECIMAL(12,2) DEFAULT 0,
+    allowances JSONB DEFAULT '{}',
+    epf_enabled BOOLEAN DEFAULT TRUE,
+    epf_contribution_rate DECIMAL(5,2) DEFAULT 8.00,
+    etf_enabled BOOLEAN DEFAULT TRUE,
+    pto_allowance INTEGER DEFAULT 20,
+
+    -- Bank details
+    bank_name VARCHAR(100),
+    bank_account_number VARCHAR(50),
+    bank_branch VARCHAR(100),
+
+    -- Emergency contact
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_relationship VARCHAR(50),
+    emergency_contact_phone VARCHAR(20),
 
     -- Suspension tracking
     suspended_at TIMESTAMP,
@@ -282,8 +302,26 @@ CREATE TABLE IF NOT EXISTS employees (
     terminated_reason TEXT,
     scheduled_purge_date DATE,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Patch existing employees tables missing the new columns
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS hire_date DATE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS manager_id INTEGER;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS base_salary DECIMAL(12,2) DEFAULT 0;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '{}';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS epf_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS epf_contribution_rate DECIMAL(5,2) DEFAULT 8.00;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS etf_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS pto_allowance INTEGER DEFAULT 20;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(50);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact_relationship VARCHAR(50);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_employees_scheduled_purge
     ON employees(scheduled_purge_date)
