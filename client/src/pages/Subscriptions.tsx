@@ -139,7 +139,7 @@ export default function Subscriptions() {
 
       {/* Summary stat cards */}
       {!loading && subscriptions.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))', gap: 12 }}>
           {[
             { label: 'Active', value: stats.active, icon: <Calendar size={18} color="#063062" />, bg: 'rgba(6,48,98,0.06)', color: '#063062' },
             { label: 'Monthly Total', value: `$${stats.monthlyTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: <DollarSign size={18} color="#0ea5e9" />, bg: 'rgba(14,165,233,0.07)', color: '#0369a1' },

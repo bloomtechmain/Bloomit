@@ -8,7 +8,10 @@
       "Bash(do:*)",
       "Bash(npm run:*)",
       "Bash(awk NR>=2540 && NR<=2570:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(find C:\\\\Users\\\\Onyx\\\\Documents\\\\New folder\\\\New folder \\(3\\)\\\\Bloomtech_ERP:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)"
     ]
   }
 }

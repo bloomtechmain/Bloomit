@@ -59,8 +59,8 @@ const toDateStr = (d: Date) =>
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
 const inputStyle: React.CSSProperties = {
-  fontSize: 11, padding: '5px 9px', borderRadius: 6,
-  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)',
+  fontSize: 11, padding: '6px 10px', borderRadius: 7,
+  background: '#f8fafc', border: '1px solid rgba(15,23,42,0.12)',
   color: 'var(--text-main)', outline: 'none', width: '100%', boxSizing: 'border-box',
 }
 
@@ -179,39 +179,39 @@ export default function CalendarWidget() {
     <div className="glass-card" style={{ display: 'flex', overflow: 'hidden', height: 370, fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif" }}>
 
       {/* ── LEFT: Calendar Grid ── */}
-      <div style={{ flex: '0 0 54%', padding: '12px 10px 10px 14px', borderRight: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: '0 0 54%', padding: '12px 10px 10px 14px', borderRight: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
 
         {/* View switcher + Today */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ display: 'flex', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderRadius: 7, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', background: 'rgba(0,0,0,0.02)' }}>
             {(['Day', 'Week', 'Month', 'Year'] as const).map((v, i, arr) => (
               <button key={v} style={{
                 padding: '3px 8px', fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer',
-                borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.09)' : 'none',
-                background: v === 'Month' ? 'var(--text-main)' : 'transparent',
-                color: v === 'Month' ? 'var(--surface-3, #0a1628)' : 'var(--text-secondary)',
+                borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none',
+                background: v === 'Month' ? '#1e293b' : 'transparent',
+                color: v === 'Month' ? '#ffffff' : 'var(--text-secondary)',
               }}>{v}</button>
             ))}
           </div>
           <button
             onClick={() => { const t = new Date(); setCurrentDate(new Date(t.getFullYear(), t.getMonth(), 1)); setSelectedDate(t) }}
-            style={{ padding: '3px 9px', fontSize: 10, fontWeight: 600, borderRadius: 5, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            style={{ padding: '3px 10px', fontSize: 10, fontWeight: 600, borderRadius: 6, border: '1px solid rgba(0,0,0,0.10)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
           >Today</button>
         </div>
 
         {/* Month nav */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 10 }}>
           <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: 3, borderRadius: 4 }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: 3, borderRadius: 5 }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.06)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
           ><ChevronLeft size={13} /></button>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', letterSpacing: '1.2px' }}>
             {monthLabel} {year}
           </span>
           <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: 3, borderRadius: 4 }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: 3, borderRadius: 5 }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.06)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
           ><ChevronRight size={13} /></button>
         </div>
@@ -219,7 +219,7 @@ export default function CalendarWidget() {
         {/* Day headers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 2 }}>
           {DAY_HEADERS.map((d, i) => (
-            <div key={d} style={{ textAlign: 'center', fontSize: 8, fontWeight: 700, letterSpacing: '0.3px', padding: '1px 0', color: i === 6 ? 'rgba(248,113,113,0.60)' : 'var(--text-muted)' }}>{d}</div>
+            <div key={d} style={{ textAlign: 'center', fontSize: 8, fontWeight: 700, letterSpacing: '0.3px', padding: '1px 0', color: i === 6 ? 'rgba(248,113,113,0.70)' : 'var(--text-muted)' }}>{d}</div>
           ))}
         </div>
 
@@ -235,8 +235,8 @@ export default function CalendarWidget() {
             let bg        = 'transparent'
             let textColor = isSun ? '#f87171' : 'var(--text-main)'
             let fw        = 400
-            if (selected) { bg = 'var(--text-main)'; textColor = 'var(--surface-3, #0a1628)'; fw = 700 }
-            else if (today) { bg = 'rgba(255,255,255,0.12)'; fw = 600 }
+            if (selected) { bg = '#1e293b'; textColor = '#ffffff'; fw = 700 }
+            else if (today) { bg = 'var(--today-bg, rgba(15,23,42,0.10))'; fw = 600 }
 
             return (
               <div key={i} onClick={() => setSelectedDate(d)}
@@ -244,11 +244,11 @@ export default function CalendarWidget() {
               >
                 <div
                   style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, fontSize: 11, fontWeight: fw, color: textColor, transition: 'background 0.12s' }}
-                  onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.09)' }}
-                  onMouseLeave={e => { if (!selected) e.currentTarget.style.background = today ? 'rgba(255,255,255,0.12)' : 'transparent' }}
+                  onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(0,0,0,0.06)' }}
+                  onMouseLeave={e => { if (!selected) e.currentTarget.style.background = today ? 'var(--today-bg, rgba(15,23,42,0.10))' : 'transparent' }}
                 >{d.getDate()}</div>
                 <div style={{ height: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {hasAct && <div style={{ width: 3, height: 3, borderRadius: '50%', background: selected ? 'rgba(255,255,255,0.4)' : '#60a5fa', opacity: 0.8 }} />}
+                  {hasAct && <div style={{ width: 3, height: 3, borderRadius: '50%', background: selected ? 'rgba(255,255,255,0.6)' : '#60a5fa', opacity: 0.9 }} />}
                 </div>
               </div>
             )
@@ -262,13 +262,13 @@ export default function CalendarWidget() {
         {/* Selected date */}
         <div style={{ flexShrink: 0, marginBottom: 8 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.5px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {selDayNum} <span style={{ opacity: 0.60 }}>{selMonthStr}</span>
+            {selDayNum} <span style={{ opacity: 0.50 }}>{selMonthStr}</span>
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 400, marginTop: 2, letterSpacing: '0.2px' }}>{selWeekday}</div>
         </div>
 
         {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', flexShrink: 0, marginBottom: 8 }} />
+        <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', flexShrink: 0, marginBottom: 8 }} />
 
         {/* 3 Tab toggles */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexShrink: 0 }}>
@@ -277,9 +277,9 @@ export default function CalendarWidget() {
               onClick={() => { setActiveTab(key); cancelForms() }}
               style={{
                 padding: '3px 9px', fontSize: 10, fontWeight: 600, borderRadius: 20, cursor: 'pointer', transition: 'all 0.12s',
-                border: '1px solid rgba(255,255,255,0.09)',
-                background: activeTab === key ? 'var(--text-main)' : 'transparent',
-                color: activeTab === key ? 'var(--surface-3, #0a1628)' : 'var(--text-secondary)',
+                border: '1px solid rgba(0,0,0,0.09)',
+                background: activeTab === key ? '#1e293b' : 'transparent',
+                color: activeTab === key ? '#ffffff' : 'var(--text-secondary)',
               }}
             >{label}</button>
           ))}
@@ -298,7 +298,7 @@ export default function CalendarWidget() {
             {eventsForDate(selectedDate).map((evt, idx) => {
               const c = evt.type === 'holiday' ? HOLIDAY_COLOR : EVENT_COLORS[idx % EVENT_COLORS.length]
               return (
-                <div key={evt.id} style={{ padding: '6px 9px', borderRadius: 7, background: c.bg, border: `1px solid ${c.border}`, borderLeft: `2px solid ${c.accent}`, position: 'relative', flexShrink: 0 }}>
+                <div key={evt.id} style={{ padding: '6px 9px', borderRadius: 8, background: c.bg, border: `1px solid ${c.border}`, borderLeft: `3px solid ${c.accent}`, position: 'relative', flexShrink: 0 }}>
                   <div style={{ fontSize: 8, fontWeight: 700, color: c.accent, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 1 }}>
                     {evt.type === 'holiday' ? 'Holiday' : 'Event'}
                   </div>
@@ -343,7 +343,7 @@ export default function CalendarWidget() {
               const isHoliday = 'type' in item && item.type === 'holiday'
               const label = isHoliday ? item.name : (item as Reminder).text
               return (
-                <div key={idx} style={{ padding: '6px 9px', borderRadius: 7, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)', borderLeft: '2px solid #a78bfa', position: 'relative', flexShrink: 0 }}>
+                <div key={idx} style={{ padding: '6px 9px', borderRadius: 8, background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.18)', borderLeft: '3px solid #a78bfa', position: 'relative', flexShrink: 0 }}>
                   <div style={{ fontSize: 8, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 1 }}>
                     {isHoliday ? 'Holiday' : 'Reminder'}
                   </div>
@@ -381,7 +381,7 @@ export default function CalendarWidget() {
             {pendingTodos.map(todo => {
               const pc = PRIORITY[todo.priority]
               return (
-                <div key={todo.id} style={{ padding: '5px 8px', borderRadius: 7, background: pc.bg, border: `1px solid ${pc.border}`, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div key={todo.id} style={{ padding: '5px 8px', borderRadius: 8, background: pc.bg, border: `1px solid ${pc.border}`, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: pc.dot, padding: 0, display: 'flex', flexShrink: 0 }}>
                     <Circle size={12} />
                   </button>
@@ -397,7 +397,7 @@ export default function CalendarWidget() {
               <div style={{ fontSize: 8, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px', textTransform: 'uppercase', marginTop: 3, flexShrink: 0 }}>Done</div>
             )}
             {doneTodos.map(todo => (
-              <div key={todo.id} style={{ padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6, opacity: 0.5, flexShrink: 0 }}>
+              <div key={todo.id} style={{ padding: '5px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 6, opacity: 0.5, flexShrink: 0 }}>
                 <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
                   <CheckCircle2 size={12} color="#4ade80" />
                 </button>
@@ -444,11 +444,11 @@ export default function CalendarWidget() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               width: '100%', padding: '5px', borderRadius: 7, marginTop: 7, flexShrink: 0,
-              border: '1px dashed rgba(255,255,255,0.15)', background: 'transparent',
+              border: '1px dashed rgba(0,0,0,0.15)', background: 'transparent',
               color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.28)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(0,0,0,0.02)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.15)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' }}
           >
             <Plus size={11} />
             {activeTab === 'events' ? 'Add Event' : activeTab === 'reminders' ? 'Add Reminder' : 'Add Task'}

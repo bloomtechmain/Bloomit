@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { API_URL } from '../config/api'
 import { hasPermission, hasAnyPermission } from '../utils/permissions'
-import CalendarWidget from '../components/CalendarWidget'
-import NotesWidget from '../components/NotesWidget'
-import TodosWidget from '../components/TodosWidget'
+import HomeProductivityWidget from '../components/HomeProductivityWidget'
 import SystemClock from '../components/SystemClock'
 import InternationalClock from '../components/InternationalClock'
 import { ProcessFlowGuidance } from '../components/ProcessFlowGuidance'
@@ -18,9 +16,33 @@ import QuoteGenerator from './QuoteGenerator'
 import PurchaseOrders from './PurchaseOrders'
 import Payroll from './Payroll'
 import Loans from './Loans'
-import { LayoutDashboard, Users, ClipboardList, Store, FolderOpen, Banknote, Landmark, Receipt, Coins, Inbox, Plus, PlusCircle, CreditCard, Building2, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Settings as SettingsIcon, Clock, Calendar, Repeat, FileText, FileSignature, ShoppingCart, DollarSign, TrendingDown, TrendingUp, LogOut, UserCheck, Briefcase, Award, User, Mail, Phone, MapPin, Hash, CheckCircle, Pencil, Trash2 } from 'lucide-react'
+import { LayoutDashboard, Users, ClipboardList, Store, FolderOpen, Banknote, Landmark, Receipt, Coins, Inbox, Plus, PlusCircle, CreditCard, Building2, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Settings as SettingsIcon, Clock, Calendar, Repeat, FileText, FileSignature, ShoppingCart, DollarSign, TrendingDown, TrendingUp, LogOut, UserCheck, Briefcase, Award, User, Mail, Phone, MapPin, Hash, CheckCircle, Pencil, Trash2, X, Scale, Menu } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
+import { useWindowSize } from '../hooks/useWindowSize'
+
+const ASSET_INPUT: React.CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1.5px solid #e2e8f0',
+  background: '#f8fafc',
+  fontSize: 13.5,
+  color: '#1e293b',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+  transition: 'all 0.2s',
+}
+function assetFocusIn(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) {
+  e.target.style.borderColor = '#2563eb'
+  e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
+}
+function assetFocusOut(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
 
 type User = { 
   id: number
@@ -173,7 +195,9 @@ export default function Dashboard({
   const { toast } = useToast()
   const confirm = useConfirm()
   const [tab, setTab] = useState<'home' | 'employees' | 'projects' | 'accounting' | 'analytics' | 'documents' | 'quotes' | 'settings'>('home')
+  const { isMobile } = useWindowSize()
   const [navOpen, setNavOpen] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [projectSubTab, setProjectSubTab] = useState<'projects' | 'time' | 'quotes'>('projects')
   const [addOpen, setAddOpen] = useState(false)
   const [addBtnPop, setAddBtnPop] = useState(false)
@@ -1506,8 +1530,18 @@ export default function Dashboard({
   }
 
   return (
-    <div style={{ height: '100vh', width: '100%', padding: '10px', boxSizing: 'border-box', display: 'grid', gridTemplateRows: '56px 1fr', background: 'transparent', color: 'var(--text-main)', overflow: 'hidden', borderRadius: '18px', gap: '10px' }}>
+    <div className="erp-root" style={{ height: '100vh', width: '100%', padding: '10px', boxSizing: 'border-box', display: 'grid', gridTemplateRows: '56px 1fr', background: 'transparent', color: 'var(--text-main)', overflow: 'hidden', borderRadius: '18px', gap: '10px' }}>
       <header className="glass-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', gap: 16, zIndex: 101, flexShrink: 0, borderRadius: '14px' }}>
+
+        {/* ── Hamburger (mobile only) ── */}
+        {isMobile && (
+          <button
+            onClick={() => setMobileNavOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: '#f0f6ff', cursor: 'pointer', flexShrink: 0 }}
+          >
+            {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        )}
 
         {/* ── Brand ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
@@ -1572,14 +1606,14 @@ export default function Dashboard({
             }}>
               {user.name.split(' ').map((n: string) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()}
             </div>
-            <div style={{ lineHeight: 1 }}>
+            {!isMobile && <div style={{ lineHeight: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f6ff', marginBottom: 2 }}>
                 {user.name}
               </div>
               <div style={{ fontSize: 10, color: '#4a6fa5', fontWeight: 500 }}>
                 {user.roleName || 'No Role'}
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* Logout button */}
@@ -1610,12 +1644,19 @@ export default function Dashboard({
             }}
           >
             <LogOut size={14} />
-            Logout
+            {!isMobile && 'Logout'}
           </button>
         </div>
       </header>
-      <main style={{ height: '100%', padding: 0, display: 'flex', overflow: 'hidden', borderRadius: 0, gap: '10px' }}>
-        <aside className="glass-sidebar" style={{ width: navOpen ? 240 : 64, transition: 'width 0.25s ease', height: '100%', display: 'flex', flexDirection: 'column', padding: '8px', gap: 1, flexShrink: 0, overflowX: 'hidden', borderRadius: '14px' }}>
+      <main style={{ height: '100%', padding: 0, display: 'flex', overflow: 'hidden', borderRadius: 0, gap: '10px', position: 'relative' }}>
+        {/* Mobile backdrop */}
+        {isMobile && (
+          <div
+            className={`mob-sidebar-backdrop${mobileNavOpen ? ' mob-open' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+        <aside className={`glass-sidebar${isMobile && mobileNavOpen ? ' mob-open' : ''}`} style={{ width: isMobile ? 240 : (navOpen ? 240 : 64), transition: isMobile ? undefined : 'width 0.25s ease', height: '100%', display: isMobile ? undefined : 'flex', flexDirection: 'column', padding: '8px', gap: 1, flexShrink: 0, overflowX: 'hidden', borderRadius: isMobile ? undefined : '14px' }}>
 
           {/* ── Decorative background icons ── */}
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 0 }}>
@@ -1629,7 +1670,7 @@ export default function Dashboard({
 
           {/* ── HOME ── */}
           <button
-            onClick={() => setTab('home')}
+            onClick={() => { setTab('home'); setMobileNavOpen(false) }}
             title="Home"
             className={`nav-item${tab === 'home' ? ' nav-item-active' : ''}`}
             style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}
@@ -1645,7 +1686,7 @@ export default function Dashboard({
           ]) && (<>
             {navOpen && <div className="nav-section-label">Workforce</div>}
             <div
-              onClick={() => setTab('employees')}
+              onClick={() => { setTab('employees'); setMobileNavOpen(false) }}
               className={`nav-section-item${tab === 'employees' ? ' nav-section-item-active' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', gap: 10, width: '100%', color: tab === 'employees' ? '#f0f6ff' : '#7aa3d4', fontSize: '0.875rem', fontWeight: 500, justifyContent: navOpen ? 'flex-start' : 'center' }}>
@@ -1674,7 +1715,7 @@ export default function Dashboard({
           {hasPermission(user, 'projects', 'read') && (<>
             {navOpen && <div className="nav-section-label">Projects</div>}
             <div
-              onClick={() => setTab('projects')}
+              onClick={() => { setTab('projects'); setMobileNavOpen(false) }}
               className={`nav-section-item${tab === 'projects' ? ' nav-section-item-active' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', gap: 10, width: '100%', color: tab === 'projects' ? '#f0f6ff' : '#7aa3d4', fontSize: '0.875rem', fontWeight: 500, justifyContent: navOpen ? 'flex-start' : 'center' }}>
@@ -1711,7 +1752,7 @@ export default function Dashboard({
           ]) && (<>
             {navOpen && <div className="nav-section-label">Finance</div>}
             <div
-              onClick={() => setTab('accounting')}
+              onClick={() => { setTab('accounting'); setMobileNavOpen(false) }}
               className={`nav-section-item${tab === 'accounting' ? ' nav-section-item-active' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', gap: 10, width: '100%', color: tab === 'accounting' ? '#f0f6ff' : '#7aa3d4', fontSize: '0.875rem', fontWeight: 500, justifyContent: navOpen ? 'flex-start' : 'center' }}>
@@ -1755,121 +1796,101 @@ export default function Dashboard({
 
           {/* ── TOOLS ── */}
           {navOpen && <div className="nav-section-label">Tools</div>}
-          <button onClick={() => setTab('documents')} title="Document Bank" className={`nav-item${tab === 'documents' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
+          <button onClick={() => { setTab('documents'); setMobileNavOpen(false) }} title="Document Bank" className={`nav-item${tab === 'documents' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
             <FileText size={19} style={{ flexShrink: 0 }} />{navOpen && <span>Document Bank</span>}
           </button>
-          <button onClick={() => setTab('analytics')} title="Data Analytics" className={`nav-item${tab === 'analytics' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
+          <button onClick={() => { setTab('analytics'); setMobileNavOpen(false) }} title="Data Analytics" className={`nav-item${tab === 'analytics' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
             <BarChart3 size={19} style={{ flexShrink: 0 }} />{navOpen && <span>Data Analytics</span>}
           </button>
           {hasPermission(user, 'settings', 'manage') && (
-            <button onClick={() => setTab('settings')} title="Settings" className={`nav-item${tab === 'settings' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
+            <button onClick={() => { setTab('settings'); setMobileNavOpen(false) }} title="Settings" className={`nav-item${tab === 'settings' ? ' nav-item-active' : ''}`} style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}>
               <SettingsIcon size={19} style={{ flexShrink: 0 }} />{navOpen && <span>Settings</span>}
             </button>
           )}
 
-          {/* ── COLLAPSE TOGGLE ── */}
-          <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <button
-              onClick={() => setNavOpen(o => !o)}
-              title={navOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
-              className="nav-item"
-              style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}
-            >
-              {navOpen ? <ChevronLeft size={18} style={{ flexShrink: 0 }} /> : <ChevronRight size={18} style={{ flexShrink: 0 }} />}
-              {navOpen && <span>Collapse</span>}
-            </button>
-          </div>
-        </aside>
-        <section className="content-section" style={{ flex: 1, overflowY: 'auto', background: 'linear-gradient(180deg, #041525 0%, #0d1f3c 18%, #ffffff 100%)', borderRadius: '14px', border: 'none', padding: 24 }}>
-          {tab === 'home' && (
-            <div className="home-dark">
-
-              {/* ── Background animation layer ─────────────────────────── */}
-              <div className="home-anim-layer">
-                {/* Scrolling ledger grid */}
-                <div className="home-grid-scroll" />
-
-                {/* Ambient orbs */}
-                <div className="home-orb-blue" />
-                <div className="home-orb-indigo" />
-                <div className="home-orb-green" />
-
-                {/* Audit scan beam */}
-                <div className="home-scan-line" />
-
-                {/* Data nodes — financial chart data points */}
-                <div className="home-data-node"
-                  style={{ top: '18%', left: '11%' }} />
-                <div className="home-data-node home-data-node-green"
-                  style={{ top: '62%', left: '37%' }} />
-                <div className="home-data-node"
-                  style={{ top: '27%', left: '73%' }} />
-                <div className="home-data-node home-data-node-indigo"
-                  style={{ top: '78%', left: '56%' }} />
-                <div className="home-data-node"
-                  style={{ top: '10%', left: '86%' }} />
-                <div className="home-data-node home-data-node-green"
-                  style={{ top: '45%', left: '20%' }} />
-                <div className="home-data-node home-data-node-indigo"
-                  style={{ top: '33%', left: '52%' }} />
-
-                {/* Connection lines between nodes */}
-                <div className="home-connect-line"
-                  style={{ top: '18%', left: '11%', width: '26%', animationDelay: '0s' }} />
-                <div className="home-connect-line"
-                  style={{ top: '27%', left: '37%', width: '36%', animationDelay: '1.8s' }} />
-                <div className="home-connect-line"
-                  style={{ top: '45%', left: '20%', width: '32%', animationDelay: '3.2s' }} />
-                <div className="home-connect-line"
-                  style={{ top: '33%', left: '52%', width: '22%', animationDelay: '0.9s' }} />
-
-                {/* Floating financial numbers */}
-                <span className="home-float-num"
-                  style={{ left: '6%',  animationDuration: '22s', animationDelay: '0s'  }}>4,821.50</span>
-                <span className="home-float-num"
-                  style={{ left: '18%', animationDuration: '28s', animationDelay: '6s'  }}>97.3%</span>
-                <span className="home-float-num"
-                  style={{ left: '31%', animationDuration: '19s', animationDelay: '11s' }}>LKR 320,000</span>
-                <span className="home-float-num"
-                  style={{ left: '47%', animationDuration: '24s', animationDelay: '3s'  }}>↑ 8.2%</span>
-                <span className="home-float-num"
-                  style={{ left: '61%', animationDuration: '31s', animationDelay: '8s'  }}>12,400</span>
-                <span className="home-float-num"
-                  style={{ left: '74%', animationDuration: '20s', animationDelay: '15s' }}>99.1%</span>
-                <span className="home-float-num"
-                  style={{ left: '86%', animationDuration: '26s', animationDelay: '2s'  }}>↓ 1.4%</span>
-              </div>
-
-              {/* ── Page content (sits above animation layer via z-index) ── */}
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Overview</div>
-                  <div className="page-title-row">
-                    <LayoutDashboard size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Welcome to Bloom Audit</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Your command center — tasks, notes, and real-time system overview</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'start' }}>
-                {/* Left column - Notes and To-Do widgets */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                  <NotesWidget userId={user.id} accessToken={accessToken} />
-                  <TodosWidget userId={user.id} accessToken={accessToken} />
-                </div>
-
-                {/* Right column - Clocks and Calendar */}
-                <div style={{ minWidth: 320, maxWidth: 400, position: 'sticky', top: 24, display: 'grid', gap: 16 }}>
-                  <SystemClock />
-                  <InternationalClock timezone={internationalTimezone} />
-                  <CalendarWidget />
-                </div>
-              </div>
+          {/* ── COLLAPSE TOGGLE (desktop only) ── */}
+          {!isMobile && (
+            <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={() => setNavOpen(o => !o)}
+                title={navOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
+                className="nav-item"
+                style={{ justifyContent: navOpen ? 'flex-start' : 'center' }}
+              >
+                {navOpen ? <ChevronLeft size={18} style={{ flexShrink: 0 }} /> : <ChevronRight size={18} style={{ flexShrink: 0 }} />}
+                {navOpen && <span>Collapse</span>}
+              </button>
             </div>
           )}
+        </aside>
+        <section className="content-section" style={{ flex: 1, overflowY: tab === 'home' ? 'hidden' : 'auto', display: tab === 'home' ? 'flex' : 'block', flexDirection: 'column', background: tab === 'home' ? 'linear-gradient(160deg, #f0f4ff 0%, #f5f3ff 35%, #eff6ff 65%, #f0fdf8 100%)' : 'linear-gradient(180deg, #041525 0%, #0d1f3c 18%, #ffffff 100%)', borderRadius: '14px', border: 'none', padding: isMobile ? 10 : 24, position: 'relative' }}>
+          {tab === 'home' && (() => {
+            const hr = new Date().getHours()
+            const greeting = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening'
+            const displayName = user.name || user.email.split('@')[0]
+            const avatarLetter = (user.name || user.email).slice(0, 1).toUpperCase()
+            const roleList = user.roleNames && user.roleNames.length > 0 ? user.roleNames : user.roleName ? [user.roleName] : []
+            const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+            return (
+              <div className="home-light" style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minHeight: 0 }}>
+
+                {/* ── Hero Banner ── */}
+                <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: 16, padding: isMobile ? '14px 16px' : '18px 26px', position: 'relative', overflow: 'hidden', zIndex: 1, flexShrink: 0 }}>
+                  {/* Dot texture */}
+                  <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1.5px, transparent 1.5px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+                  {/* Ambient glow — top right */}
+                  <div style={{ position: 'absolute', top: -100, right: -80, width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.28) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                  {/* Ambient glow — bottom left */}
+                  <div style={{ position: 'absolute', bottom: -80, left: -60, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+                  <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                    {/* Left: avatar + greeting */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                      <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.14)', border: '2px solid rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}>
+                        {avatarLetter}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.50)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>{greeting}</div>
+                        <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', lineHeight: 1.1, marginBottom: 6 }}>{displayName}</div>
+                        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.50)' }}>Your command center — tasks, notes, and real-time overview</div>
+                      </div>
+                    </div>
+
+                    {/* Right: date + roles */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Calendar size={13} style={{ color: 'rgba(255,255,255,0.40)' }} />
+                        {dateLabel}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {roleList.map((r, i) => (
+                          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 11px', borderRadius: 99, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11.5, fontWeight: 700 }}>
+                            <LayoutDashboard size={10} style={{ opacity: 0.7 }} />{r}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.38)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <User size={11} style={{ opacity: 0.6 }} />{user.email}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Widgets ── */}
+                <div style={{ position: 'relative', zIndex: 1, borderRadius: 16, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ background: 'linear-gradient(160deg,#f5f3ff 0%,#eff6ff 50%,#f0fdf4 100%)', padding: isMobile ? '14px 14px 20px' : '20px 22px 24px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 16 : 20, alignItems: 'start', flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                    <HomeProductivityWidget userId={user.id} accessToken={accessToken} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: isMobile ? '100%' : 300 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Live Clocks</div>
+                      <SystemClock />
+                      <InternationalClock timezone={internationalTimezone} />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )
+          })()}
           {tab === 'employees' && employeeSubTab === 'employees' && (
             <div style={{ width: '100%', display: 'grid', gap: 16, position: 'relative', overflow: 'hidden' }}>
 
@@ -2523,7 +2544,7 @@ export default function Dashboard({
 
                   {/* Summary stat cards */}
                   {!payablesLoading && payables.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 4 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))', gap: 12, marginBottom: 4 }}>
                       {[
                         { label: 'Total Bills', value: filteredPayables.length, icon: <Receipt size={18} color="#063062" />, bg: 'rgba(6,48,98,0.06)', color: '#063062' },
                         { label: 'Active Bills', value: filteredPayables.filter(p => p.is_active).length, icon: <CheckCircle size={18} color="#16a34a" />, bg: 'rgba(22,163,74,0.07)', color: '#16a34a' },
@@ -2691,7 +2712,7 @@ export default function Dashboard({
               </div>
 
               {/* Summary stat cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))', gap: 12 }}>
                 {[
                   {
                     label: 'Current Balance',
@@ -2945,7 +2966,7 @@ export default function Dashboard({
                       }
                     `}
                   </style>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 24, paddingBottom: 40 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: 24, paddingBottom: 40 }}>
                     {accounts.map(acc => {
                       const opt = bankOptions.find(o => o.name === acc.bank_name) || null
                       const initials = String(acc.bank_name || '')
@@ -3109,7 +3130,7 @@ export default function Dashboard({
 
               {/* Summary stat cards */}
               {!receivablesLoading && receivables.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(160px, 100%), 1fr))', gap: 12, marginBottom: 4 }}>
                   {[
                     { label: 'Total Receivables', value: filteredReceivables.length, icon: <Inbox size={18} color="#063062" />, bg: 'rgba(6,48,98,0.06)', color: '#063062' },
                     { label: 'Active', value: filteredReceivables.filter(r => r.is_active).length, icon: <CheckCircle size={18} color="#16a34a" />, bg: 'rgba(22,163,74,0.07)', color: '#16a34a' },
@@ -3438,84 +3459,141 @@ export default function Dashboard({
             </div>
           )}
           {tab === 'analytics' && (
-            <div>
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Analytics</div>
-                  <div className="page-title-row">
-                    <BarChart3 size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Data Analytics</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Visualize financial trends, KPIs, and business performance insights</p>
-                </div>
+            <div style={{ position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <BarChart3    size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#0ea5e9', transform: 'rotate(-8deg)'  }} />
+                <TrendingUp   size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#38bdf8', transform: 'rotate(5deg)'   }} />
+                <TrendingDown size={180} style={{ position: 'absolute', top: '-20px', right: '300px',  opacity: 0.04,  color: '#7dd3fc', transform: 'rotate(-5deg)'  }} />
+                <DollarSign   size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',    opacity: 0.035, color: '#bae6fd', transform: 'rotate(8deg)'   }} />
+                <Receipt      size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',    opacity: 0.035, color: '#38bdf8', transform: 'rotate(-6deg)'  }} />
+                <Coins        size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#0ea5e9', transform: 'rotate(4deg)'   }} />
               </div>
-              <DataAnalytics />
+              {/* Content */}
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="page-header">
+                  <div>
+                    <div className="page-badge">Analytics</div>
+                    <div className="page-title-row">
+                      <BarChart3 size={22} className="page-title-icon" />
+                      <div className="page-title-oval">
+                        <h1 className="page-title">Data Analytics</h1>
+                      </div>
+                    </div>
+                    <p className="page-subtitle">Visualize financial trends, KPIs, and business performance insights</p>
+                  </div>
+                </div>
+                <DataAnalytics />
+              </div>
             </div>
           )}
           {tab === 'documents' && (
-            <div>
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Documents</div>
-                  <div className="page-title-row">
-                    <FileText size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Document Bank</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Centralized storage for contracts, reports, receipts, and company files</p>
-                </div>
+            <div style={{ position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <FileText     size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#4f46e5', transform: 'rotate(-8deg)'  }} />
+                <FolderOpen   size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#6366f1', transform: 'rotate(5deg)'   }} />
+                <FileSignature size={180} style={{ position: 'absolute', top: '-20px', right: '300px', opacity: 0.04,  color: '#818cf8', transform: 'rotate(-5deg)'  }} />
+                <Inbox        size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#a5b4fc', transform: 'rotate(8deg)'   }} />
+                <ClipboardList size={130} style={{ position: 'absolute', top: '-10px', left: '20%',   opacity: 0.035, color: '#6366f1', transform: 'rotate(-6deg)'  }} />
+                <FileText     size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#4f46e5', transform: 'rotate(4deg)'   }} />
               </div>
-              <DocumentBank user={{ roleNames: user.roleNames || [user.roleName].filter(Boolean) as string[] }} accessToken={accessToken} />
+              {/* Content */}
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="page-header">
+                  <div>
+                    <div className="page-badge">Documents</div>
+                    <div className="page-title-row">
+                      <FileText size={22} className="page-title-icon" />
+                      <div className="page-title-oval">
+                        <h1 className="page-title">Document Bank</h1>
+                      </div>
+                    </div>
+                    <p className="page-subtitle">Centralized storage for contracts, reports, receipts, and company files</p>
+                  </div>
+                </div>
+                <DocumentBank user={{ roleNames: user.roleNames || [user.roleName].filter(Boolean) as string[] }} accessToken={accessToken} />
+              </div>
             </div>
           )}
           {tab === 'accounting' && accountingSubTab === 'purchase_orders' && (
-            <div>
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Procurement</div>
-                  <div className="page-title-row">
-                    <ShoppingCart size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Purchase Orders</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Create, approve, track, and close purchase orders with vendors</p>
-                </div>
+            <div style={{ position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <ShoppingCart size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#d97706', transform: 'rotate(-8deg)'  }} />
+                <Receipt      size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#f59e0b', transform: 'rotate(5deg)'   }} />
+                <Coins        size={180} style={{ position: 'absolute', top: '-20px', right: '300px',  opacity: 0.04,  color: '#fbbf24', transform: 'rotate(-5deg)'  }} />
+                <TrendingUp   size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#fcd34d', transform: 'rotate(8deg)'   }} />
+                <FileText     size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',   opacity: 0.035, color: '#f59e0b', transform: 'rotate(-6deg)'  }} />
+                <DollarSign   size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#d97706', transform: 'rotate(4deg)'   }} />
               </div>
-              <PurchaseOrders
-                user={user}
-                accessToken={accessToken}
-                vendors={vendors}
-                projects={projects
-                  .filter(p => p.contract_id && p.contract_name)
-                  .map(p => ({ contract_id: p.contract_id!, contract_name: p.contract_name! }))
-                }
-              />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="page-header">
+                  <div>
+                    <div className="page-badge">Procurement</div>
+                    <div className="page-title-row">
+                      <ShoppingCart size={22} className="page-title-icon" />
+                      <div className="page-title-oval">
+                        <h1 className="page-title">Purchase Orders</h1>
+                      </div>
+                    </div>
+                    <p className="page-subtitle">Create, approve, track, and close purchase orders with vendors</p>
+                  </div>
+                </div>
+                <PurchaseOrders
+                  user={user}
+                  accessToken={accessToken}
+                  vendors={vendors}
+                  projects={projects
+                    .filter(p => p.contract_id && p.contract_name)
+                    .map(p => ({ contract_id: p.contract_id!, contract_name: p.contract_name! }))
+                  }
+                />
+              </div>
             </div>
           )}
           {tab === 'accounting' && accountingSubTab === 'payroll' && (
-            <div>
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Payroll</div>
-                  <div className="page-title-row">
-                    <DollarSign size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Payroll</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Process employee compensation, deductions, and generate pay summaries</p>
-                </div>
+            <div style={{ position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <Users      size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#7c3aed', transform: 'rotate(-8deg)'  }} />
+                <Banknote   size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#8b5cf6', transform: 'rotate(5deg)'   }} />
+                <DollarSign size={180} style={{ position: 'absolute', top: '-20px', right: '300px',  opacity: 0.04,  color: '#a78bfa', transform: 'rotate(-5deg)'  }} />
+                <TrendingUp size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#c4b5fd', transform: 'rotate(8deg)'   }} />
+                <Coins      size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',   opacity: 0.035, color: '#8b5cf6', transform: 'rotate(-6deg)'  }} />
+                <Banknote   size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#7c3aed', transform: 'rotate(4deg)'   }} />
               </div>
-              <Payroll />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="page-header">
+                  <div>
+                    <div className="page-badge">Payroll</div>
+                    <div className="page-title-row">
+                      <DollarSign size={22} className="page-title-icon" />
+                      <div className="page-title-oval">
+                        <h1 className="page-title">Payroll</h1>
+                      </div>
+                    </div>
+                    <p className="page-subtitle">Process employee compensation, deductions, and generate pay summaries</p>
+                  </div>
+                </div>
+                <Payroll />
+              </div>
             </div>
           )}
           {tab === 'settings' && (
             hasPermission(user, 'settings', 'manage') ? (
-              <div>
+              <div style={{ position: 'relative' }}>
+                {/* ── Decorative visuals ── */}
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                  <SettingsIcon size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#334155', transform: 'rotate(-8deg)'  }} />
+                  <Users        size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#475569', transform: 'rotate(5deg)'   }} />
+                  <UserCheck    size={180} style={{ position: 'absolute', top: '-20px', right: '300px',  opacity: 0.04,  color: '#64748b', transform: 'rotate(-5deg)'  }} />
+                  <Briefcase    size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#94a3b8', transform: 'rotate(8deg)'   }} />
+                  <User         size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',   opacity: 0.035, color: '#475569', transform: 'rotate(-6deg)'  }} />
+                  <CheckCircle  size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px', opacity: 0.04,  color: '#334155', transform: 'rotate(4deg)'   }} />
+                </div>
+                {/* Content */}
+                <div style={{ position: 'relative', zIndex: 1 }}>
                 <div className="page-header">
                   <div>
                     <div className="page-badge">Settings</div>
@@ -3529,6 +3607,7 @@ export default function Dashboard({
                   </div>
                 </div>
                 <Settings accessToken={accessToken} />
+                </div>{/* end zIndex:1 */}
               </div>
             ) : (
               <div style={{ padding: 40, textAlign: 'center' }}>
@@ -3545,24 +3624,45 @@ export default function Dashboard({
             )
           )}
           {tab === 'accounting' && accountingSubTab === 'loans' && (
-            <div>
-              <div className="page-header">
-                <div>
-                  <div className="page-badge">Loans</div>
-                  <div className="page-title-row">
-                    <CreditCard size={22} className="page-title-icon" />
-                    <div className="page-title-oval">
-                      <h1 className="page-title">Loan Management</h1>
-                    </div>
-                  </div>
-                  <p className="page-subtitle">Manage outstanding loans, repayment schedules, and interest tracking</p>
-                </div>
+            <div style={{ position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <Landmark    size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#059669', transform: 'rotate(-8deg)'  }} />
+                <DollarSign  size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#10b981', transform: 'rotate(5deg)'   }} />
+                <Scale       size={180} style={{ position: 'absolute', top: '-20px', right: '300px',  opacity: 0.04,  color: '#34d399', transform: 'rotate(-5deg)'  }} />
+                <TrendingDown size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#6ee7b7', transform: 'rotate(8deg)'   }} />
+                <CreditCard  size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',   opacity: 0.035, color: '#10b981', transform: 'rotate(-6deg)'  }} />
+                <DollarSign  size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#059669', transform: 'rotate(4deg)'   }} />
               </div>
-              <Loans />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="page-header">
+                  <div>
+                    <div className="page-badge">Loans</div>
+                    <div className="page-title-row">
+                      <CreditCard size={22} className="page-title-icon" />
+                      <div className="page-title-oval">
+                        <h1 className="page-title">Loan Management</h1>
+                      </div>
+                    </div>
+                    <p className="page-subtitle">Manage outstanding loans, repayment schedules, and interest tracking</p>
+                  </div>
+                </div>
+                <Loans />
+              </div>
             </div>
           )}
           {tab === 'accounting' && accountingSubTab === 'assets' && (
-            <div style={{ width: '100%', display: 'grid', gap: 16 }}>
+            <div style={{ width: '100%', display: 'grid', gap: 16, position: 'relative' }}>
+              {/* ── Decorative visuals ── */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+                <Building2  size={220} style={{ position: 'absolute', top: '-30px', right: '-40px',  opacity: 0.06,  color: '#2563eb', transform: 'rotate(-8deg)'  }} />
+                <BarChart3  size={160} style={{ position: 'absolute', top:  '40px', right: '120px',  opacity: 0.04,  color: '#3b82f6', transform: 'rotate(5deg)'   }} />
+                <TrendingDown size={180} style={{ position: 'absolute', top: '-20px', right: '300px', opacity: 0.04,  color: '#60a5fa', transform: 'rotate(-5deg)'  }} />
+                <Coins      size={140} style={{ position: 'absolute', top:  '10px', left:  '40%',   opacity: 0.035, color: '#93c5fd', transform: 'rotate(8deg)'   }} />
+                <Landmark   size={130} style={{ position: 'absolute', top: '-10px', left:  '20%',   opacity: 0.035, color: '#3b82f6', transform: 'rotate(-6deg)'  }} />
+                <DollarSign size={150} style={{ position: 'absolute', top:  '20px', left:  '-20px',  opacity: 0.04,  color: '#2563eb', transform: 'rotate(4deg)'   }} />
+              </div>
+              <div style={{ position: 'relative', zIndex: 1, display: 'contents' }}>
               <div className="page-header">
                 <div>
                   <div className="page-badge">Assets</div>
@@ -3652,6 +3752,7 @@ export default function Dashboard({
                   </table>
                 </div>
               )}
+              </div>{/* end display:contents */}
             </div>
           )}
         </section>
@@ -4692,90 +4793,157 @@ export default function Dashboard({
       )}
 
       {addAssetModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: '20px' }} onClick={() => { setAddAssetModalOpen(false); setAssetName(''); setAssetValue(''); setPurchaseDate(''); setIsDepreciable(false); setSalvageValue(''); setUsefulLife('') }}>
-          <div className="glass-panel" style={{ width: 'min(600px, 96vw)', padding: 24, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0 }}>Add New Asset</h2>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>Asset Name *</span>
-                <input value={assetName} onChange={e => setAssetName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>Original Value (Cost) *</span>
-                <input type="number" value={assetValue} onChange={e => setAssetValue(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>Purchase Date *</span>
-                <input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-              </label>
-              
-              <div style={{ borderTop: '2px dashed #e0e0e0', paddingTop: 16, marginTop: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 16 }}>
-                  <input 
-                    type="checkbox" 
-                    checked={isDepreciable} 
-                    onChange={e => setIsDepreciable(e.target.checked)} 
-                    style={{ width: 18, height: 18, cursor: 'pointer' }}
-                  />
-                  <span style={{ fontWeight: 600, fontSize: 15 }}>This is a depreciable asset</span>
-                </label>
-                
+        <>
+          <div className="emp-drawer-overlay" onClick={() => { setAddAssetModalOpen(false); setAssetName(''); setAssetValue(''); setPurchaseDate(''); setIsDepreciable(false); setSalvageValue(''); setUsefulLife('') }} />
+          <div className="emp-drawer">
+
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(160deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%)', padding: '24px 24px 20px', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: -50, right: -50, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: -30, left: 30, width: 110, height: 110, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, position: 'relative' }}>
+                <div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Assets</div>
+                  <div style={{ color: '#fff', fontSize: 19, fontWeight: 700, letterSpacing: '-0.3px' }}>Add New Asset</div>
+                </div>
+                <button onClick={() => { setAddAssetModalOpen(false); setAssetName(''); setAssetValue(''); setPurchaseDate(''); setIsDepreciable(false); setSalvageValue(''); setUsefulLife('') }} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8, color: 'rgba(255,255,255,0.7)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative' }}>
+                <div style={{ width: 60, height: 60, borderRadius: '50%', background: assetName ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.1)', border: '2.5px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', boxShadow: assetName ? '0 4px 16px rgba(37,99,235,0.4)' : 'none', transition: 'all 0.3s', flexShrink: 0 }}>
+                  {assetName ? assetName.split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() : <Coins size={24} color="rgba(255,255,255,0.35)" />}
+                </div>
+                <div>
+                  <div style={{ color: '#fff', fontSize: 15, fontWeight: 600, letterSpacing: '-0.1px', minHeight: 22 }}>{assetName || 'New Asset'}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.42)', fontSize: 12, marginTop: 3 }}>{assetValue ? `LKR ${Number(assetValue).toLocaleString()}` : 'No value set'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="emp-drawer-body">
+
+              {/* Section: Asset Details */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Hash size={13} color="#2563eb" />
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Asset Details</span>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                      <Hash size={11} color="#94a3b8" /> Asset Name *
+                    </span>
+                    <input value={assetName} onChange={e => setAssetName(e.target.value)} placeholder="e.g. Office Laptop" style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut} />
+                  </label>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                      <DollarSign size={11} color="#94a3b8" /> Original Value (Cost) *
+                    </span>
+                    <input type="number" value={assetValue} onChange={e => setAssetValue(e.target.value)} placeholder="0.00" style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut} />
+                  </label>
+                </div>
+
+                <div>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                      <Calendar size={11} color="#94a3b8" /> Purchase Date *
+                    </span>
+                    <input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut} />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: 'linear-gradient(to right, #e2e8f0, transparent)', marginBottom: 24 }} />
+
+              {/* Section: Depreciation */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <TrendingDown size={13} color="#2563eb" />
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#475569' }}>Depreciation</span>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDepreciable(!isDepreciable)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+                      border: `1.5px solid ${isDepreciable ? '#2563eb' : '#e2e8f0'}`,
+                      background: isDepreciable ? 'rgba(37,99,235,0.08)' : '#f8fafc',
+                      color: isDepreciable ? '#2563eb' : '#94a3b8',
+                      boxShadow: isDepreciable ? '0 0 0 3px rgba(37,99,235,0.12)' : 'none'
+                    }}
+                  >
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isDepreciable ? '#2563eb' : '#cbd5e1'}`, background: isDepreciable ? '#2563eb' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
+                      {isDepreciable && <CheckCircle size={12} color="#fff" />}
+                    </div>
+                    This is a depreciable asset
+                  </button>
+                </div>
+
                 {isDepreciable && (
-                  <div style={{ display: 'grid', gap: 12, paddingLeft: 26, background: '#f8f9fa', padding: 16, borderRadius: 8 }}>
-                    <label style={{ display: 'grid', gap: 6 }}>
-                      <span style={{ fontWeight: 500 }}>Depreciation Method *</span>
-                      <select 
-                        value={depreciationMethod} 
-                        onChange={e => setDepreciationMethod(e.target.value as 'STRAIGHT_LINE' | 'DOUBLE_DECLINING')} 
-                        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }}
-                      >
-                        <option value="STRAIGHT_LINE">Straight-Line Depreciation</option>
-                        <option value="DOUBLE_DECLINING">Double-Declining Balance (DDB)</option>
-                      </select>
-                      <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                        {depreciationMethod === 'STRAIGHT_LINE' 
-                          ? '📊 Best for: Office furniture, buildings - loses value steadily'
-                          : '📉 Best for: Technology, computers - becomes obsolete quickly'
-                        }
-                      </div>
-                    </label>
-                    
-                    <label style={{ display: 'grid', gap: 6 }}>
-                      <span style={{ fontWeight: 500 }}>Salvage Value *</span>
-                      <input 
-                        type="number" 
-                        value={salvageValue} 
-                        onChange={e => setSalvageValue(e.target.value)} 
-                        placeholder="Estimated value at end of life"
-                        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} 
-                        required 
-                      />
-                      <div style={{ fontSize: 12, color: '#666' }}>The estimated value when the asset reaches end of its useful life</div>
-                    </label>
-                    
-                    <label style={{ display: 'grid', gap: 6 }}>
-                      <span style={{ fontWeight: 500 }}>Useful Life (Years) *</span>
-                      <input 
-                        type="number" 
-                        value={usefulLife} 
-                        onChange={e => setUsefulLife(e.target.value)} 
-                        placeholder="e.g., 5"
-                        min="1"
-                        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} 
-                        required 
-                      />
-                      <div style={{ fontSize: 12, color: '#666' }}>Expected number of years the asset will be in service</div>
-                    </label>
+                  <div style={{ display: 'grid', gap: 12, background: 'rgba(37,99,235,0.04)', padding: 16, borderRadius: 12, border: '1px solid rgba(37,99,235,0.1)' }}>
+                    <div>
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                          <TrendingDown size={11} color="#94a3b8" /> Depreciation Method *
+                        </span>
+                        <select value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value as 'STRAIGHT_LINE' | 'DOUBLE_DECLINING')} style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut}>
+                          <option value="STRAIGHT_LINE">Straight-Line Depreciation</option>
+                          <option value="DOUBLE_DECLINING">Double-Declining Balance (DDB)</option>
+                        </select>
+                        <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{depreciationMethod === 'STRAIGHT_LINE' ? 'Best for: Office furniture, buildings — loses value steadily' : 'Best for: Technology, computers — becomes obsolete quickly'}</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                          <DollarSign size={11} color="#94a3b8" /> Salvage Value *
+                        </span>
+                        <input type="number" value={salvageValue} onChange={e => setSalvageValue(e.target.value)} placeholder="Estimated value at end of life" style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut} />
+                        <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Estimated value when the asset reaches end of its useful life</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                          <Clock size={11} color="#94a3b8" /> Useful Life (Years) *
+                        </span>
+                        <input type="number" value={usefulLife} onChange={e => setUsefulLife(e.target.value)} placeholder="e.g., 5" min="1" style={{ ...ASSET_INPUT }} onFocus={assetFocusIn} onBlur={assetFocusOut} />
+                        <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Expected number of years the asset will be in service</span>
+                      </label>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24, gap: 12 }}>
-              <button onClick={() => { setAddAssetModalOpen(false); setAssetName(''); setAssetValue(''); setPurchaseDate(''); setIsDepreciable(false); setSalvageValue(''); setUsefulLife('') }} className="btn-secondary">Cancel</button>
-              <button onClick={saveAsset} className="btn-primary">Save Asset</button>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#fff', display: 'flex', gap: 10, justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button type="button" onClick={() => { setAddAssetModalOpen(false); setAssetName(''); setAssetValue(''); setPurchaseDate(''); setIsDepreciable(false); setSalvageValue(''); setUsefulLife('') }} style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: 'transparent', color: '#64748b', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button type="button" onClick={saveAsset} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
+                + Save Asset
+              </button>
             </div>
+
           </div>
-        </div>
+        </>
       )}
 
       {depreciationScheduleModalOpen && selectedAssetForSchedule && (

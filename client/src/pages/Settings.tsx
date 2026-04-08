@@ -2,7 +2,26 @@ import { useState, useEffect } from 'react'
 import { API_URL } from '../config/api'
 import { fetchWithAuth } from '../utils/apiClient'
 import { useToast } from '../context/ToastContext'
-import { Shield, Users as UsersIcon, Key, Plus, Edit2, Trash2, Save, X, Copy, CheckCircle, User, RotateCcw, Settings as SettingsIcon2, Lock } from 'lucide-react'
+import { decodeToken, formatTimeUntilExpiry } from '../utils/tokenManager'
+import { Shield, Users as UsersIcon, Key, Plus, Edit2, Trash2, Save, X, Copy, CheckCircle, User, RotateCcw, Settings as SettingsIcon2, Lock, AlertTriangle, Globe, Clock, Eye, EyeOff } from 'lucide-react'
+
+/* ── Slate theme constants ── */
+const SL      = '#334155'   // slate-700
+const SL_DARK = '#1e293b'   // slate-800
+
+const SETTINGS_INPUT: React.CSSProperties = {
+  padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0',
+  background: '#f8fafc', fontSize: 13.5, color: '#1e293b', outline: 'none',
+  width: '100%', boxSizing: 'border-box', transition: 'all 0.2s',
+}
+function sFocusIn(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+  e.target.style.borderColor = SL; e.target.style.background = '#fff'
+  e.target.style.boxShadow = '0 0 0 3px rgba(51,65,85,0.1)'
+}
+function sFocusOut(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+  e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'
+  e.target.style.boxShadow = 'none'
+}
 import PermissionHierarchy from '../components/PermissionHierarchy'
 import { 
   getAllEmployeesWithUserStatus,
@@ -85,6 +104,9 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordChangeError, setPasswordChangeError] = useState('')
+  const [showCurrentPw, setShowCurrentPw] = useState(false)
+  const [showNewPw, setShowNewPw] = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
 
   // Application Settings state
   const [applicationTimezone, setApplicationTimezone] = useState('America/New_York')
@@ -355,38 +377,15 @@ export default function Settings({ accessToken }: { accessToken: string }) {
   // Helper to get account status badge
   const getStatusBadge = (emp: EmployeeWithUserStatus) => {
     if (!emp.has_user_account) {
-      return (
-        <span style={{ padding: '4px 8px', borderRadius: 4, background: '#ff9800', color: '#fff', fontSize: 12, fontWeight: 600 }}>
-          ⚠ No Account
-        </span>
-      )
+      return <span style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(245,158,11,0.12)', color: '#b45309', border: '1px solid rgba(245,158,11,0.3)', fontSize: 11.5, fontWeight: 700 }}>No Account</span>
     }
-    
     switch (emp.account_status) {
       case 'suspended':
-        return (
-          <span 
-            title={`Suspended: ${emp.suspended_reason || 'No reason provided'}`}
-            style={{ padding: '4px 8px', borderRadius: 4, background: '#ff9800', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'help' }}
-          >
-            🟠 Suspended
-          </span>
-        )
+        return <span title={`Suspended: ${emp.suspended_reason || 'No reason provided'}`} style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(234,88,12,0.1)', color: '#c2410c', border: '1px solid rgba(234,88,12,0.25)', fontSize: 11.5, fontWeight: 700, cursor: 'help' }}>Suspended</span>
       case 'terminated':
-        return (
-          <span 
-            title={`Terminated: ${emp.terminated_reason || 'No reason provided'}. Purge date: ${emp.scheduled_purge_date ? new Date(emp.scheduled_purge_date).toLocaleDateString() : 'Unknown'}`}
-            style={{ padding: '4px 8px', borderRadius: 4, background: '#f44336', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'help' }}
-          >
-            🔴 Terminated
-          </span>
-        )
+        return <span title={`Terminated: ${emp.terminated_reason || 'No reason provided'}. Purge: ${emp.scheduled_purge_date ? new Date(emp.scheduled_purge_date).toLocaleDateString() : 'Unknown'}`} style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)', fontSize: 11.5, fontWeight: 700, cursor: 'help' }}>Terminated</span>
       default:
-        return (
-          <span style={{ padding: '4px 8px', borderRadius: 4, background: '#4CAF50', color: '#fff', fontSize: 12, fontWeight: 600 }}>
-            🟢 Active
-          </span>
-        )
+        return <span style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.25)', fontSize: 11.5, fontWeight: 700 }}>Active</span>
     }
   }
   
@@ -814,294 +813,194 @@ export default function Settings({ accessToken }: { accessToken: string }) {
         <Shield size={180} strokeWidth={0.7} style={{ position: 'absolute', left: '2%', top: '45%', opacity: 0.07, color: 'var(--primary)' }} />
       </div>
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 8 }}>
-        <button
-          onClick={() => setSubTab('roles')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'roles' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'roles' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <Shield size={18} />
-          Role Management
-        </button>
-        <button
-          onClick={() => setSubTab('permissions')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'permissions' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'permissions' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <Key size={18} />
-          Permissions
-        </button>
-        <button
-          onClick={() => setSubTab('users')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'users' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'users' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <UsersIcon size={18} />
-          User Roles
-        </button>
-        <button
-          onClick={() => setSubTab('profile')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'profile' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'profile' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <User size={18} />
-          My Profile
-        </button>
-        <button
-          onClick={() => setSubTab('app_settings')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'app_settings' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'app_settings' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <Key size={18} />
-          Application Settings
-        </button>
-        <button
-          onClick={() => setSubTab('employee_onboarding')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            background: subTab === 'employee_onboarding' ? 'var(--primary)' : 'transparent',
-            color: subTab === 'employee_onboarding' ? '#fff' : '#666',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <UsersIcon size={18} />
-          Employee Onboarding
-        </button>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)', marginBottom: 4 }}>
+        {([
+          { key: 'roles',               label: 'Roles',               icon: <Shield size={13} />      },
+          { key: 'permissions',         label: 'Permissions',         icon: <Key size={13} />         },
+          { key: 'users',               label: 'User Management',     icon: <UsersIcon size={13} />   },
+          { key: 'profile',             label: 'My Profile',          icon: <User size={13} />        },
+          { key: 'app_settings',        label: 'App Settings',        icon: <SettingsIcon2 size={13} /> },
+          { key: 'employee_onboarding', label: 'Employee Onboarding', icon: <UsersIcon size={13} />   },
+        ] as { key: typeof subTab; label: string; icon: React.ReactNode }[]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setSubTab(t.key)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 16px', borderRadius: 99, fontSize: 12.5, fontWeight: 600,
+              cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+              background: subTab === t.key ? `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)` : 'rgba(51,65,85,0.07)',
+              color: subTab === t.key ? '#fff' : SL,
+            }}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
       </div>
       
       {/* Role Management */}
       {subTab === 'roles' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0 }}>Roles</h2>
-            <button
-              onClick={() => setIsAddingRole(true)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
-            >
-              <Plus size={18} />
-              Create Role
-            </button>
-          </div>
-          
+
+          {/* Inline add/edit form */}
           {(isAddingRole || editingRole) && (
-            <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
-              <h3 style={{ marginTop: 0 }}>{editingRole ? 'Edit Role' : 'Create New Role'}</h3>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Role Name *</span>
-                  <input
-                    type="text"
-                    value={roleName}
-                    onChange={e => setRoleName(e.target.value)}
-                    placeholder="e.g., Senior Accountant"
-                    style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }}
-                  />
+            <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(30,41,59,0.1)', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <Shield size={15} color="rgba(255,255,255,0.8)" />
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>{editingRole ? 'Edit Role' : 'Create New Role'}</span>
+                </div>
+                <button onClick={() => { setIsAddingRole(false); setEditingRole(null); setRoleName(''); setRoleDescription('') }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={14} />
+                </button>
+              </div>
+              <div style={{ padding: '20px 20px 16px', display: 'grid', gap: 14 }}>
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Role Name <span style={{ color: '#ef4444' }}>*</span></span>
+                  <input type="text" value={roleName} onChange={e => setRoleName(e.target.value)} placeholder="e.g., Senior Accountant" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                 </label>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Description</span>
-                  <textarea
-                    value={roleDescription}
-                    onChange={e => setRoleDescription(e.target.value)}
-                    placeholder="Describe this role..."
-                    rows={3}
-                    style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', resize: 'vertical' }}
-                  />
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Description <span style={{ color: '#94a3b8', fontWeight: 400 }}>(optional)</span></span>
+                  <textarea value={roleDescription} onChange={e => setRoleDescription(e.target.value)} placeholder="Describe this role…" rows={3} style={{ ...SETTINGS_INPUT, resize: 'vertical', lineHeight: 1.5 }} onFocus={sFocusIn} onBlur={sFocusOut} />
                 </label>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
-                  <button
-                    onClick={() => {
-                      setIsAddingRole(false)
-                      setEditingRole(null)
-                      setRoleName('')
-                      setRoleDescription('')
-                    }}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      border: '1px solid #ccc',
-                      background: 'var(--surface)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8
-                    }}
-                  >
-                    <X size={16} />
-                    Cancel
-                  </button>
-                  <button
-                    onClick={editingRole ? handleUpdateRole : handleCreateRole}
-                    disabled={saving}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      fontWeight: 600,
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8
-                    }}
-                  >
-                    <Save size={16} />
-                    {saving ? 'Saving...' : 'Save'}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button onClick={() => { setIsAddingRole(false); setEditingRole(null); setRoleName(''); setRoleDescription('') }} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={editingRole ? handleUpdateRole : handleCreateRole} disabled={saving} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: saving ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Save size={13} />{saving ? 'Saving…' : 'Save Role'}
                   </button>
                 </div>
               </div>
             </div>
           )}
-          
-          {rolesLoading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>Loading roles...</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {roles.map(role => (
-                <div
-                  key={role.id}
-                  className="glass-panel"
-                  style={{ padding: 20, borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <h3 style={{ margin: 0, fontSize: 18 }}>{role.name}</h3>
-                      {role.is_system_role && (
-                        <span style={{ padding: '4px 8px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 11, fontWeight: 700 }}>
-                          SYSTEM
-                        </span>
-                      )}
+
+          {/* Roles container */}
+          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            {/* Container header */}
+            <div style={{ background: `linear-gradient(90deg, ${SL_DARK} 0%, #475569 55%, ${SL} 100%)`, padding: '13px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <Shield size={15} color="rgba(255,255,255,0.85)" />
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: 13.5 }}>Role Management</span>
+                <span style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
+                  {rolesLoading ? '…' : roles.length}
+                </span>
+              </div>
+              <button
+                onClick={() => { setIsAddingRole(true); setEditingRole(null); setRoleName(''); setRoleDescription('') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 15px', borderRadius: 9, border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+              >
+                <Plus size={13} />Create Role
+              </button>
+            </div>
+
+            {/* Roles list */}
+            {rolesLoading ? (
+              <div style={{ padding: 52, textAlign: 'center', color: '#94a3b8', fontSize: 13.5 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid #f1f5f9`, borderTop: `3px solid ${SL}`, animation: 'ql-spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                Loading roles…
+              </div>
+            ) : roles.length === 0 ? (
+              <div style={{ padding: 52, textAlign: 'center' }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(51,65,85,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: '#94a3b8' }}>
+                  <Shield size={24} />
+                </div>
+                <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14, marginBottom: 6 }}>No roles yet</div>
+                <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 20 }}>Create your first custom role to get started.</div>
+                <button onClick={() => setIsAddingRole(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  <Plus size={13} />Create Role
+                </button>
+              </div>
+            ) : (
+              <div>
+                {roles.map((role, idx) => (
+                  <div
+                    key={role.id}
+                    style={{
+                      padding: '15px 20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderBottom: idx < roles.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      borderLeft: `3px solid ${role.is_system_role ? '#2563eb' : SL}`,
+                      transition: 'background 0.12s',
+                      cursor: 'default',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    {/* Left: icon + info */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: role.is_system_role ? 'rgba(37,99,235,0.1)' : 'rgba(51,65,85,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: role.is_system_role ? '#2563eb' : SL, flexShrink: 0 }}>
+                        <Shield size={17} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        {/* Name row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{role.name}</span>
+                          {role.is_system_role && (
+                            <span style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>System</span>
+                          )}
+                        </div>
+                        {/* Description */}
+                        <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 480 }}>
+                          {role.description || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>No description</span>}
+                        </div>
+                        {/* Stats chips */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 7 }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: SL, background: 'rgba(51,65,85,0.07)', padding: '3px 9px', borderRadius: 99, fontWeight: 600 }}>
+                            <Key size={10} />{role.permission_count} permission{role.permission_count !== 1 ? 's' : ''}
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: '#475569', background: '#f1f5f9', padding: '3px 9px', borderRadius: 99, fontWeight: 600 }}>
+                            <UsersIcon size={10} />{role.user_count} user{role.user_count !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <p style={{ margin: '4px 0', color: '#666', fontSize: 14 }}>{role.description || 'No description'}</p>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 13, color: '#888' }}>
-                      <span>{role.permission_count} permissions</span>
-                      <span>{role.user_count} users</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {!role.is_system_role && (
-                      <>
+
+                    {/* Right: action buttons */}
+                    {!role.is_system_role ? (
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 16 }}>
                         <button
-                          onClick={() => {
-                            setEditingRole(role)
-                            setRoleName(role.name)
-                            setRoleDescription(role.description || '')
-                            setIsAddingRole(false)
-                          }}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 6,
-                            border: '1px solid #4CAF50',
-                            background: '#4CAF50',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6
-                          }}
-                        >
-                          <Edit2 size={14} />
-                          Edit
-                        </button>
+                          onClick={() => { setEditingRole(role); setRoleName(role.name); setRoleDescription(role.description || ''); setIsAddingRole(false) }}
+                          style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: 'rgba(22,163,74,0.1)', color: '#16a34a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(22,163,74,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+                          title="Edit role"
+                        ><Edit2 size={14} /></button>
                         <button
                           onClick={() => handleDeleteRole(role)}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 6,
-                            border: '1px solid #f44336',
-                            background: '#f44336',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6
-                          }}
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
-                      </>
+                          style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: 'rgba(220,38,38,0.1)', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#dc2626'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,38,38,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
+                          title="Delete role"
+                        ><Trash2 size={14} /></button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 11.5, color: '#cbd5e1', fontStyle: 'italic', flexShrink: 0, marginLeft: 16 }}>Protected</span>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
       
       {/* Permission Assignment */}
       {subTab === 'permissions' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <div>
-            <h2 style={{ margin: 0, marginBottom: 12 }}>Assign Permissions to Role</h2>
+          {/* Header bar with role selector */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(51,65,85,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: SL }}>
+                <Key size={17} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>Permission Assignment</div>
+                <div style={{ fontSize: 11.5, color: '#64748b' }}>Assign permissions to a custom role</div>
+              </div>
+            </div>
             <select
               value={selectedRole?.id || ''}
               onChange={e => {
@@ -1109,47 +1008,39 @@ export default function Settings({ accessToken }: { accessToken: string }) {
                 setSelectedRole(role || null)
                 if (role) fetchRolePermissions(role.id)
               }}
-              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', minWidth: 300 }}
+              style={{ ...SETTINGS_INPUT, width: 'auto', minWidth: 220 }}
+              onFocus={sFocusIn} onBlur={sFocusOut}
             >
-              <option value="">Select a role</option>
+              <option value="">Select a role…</option>
               {roles.filter(r => !r.is_system_role).map(role => (
                 <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </select>
           </div>
-          
+
           {selectedRole && (
-            <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
-              <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: 20, color: '#fff' }}>Permissions for {selectedRole.name}</h3>
+            <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.09)', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <Key size={15} color="rgba(255,255,255,0.8)" />
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Permissions for {selectedRole.name}</span>
+                </div>
                 <button
                   onClick={handleSavePermissions}
                   disabled={saving}
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: saving ? '#b1b1b1' : 'var(--accent)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 15
-                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
                 >
-                  <Save size={18} />
-                  {saving ? 'Saving...' : 'Save Permissions'}
+                  <Save size={13} />{saving ? 'Saving…' : 'Save Permissions'}
                 </button>
               </div>
-
-              <PermissionHierarchy
-                selectedPermissions={rolePermissions}
-                onPermissionsChange={setRolePermissions}
-                allPermissions={permissions}
-                loading={permissionsLoading}
-              />
+              <div style={{ padding: 20 }}>
+                <PermissionHierarchy
+                  selectedPermissions={rolePermissions}
+                  onPermissionsChange={setRolePermissions}
+                  allPermissions={permissions}
+                  loading={permissionsLoading}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -1158,107 +1049,90 @@ export default function Settings({ accessToken }: { accessToken: string }) {
       {/* User Management */}
       {subTab === 'users' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0 }}>Manage User Roles</h2>
-            <button
-              onClick={() => setIsCreatingUser(true)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
-            >
-              <Plus size={18} />
-              Create User
+          {/* Header bar */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(51,65,85,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: SL }}>
+                <UsersIcon size={17} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>User Management</div>
+                <div style={{ fontSize: 11.5, color: '#64748b' }}>{users.length} user{users.length !== 1 ? 's' : ''} registered</div>
+              </div>
+            </div>
+            <button onClick={() => setIsCreatingUser(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(30,41,59,0.3)' }}>
+              <Plus size={14} />Create User
             </button>
           </div>
-          
+
           {usersLoading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>Loading users...</div>
+            <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+              <div style={{ width: 30, height: 30, borderRadius: '50%', border: `3px solid #f1f5f9`, borderTop: `3px solid ${SL}`, animation: 'ql-spin 0.8s linear infinite', margin: '0 auto 12px' }} />Loading users…
+            </div>
           ) : (
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <table className="glass-panel" style={{ width: '100%', borderCollapse: 'collapse', overflow: 'hidden', fontSize: 14 }}>
+            <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
                 <thead>
-                  <tr style={{ background: 'var(--primary)', color: '#fff' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>User</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Email</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Current Role</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Actions</th>
+                  <tr style={{ background: `linear-gradient(90deg, ${SL_DARK} 0%, #475569 55%, ${SL} 100%)` }}>
+                    <th style={{ padding: '11px 16px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 12 }}>User</th>
+                    <th style={{ padding: '11px 16px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 12 }}>Email</th>
+                    <th style={{ padding: '11px 16px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 12 }}>Roles</th>
+                    <th style={{ padding: '11px 16px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 12 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user, idx) => (
-                    <tr key={user.id} style={{ borderBottom: idx < users.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: 500 }}>{user.name}</td>
-                      <td style={{ padding: '12px 16px' }}>{user.email}</td>
+                    <tr key={user.id}
+                      style={{ borderBottom: idx < users.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    >
+                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1e293b' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${SL_DARK}, ${SL})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {(user.name || user.email).slice(0, 1).toUpperCase()}
+                          </div>
+                          {user.name || '—'}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#475569' }}>{user.email}</td>
                       <td style={{ padding: '12px 16px' }}>
                         {user.roles.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                             {user.roles.map(role => (
-                              <span key={role.id} style={{ padding: '4px 8px', borderRadius: 4, background: role.is_system_role ? '#e3f2fd' : 'var(--surface)', color: role.is_system_role ? '#1565c0' : '#666', fontSize: 12, fontWeight: 600 }}>
+                              <span key={role.id} style={{ padding: '3px 9px', borderRadius: 99, background: role.is_system_role ? 'rgba(37,99,235,0.1)' : 'rgba(51,65,85,0.08)', color: role.is_system_role ? '#2563eb' : SL, fontSize: 11.5, fontWeight: 700 }}>
                                 {role.name}
-                                {role.is_system_role && ' ●'}
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span style={{ color: '#999' }}>No roles assigned</span>
+                          <span style={{ color: '#94a3b8', fontSize: 12 }}>No roles assigned</span>
                         )}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
                           <button
-                            onClick={() => {
-                              setAssigningUser(user)
-                              setSelectedRoleIds(user.roles.map(r => r.id))
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 6,
-                              border: '1px solid #2196F3',
-                              background: '#2196F3',
-                              color: '#fff',
-                              cursor: 'pointer',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4
-                            }}
-                          >
-                            Assign Roles
+                            onClick={() => { setAssigningUser(user); setSelectedRoleIds(user.roles.map(r => r.id)) }}
+                            style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: 'rgba(51,65,85,0.08)', color: SL, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = SL; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(51,65,85,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = SL }}
+                            title="Assign Roles"><Key size={14} />
                           </button>
                           <button
                             onClick={() => handleResetPassword(user)}
                             disabled={saving}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 6,
-                              border: '1px solid #ff9800',
-                              background: '#ff9800',
-                              color: '#fff',
-                              cursor: saving ? 'not-allowed' : 'pointer',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4
-                            }}
-                          >
-                            <RotateCcw size={12} />
-                            Reset Password
+                            style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: 'rgba(234,88,12,0.1)', color: '#c2410c', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                            onMouseEnter={e => { if (!saving) { (e.currentTarget as HTMLButtonElement).style.background = '#ea580c'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' } }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(234,88,12,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#c2410c' }}
+                            title="Reset Password"><RotateCcw size={14} />
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {users.length === 0 && (
+                    <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No users found.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1266,91 +1140,48 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Create User Modal */}
           {isCreatingUser && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }} onClick={() => setIsCreatingUser(false)}>
-              <div className="glass-panel" style={{ width: 'min(600px, 92vw)', padding: 24, borderRadius: 16, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0 }}>Create New User</h3>
-                <div style={{ display: 'grid', gap: 16 }}>
-                  <label style={{ display: 'grid', gap: 6 }}>
-                    <span style={{ fontWeight: 500 }}>Email Address *</span>
-                    <input
-                      type="email"
-                      value={newUserEmail}
-                      onChange={e => setNewUserEmail(e.target.value)}
-                      placeholder="user@example.com"
-                      style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                    />
-                    <span style={{ fontSize: 12, color: '#666' }}>The user's email address (will also be used as username)</span>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000 }} onClick={() => setIsCreatingUser(false)}>
+              <div style={{ width: 'min(580px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <UsersIcon size={16} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Create New User</span>
+                  </div>
+                  <button onClick={() => { setIsCreatingUser(false); setNewUserEmail(''); setNewUserRoleIds([]) }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+                </div>
+                <div style={{ padding: '22px', overflow: 'auto', display: 'grid', gap: 16 }}>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Email Address <span style={{ color: '#ef4444' }}>*</span></span>
+                    <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="user@example.com" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                    <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Will also be used as the login username</span>
                   </label>
-                  
+
                   <div style={{ display: 'grid', gap: 6 }}>
-                    <span style={{ fontWeight: 500, marginBottom: 4 }}>Assign Roles * (select at least one)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Assign Roles <span style={{ color: '#ef4444' }}>*</span></span>
+                    <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflow: 'auto', padding: 8, border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: newUserRoleIds.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (newUserRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
-                          <input
-                            type="checkbox"
-                            checked={newUserRoleIds.includes(role.id)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setNewUserRoleIds([...newUserRoleIds, role.id])
-                              } else {
-                                setNewUserRoleIds(newUserRoleIds.filter(id => id !== role.id))
-                              }
-                            }}
-                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                          />
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '9px 12px', borderRadius: 8, background: newUserRoleIds.includes(role.id) ? 'rgba(51,65,85,0.07)' : '#fff', border: '1.5px solid ' + (newUserRoleIds.includes(role.id) ? SL : '#e2e8f0'), transition: 'all 0.15s' }}>
+                          <input type="checkbox" checked={newUserRoleIds.includes(role.id)} onChange={e => { if (e.target.checked) setNewUserRoleIds([...newUserRoleIds, role.id]); else setNewUserRoleIds(newUserRoleIds.filter(id => id !== role.id)) }} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: SL }} />
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#333', marginBottom: 2 }}>{role.name}</div>
-                            {role.description && <div style={{ fontSize: 12, color: '#666' }}>{role.description}</div>}
+                            <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{role.name}</div>
+                            {role.description && <div style={{ fontSize: 11.5, color: '#64748b' }}>{role.description}</div>}
                           </div>
-                          {role.is_system_role && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 10, fontWeight: 700 }}>
-                              SYSTEM
-                            </span>
-                          )}
+                          {role.is_system_role && <span style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontSize: 10, fontWeight: 700 }}>SYSTEM</span>}
                         </label>
                       ))}
                     </div>
-                    <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
-                      {newUserRoleIds.length} role{newUserRoleIds.length !== 1 ? 's' : ''} selected
-                    </div>
+                    <div style={{ fontSize: 11.5, color: '#64748b' }}>{newUserRoleIds.length} role{newUserRoleIds.length !== 1 ? 's' : ''} selected</div>
                   </div>
-                  
-                  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16 }}>
-                    <div style={{ fontWeight: 600, color: '#856404', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      ℹ️ Password Information
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, color: '#856404' }}>
-                      A secure temporary password will be automatically generated (10+ characters with uppercase, lowercase, numbers, and symbols) and sent to the user's email address.
-                    </p>
+
+                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <Lock size={14} style={{ color: '#64748b', marginTop: 2, flexShrink: 0 }} />
+                    <p style={{ margin: 0, fontSize: 12.5, color: '#475569', lineHeight: 1.6 }}>A secure temporary password will be auto-generated and sent to the user's email address.</p>
                   </div>
-                  
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
-                    <button
-                      onClick={() => {
-                        setIsCreatingUser(false)
-                        setNewUserEmail('')
-                        setNewUserRoleIds([])
-                      }}
-                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleCreateUser}
-                      disabled={saving || !newUserEmail || newUserRoleIds.length === 0}
-                      style={{
-                        padding: '10px 20px',
-                        borderRadius: 8,
-                        border: 'none',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: (saving || !newUserEmail || newUserRoleIds.length === 0) ? 'not-allowed' : 'pointer',
-                        opacity: (saving || !newUserEmail || newUserRoleIds.length === 0) ? 0.6 : 1
-                      }}
-                    >
-                      {saving ? 'Creating...' : 'Create User'}
+
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => { setIsCreatingUser(false); setNewUserEmail(''); setNewUserRoleIds([]) }} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleCreateUser} disabled={saving || !newUserEmail || newUserRoleIds.length === 0} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: (saving || !newUserEmail || newUserRoleIds.length === 0) ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, fontSize: 13, cursor: (saving || !newUserEmail || newUserRoleIds.length === 0) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <Plus size={13} />{saving ? 'Creating…' : 'Create User'}
                     </button>
                   </div>
                 </div>
@@ -1360,142 +1191,66 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Success Modal - Show Created Password */}
           {createdUserPassword && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setCreatedUserPassword(null); setEmailSentStatus(null) }}>
-              <div className="glass-panel" style={{ width: 'min(550px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'inline-block', padding: 16, background: '#4CAF50', borderRadius: '50%', marginBottom: 16 }}>
-                    <CheckCircle size={48} color="#fff" />
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setCreatedUserPassword(null); setEmailSentStatus(null) }}>
+              <div style={{ width: 'min(520px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #14532d 0%, #16a34a 100%)', padding: '24px 24px 20px', textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <CheckCircle size={26} color="#fff" />
                   </div>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 24, color: '#4CAF50' }}>User Created Successfully!</h3>
+                  <h3 style={{ margin: '0 0 6px', fontSize: 18, color: '#fff', fontWeight: 700 }}>User Created Successfully!</h3>
                   {emailSentStatus?.sent ? (
-                    <p style={{ margin: 0, color: '#666' }}>A welcome email has been sent with login credentials.</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>Welcome email sent with login credentials.</p>
                   ) : (
-                    <p style={{ margin: 0, color: '#ff9800' }}>⚠️ User created but email could not be sent. {emailSentStatus?.error}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: 13 }}>User created — email delivery failed. {emailSentStatus?.error}</p>
                   )}
                 </div>
-                
-                <div style={{ background: 'var(--surface)', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#333' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
-                    <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {createdUserPassword}
-                    </code>
-                    <button
-                      onClick={handleCopyPassword}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: copied ? '#4CAF50' : '#2196F3',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontWeight: 600,
-                        fontSize: 13,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                <div style={{ padding: '20px 22px' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>TEMPORARY PASSWORD</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                    <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: SL_DARK, fontFamily: 'monospace', wordBreak: 'break-all' }}>{createdUserPassword}</code>
+                    <button onClick={handleCopyPassword} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: copied ? '#16a34a' : SL, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {copied ? <><CheckCircle size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
                     </button>
                   </div>
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e' }}>
+                    Save this password — it will not be shown again. The user should change it after first login.
+                  </div>
+                  <button onClick={() => { setCreatedUserPassword(null); setEmailSentStatus(null); setCopied(false) }} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Done</button>
                 </div>
-                
-                <div style={{ background: '#fff3cd', borderLeft: '4px solid #ffc107', padding: 16, borderRadius: 4, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, color: '#856404', marginBottom: 8 }}>⚠️ Important</div>
-                  <p style={{ margin: 0, fontSize: 13, color: '#856404', lineHeight: 1.6 }}>
-                    Please save this password. For security reasons, it will not be shown again. The user should change this password after their first login.
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setCreatedUserPassword(null)
-                    setEmailSentStatus(null)
-                    setCopied(false)
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: 'var(--primary)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontSize: 15
-                  }}
-                >
-                  Close
-                </button>
               </div>
             </div>
           )}
           
           {/* Assign Roles Modal */}
           {assigningUser && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }} onClick={() => setAssigningUser(null)}>
-              <div className="glass-panel" style={{ width: 'min(600px, 92vw)', padding: 24, borderRadius: 16, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0 }}>Assign Roles to {assigningUser.name}</h3>
-                <div style={{ display: 'grid', gap: 16 }}>
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    <span style={{ fontWeight: 500, marginBottom: 8 }}>Select Roles (you can select multiple)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 400, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8 }}>
-                      {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: selectedRoleIds.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (selectedRoleIds.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedRoleIds.includes(role.id)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSelectedRoleIds([...selectedRoleIds, role.id])
-                              } else {
-                                setSelectedRoleIds(selectedRoleIds.filter(id => id !== role.id))
-                              }
-                            }}
-                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                          />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#333', marginBottom: 2 }}>{role.name}</div>
-                            {role.description && <div style={{ fontSize: 12, color: '#666' }}>{role.description}</div>}
-                          </div>
-                          {role.is_system_role && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 10, fontWeight: 700 }}>
-                              SYSTEM
-                            </span>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
-                      {selectedRoleIds.length} role{selectedRoleIds.length !== 1 ? 's' : ''} selected
-                    </div>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000 }} onClick={() => setAssigningUser(null)}>
+              <div style={{ width: 'min(560px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Key size={16} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Assign Roles — {assigningUser.name || assigningUser.email}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
-                    <button
-                      onClick={() => {
-                        setAssigningUser(null)
-                        setSelectedRoleIds([])
-                      }}
-                      style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleAssignRoles}
-                      disabled={saving}
-                      style={{
-                        padding: '10px 20px',
-                        borderRadius: 8,
-                        border: 'none',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: saving ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {saving ? 'Assigning...' : `Assign ${selectedRoleIds.length} Role${selectedRoleIds.length !== 1 ? 's' : ''}`}
+                  <button onClick={() => { setAssigningUser(null); setSelectedRoleIds([]) }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+                </div>
+                <div style={{ padding: '20px 22px', overflow: 'auto', display: 'grid', gap: 14 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Select roles to assign (multiple allowed)</span>
+                  <div style={{ display: 'grid', gap: 8, maxHeight: 340, overflow: 'auto', padding: 8, border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' }}>
+                    {roles.map(role => (
+                      <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '9px 12px', borderRadius: 8, background: selectedRoleIds.includes(role.id) ? 'rgba(51,65,85,0.07)' : '#fff', border: '1.5px solid ' + (selectedRoleIds.includes(role.id) ? SL : '#e2e8f0'), transition: 'all 0.15s' }}>
+                        <input type="checkbox" checked={selectedRoleIds.includes(role.id)} onChange={e => { if (e.target.checked) setSelectedRoleIds([...selectedRoleIds, role.id]); else setSelectedRoleIds(selectedRoleIds.filter(id => id !== role.id)) }} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: SL }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{role.name}</div>
+                          {role.description && <div style={{ fontSize: 11.5, color: '#64748b' }}>{role.description}</div>}
+                        </div>
+                        {role.is_system_role && <span style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontSize: 10, fontWeight: 700 }}>SYSTEM</span>}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#64748b' }}>{selectedRoleIds.length} role{selectedRoleIds.length !== 1 ? 's' : ''} selected</div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => { setAssigningUser(null); setSelectedRoleIds([]) }} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleAssignRoles} disabled={saving} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: saving ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <Save size={13} />{saving ? 'Saving…' : `Assign ${selectedRoleIds.length} Role${selectedRoleIds.length !== 1 ? 's' : ''}`}
                     </button>
                   </div>
                 </div>
@@ -1505,76 +1260,31 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Reset Password Success Modal */}
           {resettingUser && resetPasswordResult && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setResettingUser(null); setResetPasswordResult(null); setResetCopied(false) }}>
-              <div className="glass-panel" style={{ width: 'min(550px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'inline-block', padding: 16, background: '#ff9800', borderRadius: '50%', marginBottom: 16 }}>
-                    <RotateCcw size={48} color="#fff" />
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setResettingUser(null); setResetPasswordResult(null); setResetCopied(false) }}>
+              <div style={{ width: 'min(500px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #9a3412 0%, #ea580c 100%)', padding: '24px 24px 20px', textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <RotateCcw size={24} color="#fff" />
                   </div>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 24, color: '#ff9800' }}>Password Reset Successfully!</h3>
-                  <p style={{ margin: 0, color: '#666' }}>Password reset for <strong>{resettingUser.email}</strong></p>
-                  {resetPasswordResult.emailSent ? (
-                    <p style={{ margin: '8px 0 0', color: '#4CAF50', fontSize: 14 }}>✅ Reset email sent successfully</p>
-                  ) : (
-                    <p style={{ margin: '8px 0 0', color: '#ff9800', fontSize: 14 }}>⚠️ Email could not be sent. {resetPasswordResult.error}</p>
-                  )}
+                  <h3 style={{ margin: '0 0 4px', fontSize: 17, color: '#fff', fontWeight: 700 }}>Password Reset</h3>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>{resettingUser.email}</p>
+                  {resetPasswordResult.emailSent
+                    ? <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Reset email sent successfully.</p>
+                    : <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Email delivery failed. {resetPasswordResult.error}</p>}
                 </div>
-                
-                <div style={{ background: '#fff3cd', border: '2px solid #ff9800', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#856404' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
-                    <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {resetPasswordResult.password}
-                    </code>
-                    <button
-                      onClick={handleCopyResetPassword}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: resetCopied ? '#4CAF50' : '#2196F3',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontWeight: 600,
-                        fontSize: 13,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {resetCopied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                <div style={{ padding: '20px 22px' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>TEMPORARY PASSWORD</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                    <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: SL_DARK, fontFamily: 'monospace', wordBreak: 'break-all' }}>{resetPasswordResult.password}</code>
+                    <button onClick={handleCopyResetPassword} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: resetCopied ? '#16a34a' : SL, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {resetCopied ? <><CheckCircle size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
                     </button>
                   </div>
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#92400e' }}>
+                    The user must change this password on next login. Share it directly if email was not delivered.
+                  </div>
+                  <button onClick={() => { setResettingUser(null); setResetPasswordResult(null); setResetCopied(false) }} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Done</button>
                 </div>
-                
-                <div style={{ background: '#fff3cd', borderLeft: '4px solid #ffc107', padding: 16, borderRadius: 4, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, color: '#856404', marginBottom: 8 }}>⚠️ Important</div>
-                  <p style={{ margin: 0, fontSize: 13, color: '#856404', lineHeight: 1.6 }}>
-                    The user will be required to change this password on their next login. Please provide them with this temporary password if the email was not delivered.
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setResettingUser(null)
-                    setResetPasswordResult(null)
-                    setResetCopied(false)
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: 'var(--primary)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontSize: 15
-                  }}
-                >
-                  Close
-                </button>
               </div>
             </div>
           )}
@@ -1582,167 +1292,215 @@ export default function Settings({ accessToken }: { accessToken: string }) {
       )}
       
       {/* My Profile Tab */}
-      {subTab === 'profile' && (
-        <div style={{ display: 'grid', gap: 16 }}>
-          <h2 style={{ margin: 0 }}>My Profile</h2>
-          
-          <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 20 }}>Change Password</h3>
-            
-            <div style={{ display: 'grid', gap: 16, maxWidth: 500 }}>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>Current Password *</span>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                />
-              </label>
-              
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>New Password *</span>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                />
-                {newPassword && (
-                  <div style={{ fontSize: 12, color: passwordStrength.color, fontWeight: 500 }}>
-                    Password Strength: {passwordStrength.text}
-                  </div>
-                )}
-              </label>
-              
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500 }}>Confirm New Password *</span>
-                <input
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={e => setConfirmNewPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                  style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                />
-              </label>
-              
-              <div style={{ background: '#f0f7ff', border: '1px solid #2196F3', borderRadius: 8, padding: 16, fontSize: 13 }}>
-                <strong style={{ color: '#1565c0' }}>Password Requirements:</strong>
-                <ul style={{ margin: '8px 0 0', paddingLeft: 20, color: '#1976d2' }}>
-                  <li>At least 10 characters long</li>
-                  <li>Contains uppercase and lowercase letters</li>
-                  <li>Contains at least one number</li>
-                  <li>Contains at least one special symbol</li>
-                  <li>Cannot match your last 3 passwords</li>
-                </ul>
+      {subTab === 'profile' && (() => {
+        const decoded = decodeToken(accessToken)
+        const email = decoded?.email ?? '—'
+        const roleNames = decoded?.roleNames ?? []
+        const userId = decoded?.userId
+        const sessionExpiry = formatTimeUntilExpiry(accessToken)
+        const avatarLetter = email.slice(0, 1).toUpperCase()
+        return (
+          <div style={{ display: 'grid', gap: 16 }}>
+
+            {/* ── Account Overview ── */}
+            <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ background: `linear-gradient(90deg, ${SL_DARK} 0%, #475569 55%, ${SL} 100%)`, padding: '13px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <User size={15} color="rgba(255,255,255,0.85)" />
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>My Account</span>
               </div>
-              
-              {passwordChangeError && (
-                <div style={{ padding: '12px', background: '#f443364d', border: '1px solid #f44336', borderRadius: 8, color: '#c62828', fontSize: 14 }}>
-                  {passwordChangeError}
+              <div style={{ padding: '26px 24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
+                  {/* Avatar */}
+                  <div style={{ width: 68, height: 68, borderRadius: '50%', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 26, fontWeight: 800, flexShrink: 0, boxShadow: '0 4px 14px rgba(30,41,59,0.25)' }}>
+                    {avatarLetter}
+                  </div>
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: '#1e293b', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
+                    {/* Role pills */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      {roleNames.length > 0 ? roleNames.map((r, i) => (
+                        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 99, background: 'rgba(51,65,85,0.08)', color: SL, fontSize: 11.5, fontWeight: 700 }}>
+                          <Shield size={10} />{r}
+                        </span>
+                      )) : (
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>No roles assigned</span>
+                      )}
+                    </div>
+                    {/* Info chips */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                        <Clock size={11} style={{ color: '#64748b' }} />
+                        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>Session expires in <strong style={{ color: SL }}>{sessionExpiry}</strong></span>
+                      </div>
+                      {userId && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                          <User size={11} style={{ color: '#64748b' }} />
+                          <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>User <strong style={{ color: SL }}>#{userId}</strong></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-              
-              <button
-                onClick={handleChangeOwnPassword}
-                disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}
-                style={{
-                  padding: '12px 20px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: (changingPassword || !currentPassword || !newPassword || !confirmNewPassword) ? '#b1b1b1' : 'var(--accent)',
-                  color: '#fff',
-                  fontWeight: 600,
-                  cursor: (changingPassword || !currentPassword || !newPassword || !confirmNewPassword) ? 'not-allowed' : 'pointer',
-                  fontSize: 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8
-                }}
-              >
-                <Save size={16} />
-                {changingPassword ? 'Changing Password...' : 'Change Password'}
-              </button>
+              </div>
             </div>
+
+            {/* ── Change Password ── */}
+            <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ background: `linear-gradient(90deg, ${SL_DARK} 0%, #475569 55%, ${SL} 100%)`, padding: '13px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Lock size={15} color="rgba(255,255,255,0.85)" />
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Change Password</span>
+              </div>
+              <div style={{ padding: '24px 26px' }}>
+                <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+
+                  {/* Left — form fields */}
+                  <div style={{ flex: '1 1 280px', display: 'grid', gap: 16 }}>
+
+                    {/* Current password */}
+                    <label style={{ display: 'grid', gap: 5 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Current Password <span style={{ color: '#ef4444' }}>*</span></span>
+                      <div style={{ position: 'relative' }}>
+                        <input type={showCurrentPw ? 'text' : 'password'} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" style={{ ...SETTINGS_INPUT, paddingRight: 40 }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        <button type="button" onClick={() => setShowCurrentPw(v => !v)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}>
+                          {showCurrentPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </label>
+
+                    {/* New password + strength */}
+                    <label style={{ display: 'grid', gap: 5 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>New Password <span style={{ color: '#ef4444' }}>*</span></span>
+                      <div style={{ position: 'relative' }}>
+                        <input type={showNewPw ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" style={{ ...SETTINGS_INPUT, paddingRight: 40 }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        <button type="button" onClick={() => setShowNewPw(v => !v)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}>
+                          {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                      {newPassword && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                          <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+                            {[1,2,3,4,5].map(i => (
+                              <div key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i <= passwordStrength.strength ? passwordStrength.color : '#e2e8f0', transition: 'background 0.2s' }} />
+                            ))}
+                          </div>
+                          <span style={{ fontSize: 11, color: passwordStrength.color, fontWeight: 700, whiteSpace: 'nowrap', minWidth: 52, textAlign: 'right' }}>{passwordStrength.text}</span>
+                        </div>
+                      )}
+                    </label>
+
+                    {/* Confirm password */}
+                    <label style={{ display: 'grid', gap: 5 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Confirm New Password <span style={{ color: '#ef4444' }}>*</span></span>
+                      <div style={{ position: 'relative' }}>
+                        <input type={showConfirmPw ? 'text' : 'password'} value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Confirm new password" style={{ ...SETTINGS_INPUT, paddingRight: 40 }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        <button type="button" onClick={() => setShowConfirmPw(v => !v)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: 0 }}>
+                          {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                      {confirmNewPassword && newPassword !== confirmNewPassword && (
+                        <span style={{ fontSize: 11.5, color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <X size={12} />Passwords do not match
+                        </span>
+                      )}
+                      {confirmNewPassword && newPassword === confirmNewPassword && (
+                        <span style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <CheckCircle size={12} />Passwords match
+                        </span>
+                      )}
+                    </label>
+
+                    {passwordChangeError && (
+                      <div style={{ padding: '10px 13px', background: 'rgba(220,38,38,0.07)', border: '1.5px solid rgba(220,38,38,0.25)', borderRadius: 10, color: '#dc2626', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <AlertTriangle size={13} style={{ flexShrink: 0 }} />{passwordChangeError}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleChangeOwnPassword}
+                      disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                      style={{ padding: '11px 0', borderRadius: 10, border: 'none', background: (changingPassword || !currentPassword || !newPassword || !confirmNewPassword) ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: (changingPassword || !currentPassword || !newPassword || !confirmNewPassword) ? 'not-allowed' : 'pointer', fontSize: 13.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', boxShadow: (changingPassword || !currentPassword || !newPassword || !confirmNewPassword) ? 'none' : '0 2px 8px rgba(30,41,59,0.25)' }}
+                    >
+                      <Save size={14} />{changingPassword ? 'Changing Password…' : 'Change Password'}
+                    </button>
+
+                  </div>
+
+                  {/* Right — live requirements */}
+                  <div style={{ flex: '0 0 200px', minWidth: 180 }}>
+                    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '16px 16px', height: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: SL, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 12 }}>Requirements</div>
+                      <div style={{ display: 'grid', gap: 9 }}>
+                        {[
+                          { text: 'At least 10 characters', met: newPassword.length >= 10 },
+                          { text: 'Uppercase letter', met: /[A-Z]/.test(newPassword) },
+                          { text: 'Lowercase letter', met: /[a-z]/.test(newPassword) },
+                          { text: 'One number', met: /\d/.test(newPassword) },
+                          { text: 'One symbol', met: /[^A-Za-z0-9]/.test(newPassword) },
+                          { text: 'Not a recent password', met: false },
+                        ].map((req, i) => {
+                          const active = newPassword.length > 0
+                          const met = active && req.met
+                          const unmet = active && !req.met
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: met ? '#16a34a' : unmet ? '#ef4444' : '#94a3b8', transition: 'color 0.2s' }}>
+                              <div style={{ width: 16, height: 16, borderRadius: '50%', background: met ? '#dcfce7' : unmet ? '#fee2e2' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'background 0.2s' }}>
+                                {met
+                                  ? <CheckCircle size={10} style={{ color: '#16a34a' }} />
+                                  : unmet
+                                    ? <X size={9} style={{ color: '#ef4444' }} />
+                                    : <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd5e1' }} />
+                                }
+                              </div>
+                              <span style={{ lineHeight: 1.4 }}>{req.text}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
           </div>
-        </div>
-      )}
+        )
+      })()}
       
       {/* Application Settings Tab */}
       {subTab === 'app_settings' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <h2 style={{ margin: 0 }}>Application Settings</h2>
-          
-          <div className="glass-panel" style={{ padding: 24, borderRadius: 12 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 20 }}>International Clock Configuration</h3>
-            
-            <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
-              <div style={{ background: '#f0f7ff', border: '1px solid #2196F3', borderRadius: 8, padding: 16, fontSize: 13 }}>
-                <strong style={{ color: '#1565c0' }}>ℹ️ About International Clock:</strong>
-                <p style={{ margin: '8px 0 0', color: '#1976d2', lineHeight: 1.6 }}>
-                  The international clock appears on the home page below the local time clock. 
-                  Select the timezone you want to display for international time tracking.
-                </p>
-              </div>
-              
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontWeight: 500, fontSize: 15 }}>Select Timezone</span>
-                <select
-                  value={applicationTimezone}
-                  onChange={e => setApplicationTimezone(e.target.value)}
-                  disabled={timezoneLoading}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: 8,
-                    border: '1px solid #ccc',
-                    fontSize: 14,
-                    background: timezoneLoading ? 'var(--surface)' : '#fff',
-                    cursor: timezoneLoading ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {timezoneOptions.map(tz => (
-                    <option key={tz.value} value={tz.value}>
-                      {tz.label}
-                    </option>
-                  ))}
-                </select>
-                <span style={{ fontSize: 12, color: '#666' }}>
-                  Currently selected: <strong>{applicationTimezone}</strong>
-                </span>
-              </label>
-              
-              <button
-                onClick={handleSaveTimezone}
-                disabled={timezoneSaving || timezoneLoading}
-                style={{
-                  padding: '12px 20px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: (timezoneSaving || timezoneLoading) ? '#b1b1b1' : 'var(--accent)',
-                  color: '#fff',
-                  fontWeight: 600,
-                  cursor: (timezoneSaving || timezoneLoading) ? 'not-allowed' : 'pointer',
-                  fontSize: 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  width: 'fit-content'
-                }}
-              >
-                <Save size={16} />
-                {timezoneSaving ? 'Saving...' : 'Save Timezone'}
-              </button>
-              
-              <div style={{ background: '#fff3cd', borderLeft: '4px solid #ffc107', padding: 16, borderRadius: 4, fontSize: 13 }}>
-                <strong style={{ color: '#856404' }}>🔒 Permission Required:</strong>
-                <p style={{ margin: '8px 0 0', color: '#856404' }}>
-                  Only users with <code style={{ background: 'var(--surface)', padding: '2px 6px', borderRadius: 3 }}>settings:manage</code> permission 
-                  can modify application settings. This is typically SuperAdmin or Admin roles.
-                </p>
+          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.09)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Globe size={16} color="rgba(255,255,255,0.85)" />
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>International Clock Configuration</span>
+            </div>
+            <div style={{ padding: '22px 24px' }}>
+              <div style={{ display: 'grid', gap: 16, maxWidth: 560 }}>
+                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '13px 15px', fontSize: 12.5, color: '#475569', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <Globe size={14} style={{ color: '#64748b', marginTop: 1, flexShrink: 0 }} />
+                  <p style={{ margin: 0, lineHeight: 1.6 }}>The international clock appears on the home page below the local time. Select the timezone for international time tracking.</p>
+                </div>
+
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Select Timezone</span>
+                  <select value={applicationTimezone} onChange={e => setApplicationTimezone(e.target.value)} disabled={timezoneLoading} style={{ ...SETTINGS_INPUT, cursor: timezoneLoading ? 'not-allowed' : 'pointer', opacity: timezoneLoading ? 0.6 : 1 }} onFocus={sFocusIn} onBlur={sFocusOut}>
+                    {timezoneOptions.map(tz => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Selected: <strong style={{ color: '#475569' }}>{applicationTimezone}</strong></span>
+                </label>
+
+                <button onClick={handleSaveTimezone} disabled={timezoneSaving || timezoneLoading} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: (timezoneSaving || timezoneLoading) ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: (timezoneSaving || timezoneLoading) ? 'not-allowed' : 'pointer', fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8, width: 'fit-content' }}>
+                  <Save size={14} />{timezoneSaving ? 'Saving…' : 'Save Timezone'}
+                </button>
+
+                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#475569', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <Lock size={13} style={{ color: '#94a3b8', marginTop: 1, flexShrink: 0 }} />
+                  <p style={{ margin: 0 }}>Requires <code style={{ background: '#e2e8f0', padding: '1px 5px', borderRadius: 4, fontSize: 11.5, color: SL }}>settings:manage</code> permission — typically SuperAdmin or Admin roles.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1752,534 +1510,295 @@ export default function Settings({ accessToken }: { accessToken: string }) {
       {/* Employee Onboarding Tab */}
       {subTab === 'employee_onboarding' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0 }}>Employee Onboarding</h2>
-            <button
-              onClick={() => setIsOnboardingEmployee(true)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
-            >
-              <Plus size={18} />
-              Onboard New Employee
+          {/* Header bar */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '13px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(51,65,85,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: SL }}>
+                <UsersIcon size={17} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>Employee Onboarding</div>
+                <div style={{ fontSize: 11.5, color: '#64748b' }}>{employees.length} employee{employees.length !== 1 ? 's' : ''} on record</div>
+              </div>
+            </div>
+            <button onClick={() => setIsOnboardingEmployee(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(30,41,59,0.3)' }}>
+              <Plus size={14} />Onboard Employee
             </button>
           </div>
-          
+
           {employeesLoading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>Loading employees...</div>
+            <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+              <div style={{ width: 30, height: 30, borderRadius: '50%', border: `3px solid #f1f5f9`, borderTop: `3px solid ${SL}`, animation: 'ql-spin 0.8s linear infinite', margin: '0 auto 12px' }} />Loading employees…
+            </div>
           ) : (
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <table className="glass-panel" style={{ width: '100%', borderCollapse: 'collapse', overflow: 'hidden', fontSize: 14 }}>
+            <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: 'var(--primary)', color: '#fff' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Employee #</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Name</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Email</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Designation</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Roles</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Actions</th>
+                  <tr style={{ background: `linear-gradient(90deg, ${SL_DARK} 0%, #475569 55%, ${SL} 100%)` }}>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5, whiteSpace: 'nowrap' }}>Employee #</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Name</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Email</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Designation</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Status</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Roles</th>
+                    <th style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#fff', fontSize: 11.5 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.map((emp, idx) => (
-                    <tr key={emp.employee_id} style={{ borderBottom: idx < employees.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: 500 }}>{emp.employee_number}</td>
-                      <td style={{ padding: '12px 16px' }}>{emp.first_name} {emp.last_name}</td>
-                      <td style={{ padding: '12px 16px' }}>{emp.email}</td>
-                      <td style={{ padding: '12px 16px' }}>{emp.designation || '-'}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        {getStatusBadge(emp)}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
+                    <tr key={emp.employee_id}
+                      style={{ borderBottom: idx < employees.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    >
+                      <td style={{ padding: '11px 14px', fontWeight: 700, color: SL, fontSize: 12 }}>{emp.employee_number}</td>
+                      <td style={{ padding: '11px 14px', fontWeight: 600, color: '#1e293b' }}>{emp.first_name} {emp.last_name}</td>
+                      <td style={{ padding: '11px 14px', color: '#475569' }}>{emp.email}</td>
+                      <td style={{ padding: '11px 14px', color: '#64748b' }}>{emp.designation || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                      <td style={{ padding: '11px 14px' }}>{getStatusBadge(emp)}</td>
+                      <td style={{ padding: '11px 14px' }}>
                         {emp.roles.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                             {emp.roles.map(role => (
-                              <span key={role.id} style={{ padding: '4px 8px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 12, fontWeight: 600 }}>
-                                {role.name}
-                              </span>
+                              <span key={role.id} style={{ padding: '3px 9px', borderRadius: 99, background: 'rgba(51,65,85,0.08)', color: SL, fontSize: 11, fontWeight: 700 }}>{role.name}</span>
                             ))}
                           </div>
-                        ) : (
-                          <span style={{ color: '#999' }}>-</span>
-                        )}
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ display: 'flex', gap: 5 }}>
                           {emp.has_user_account && emp.account_status !== 'terminated' && (
-                            <button
-                              onClick={() => handleOpenEditModal(emp)}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: 6,
-                                border: '1px solid #2196F3',
-                                background: '#2196F3',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4
-                              }}
-                            >
-                              <Edit2 size={12} />
-                              Edit
-                            </button>
+                            <button onClick={() => handleOpenEditModal(emp)}
+                              style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(22,163,74,0.1)', color: '#16a34a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(22,163,74,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+                              title="Edit"><Edit2 size={13} /></button>
                           )}
                           {emp.has_user_account && emp.account_status === 'active' && (
                             <>
-                              <button
-                                onClick={() => setSuspendingEmployee(emp)}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: 6,
-                                  border: '1px solid #ff9800',
-                                  background: '#ff9800',
-                                  color: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  fontWeight: 600
-                                }}
-                              >
-                                Suspend
-                              </button>
-                              <button
-                                onClick={() => setTerminatingEmployee(emp)}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: 6,
-                                  border: '1px solid #f44336',
-                                  background: '#f44336',
-                                  color: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  fontWeight: 600
-                                }}
-                              >
-                                Terminate
-                              </button>
+                              <button onClick={() => setSuspendingEmployee(emp)}
+                                style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(234,88,12,0.1)', color: '#c2410c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#ea580c'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(234,88,12,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#c2410c' }}
+                                title="Suspend"><Lock size={13} /></button>
+                              <button onClick={() => setTerminatingEmployee(emp)}
+                                style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(220,38,38,0.1)', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#dc2626'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,38,38,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
+                                title="Terminate"><AlertTriangle size={13} /></button>
                             </>
                           )}
                           {emp.has_user_account && emp.account_status === 'suspended' && (
                             <>
-                              <button
-                                onClick={() => setReactivatingEmployee(emp)}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: 6,
-                                  border: '1px solid #4CAF50',
-                                  background: '#4CAF50',
-                                  color: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  fontWeight: 600
-                                }}
-                              >
-                                Reactivate
-                              </button>
-                              <button
-                                onClick={() => setTerminatingEmployee(emp)}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: 6,
-                                  border: '1px solid #f44336',
-                                  background: '#f44336',
-                                  color: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                  fontWeight: 600
-                                }}
-                              >
-                                Terminate
-                              </button>
+                              <button onClick={() => setReactivatingEmployee(emp)}
+                                style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(22,163,74,0.1)', color: '#16a34a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#16a34a'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(22,163,74,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#16a34a' }}
+                                title="Reactivate"><RotateCcw size={13} /></button>
+                              <button onClick={() => setTerminatingEmployee(emp)}
+                                style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(220,38,38,0.1)', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#dc2626'; (e.currentTarget as HTMLButtonElement).style.color = '#fff' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,38,38,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
+                                title="Terminate"><AlertTriangle size={13} /></button>
                             </>
                           )}
                           {emp.has_user_account && emp.account_status === 'terminated' && (
-                            <span style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>No actions available</span>
+                            <span style={{ fontSize: 11.5, color: '#94a3b8', fontStyle: 'italic' }}>Terminated</span>
                           )}
                         </div>
                       </td>
                     </tr>
                   ))}
                   {employees.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#999' }}>
-                        No employees found. Click "Onboard New Employee" to get started.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No employees found. Click "Onboard Employee" to get started.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           )}
           
-          {/* Onboarding Modal */}
+          {/* Onboarding Drawer */}
           {isOnboardingEmployee && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, overflowY: 'auto', padding: '20px 0' }} onClick={() => setIsOnboardingEmployee(false)}>
-              <div className="glass-panel" style={{ width: 'min(800px, 92vw)', padding: 24, borderRadius: 16, maxHeight: '90vh', overflow: 'auto', margin: 'auto' }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, marginBottom: 20 }}>Onboard New Employee</h3>
-                
-                <div style={{ display: 'grid', gap: 24 }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 1000 }} onClick={() => { setIsOnboardingEmployee(false); setOnboardingData({ roleIds: [] }) }}>
+              <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(580px, 100vw)', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-6px 0 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+
+                {/* Drawer header */}
+                <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <UsersIcon size={17} color="#fff" />
+                    </div>
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Onboard New Employee</div>
+                      <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: 11.5, marginTop: 2 }}>Fill in details to create employee account</div>
+                    </div>
+                  </div>
+                  <button onClick={() => { setIsOnboardingEmployee(false); setOnboardingData({ roleIds: [] }) }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Scrollable body */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'grid', gap: 18, alignContent: 'start' }}>
+
                   {/* Personal Information */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      👤 Personal Information
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>First Name *</span>
-                        <input
-                          type="text"
-                          value={onboardingData.first_name || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, first_name: e.target.value })}
-                          placeholder="John"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                  <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 700, fontSize: 11.5, color: SL, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>Personal Information</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>First Name <span style={{ color: '#ef4444' }}>*</span></span>
+                        <input type="text" value={onboardingData.first_name || ''} onChange={e => setOnboardingData({ ...onboardingData, first_name: e.target.value })} placeholder="John" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Last Name *</span>
-                        <input
-                          type="text"
-                          value={onboardingData.last_name || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, last_name: e.target.value })}
-                          placeholder="Doe"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></span>
+                        <input type="text" value={onboardingData.last_name || ''} onChange={e => setOnboardingData({ ...onboardingData, last_name: e.target.value })} placeholder="Doe" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Email *</span>
-                        <input
-                          type="email"
-                          value={onboardingData.email || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, email: e.target.value })}
-                          placeholder="john.doe@company.com"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Email <span style={{ color: '#ef4444' }}>*</span></span>
+                        <input type="email" value={onboardingData.email || ''} onChange={e => setOnboardingData({ ...onboardingData, email: e.target.value })} placeholder="john.doe@company.com" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Phone *</span>
-                        <input
-                          type="text"
-                          value={onboardingData.phone || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
-                          placeholder="+1234567890"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Phone <span style={{ color: '#ef4444' }}>*</span></span>
+                        <input type="text" value={onboardingData.phone || ''} onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })} placeholder="+1234567890" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Date of Birth</span>
-                        <input
-                          type="date"
-                          value={onboardingData.dob || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, dob: e.target.value })}
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Date of Birth</span>
+                        <input type="date" value={onboardingData.dob || ''} onChange={e => setOnboardingData({ ...onboardingData, dob: e.target.value })} style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>NIC/ID Number</span>
-                        <input
-                          type="text"
-                          value={onboardingData.nic || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, nic: e.target.value })}
-                          placeholder="ID/NIC Number"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>NIC / ID Number</span>
+                        <input type="text" value={onboardingData.nic || ''} onChange={e => setOnboardingData({ ...onboardingData, nic: e.target.value })} placeholder="ID/NIC Number" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6, gridColumn: 'span 2' }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Address</span>
-                        <input
-                          type="text"
-                          value={onboardingData.address || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, address: e.target.value })}
-                          placeholder="Full address"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5, gridColumn: '1 / -1' }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Address</span>
+                        <input type="text" value={onboardingData.address || ''} onChange={e => setOnboardingData({ ...onboardingData, address: e.target.value })} placeholder="Full address" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
                     </div>
                   </div>
-                  
+
                   {/* Employment Details */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      💼 Employment Details
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Employee Number *</span>
+                  <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 700, fontSize: 11.5, color: SL, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>Employment Details</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 5, gridColumn: '1 / -1' }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Employee Number <span style={{ color: '#ef4444' }}>*</span></span>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            type="text"
-                            value={onboardingData.employee_number || ''}
-                            onChange={e => setOnboardingData({ ...onboardingData, employee_number: e.target.value })}
-                            placeholder="EMP00001"
-                            style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                          />
-                          <button
-                            onClick={handleGenerateEmployeeNumber}
-                            disabled={generatingNumber}
-                            style={{
-                              padding: '10px 16px',
-                              borderRadius: 8,
-                              border: 'none',
-                              background: '#2196F3',
-                              color: '#fff',
-                              fontWeight: 600,
-                              cursor: generatingNumber ? 'not-allowed' : 'pointer',
-                              fontSize: 13,
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {generatingNumber ? 'Generating...' : 'Generate'}
+                          <input type="text" value={onboardingData.employee_number || ''} onChange={e => setOnboardingData({ ...onboardingData, employee_number: e.target.value })} placeholder="EMP00001" style={{ ...SETTINGS_INPUT, flex: 1, width: 'auto' }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                          <button onClick={handleGenerateEmployeeNumber} disabled={generatingNumber} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: generatingNumber ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: generatingNumber ? 'not-allowed' : 'pointer', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {generatingNumber ? '…' : 'Generate'}
                           </button>
                         </div>
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Designation</span>
-                        <input
-                          type="text"
-                          value={onboardingData.designation || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, designation: e.target.value })}
-                          placeholder="e.g., Senior Accountant"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Designation</span>
+                        <input type="text" value={onboardingData.designation || ''} onChange={e => setOnboardingData({ ...onboardingData, designation: e.target.value })} placeholder="e.g., Senior Accountant" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Department</span>
-                        <input
-                          type="text"
-                          value={onboardingData.employee_department || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, employee_department: e.target.value })}
-                          placeholder="e.g., Finance"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Department</span>
+                        <input type="text" value={onboardingData.employee_department || ''} onChange={e => setOnboardingData({ ...onboardingData, employee_department: e.target.value })} placeholder="e.g., Finance" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Hire Date</span>
-                        <input
-                          type="date"
-                          value={onboardingData.hire_date || new Date().toISOString().split('T')[0]}
-                          onChange={e => setOnboardingData({ ...onboardingData, hire_date: e.target.value })}
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Hire Date</span>
+                        <input type="date" value={onboardingData.hire_date || new Date().toISOString().split('T')[0]} onChange={e => setOnboardingData({ ...onboardingData, hire_date: e.target.value })} style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
                     </div>
                   </div>
-                  
+
                   {/* Payroll Configuration */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      💰 Payroll Configuration
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Base Salary</span>
-                        <input
-                          type="number"
-                          value={onboardingData.base_salary || ''}
-                          onChange={e => setOnboardingData({ ...onboardingData, base_salary: parseFloat(e.target.value) || undefined })}
-                          placeholder="60000"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                  <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 700, fontSize: 11.5, color: SL, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>Payroll Configuration</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Base Salary</span>
+                        <input type="number" value={onboardingData.base_salary || ''} onChange={e => setOnboardingData({ ...onboardingData, base_salary: parseFloat(e.target.value) || undefined })} placeholder="60000" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>EPF Contribution Rate (%)</span>
-                        <input
-                          type="number"
-                          value={onboardingData.epf_contribution_rate || 8}
-                          onChange={e => setOnboardingData({ ...onboardingData, epf_contribution_rate: parseFloat(e.target.value) || 8 })}
-                          placeholder="8"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>EPF Contribution Rate (%)</span>
+                        <input type="number" value={onboardingData.epf_contribution_rate || 8} onChange={e => setOnboardingData({ ...onboardingData, epf_contribution_rate: parseFloat(e.target.value) || 8 })} placeholder="8" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>PTO Allowance (days)</span>
-                        <input
-                          type="number"
-                          value={onboardingData.pto_allowance || 20}
-                          onChange={e => setOnboardingData({ ...onboardingData, pto_allowance: parseInt(e.target.value) || 20 })}
-                          placeholder="20"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
+                      <label style={{ display: 'grid', gap: 5 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>PTO Allowance (days)</span>
+                        <input type="number" value={onboardingData.pto_allowance || 20} onChange={e => setOnboardingData({ ...onboardingData, pto_allowance: parseInt(e.target.value) || 20 })} placeholder="20" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={onboardingData.epf_enabled !== false}
-                          onChange={e => setOnboardingData({ ...onboardingData, epf_enabled: e.target.checked })}
-                          style={{ width: 18, height: 18, cursor: 'pointer' }}
-                        />
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>EPF Enabled</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid #e0e0e0', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={onboardingData.etf_enabled !== false}
-                          onChange={e => setOnboardingData({ ...onboardingData, etf_enabled: e.target.checked })}
-                          style={{ width: 18, height: 18, cursor: 'pointer' }}
-                        />
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>ETF Enabled</span>
-                      </label>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={onboardingData.epf_enabled !== false} onChange={e => setOnboardingData({ ...onboardingData, epf_enabled: e.target.checked })} style={{ width: 15, height: 15, cursor: 'pointer', accentColor: SL }} />
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}>EPF</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, padding: '10px 12px', borderRadius: 10, background: '#fff', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={onboardingData.etf_enabled !== false} onChange={e => setOnboardingData({ ...onboardingData, etf_enabled: e.target.checked })} style={{ width: 15, height: 15, cursor: 'pointer', accentColor: SL }} />
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}>ETF</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                  
+
                   {/* Role Assignment */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      🔐 Access & Permissions
-                    </h4>
-                    <span style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, display: 'block', color: '#000' }}>Assign Roles * (select at least one)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: 'var(--surface)' }}>
+                  <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 700, fontSize: 11.5, color: SL, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>Access & Permissions</div>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 10 }}>Assign Roles <span style={{ color: '#ef4444' }}>*</span> — select at least one</div>
+                    <div style={{ display: 'grid', gap: 7, maxHeight: 200, overflowY: 'auto', padding: '2px 0' }}>
                       {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: onboardingData.roleIds?.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (onboardingData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
-                          <input
-                            type="checkbox"
-                            checked={onboardingData.roleIds?.includes(role.id) || false}
-                            onChange={e => {
-                              const currentRoles = onboardingData.roleIds || []
-                              if (e.target.checked) {
-                                setOnboardingData({ ...onboardingData, roleIds: [...currentRoles, role.id] })
-                              } else {
-                                setOnboardingData({ ...onboardingData, roleIds: currentRoles.filter(id => id !== role.id) })
-                              }
-                            }}
-                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                          />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#333', marginBottom: 2 }}>{role.name}</div>
-                            {role.description && <div style={{ fontSize: 12, color: '#666' }}>{role.description}</div>}
+                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '9px 12px', borderRadius: 9, background: onboardingData.roleIds?.includes(role.id) ? 'rgba(51,65,85,0.07)' : '#fff', border: '1.5px solid ' + (onboardingData.roleIds?.includes(role.id) ? SL : '#e2e8f0'), transition: 'all 0.15s' }}>
+                          <input type="checkbox" checked={onboardingData.roleIds?.includes(role.id) || false} onChange={e => { const cur = onboardingData.roleIds || []; if (e.target.checked) setOnboardingData({ ...onboardingData, roleIds: [...cur, role.id] }); else setOnboardingData({ ...onboardingData, roleIds: cur.filter(id => id !== role.id) }) }} style={{ width: 15, height: 15, cursor: 'pointer', accentColor: SL, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{role.name}</div>
+                            {role.description && <div style={{ fontSize: 11.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{role.description}</div>}
                           </div>
-                          {role.is_system_role && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 10, fontWeight: 700 }}>
-                              SYSTEM
-                            </span>
-                          )}
+                          {role.is_system_role && <span style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>SYSTEM</span>}
                         </label>
                       ))}
                     </div>
-                    <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>
-                      {onboardingData.roleIds?.length || 0} role{(onboardingData.roleIds?.length || 0) !== 1 ? 's' : ''} selected
+                    <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 8 }}>{onboardingData.roleIds?.length || 0} role{(onboardingData.roleIds?.length || 0) !== 1 ? 's' : ''} selected</div>
+                  </div>
+
+                  {/* Info box */}
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '13px 15px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <CheckCircle size={14} style={{ color: '#16a34a', marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.7 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 3 }}>What happens next?</div>
+                      Employee record + user account created, roles assigned, temporary password generated, and welcome email sent.
                     </div>
                   </div>
-                  
-                  {/* Info Box */}
-                  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16 }}>
-                    <div style={{ fontWeight: 600, color: '#856404', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      ℹ️ What Happens Next?
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#856404', lineHeight: 1.8 }}>
-                      <li>Employee record will be created in the system</li>
-                      <li>User account will be created with selected roles</li>
-                      <li>Temporary password will be generated automatically</li>
-                      <li>Welcome email will be sent with login credentials</li>
-                      <li>Employee can access the portal immediately</li>
-                    </ul>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 8, borderTop: '2px solid #e0e0e0' }}>
-                    <button
-                      onClick={() => {
-                        setIsOnboardingEmployee(false)
-                        setOnboardingData({ roleIds: [] })
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        borderRadius: 8,
-                        border: '1px solid #ccc',
-                        background: 'var(--surface)',
-                        cursor: 'pointer',
-                        fontSize: 15,
-                        fontWeight: 600
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleOnboardEmployee}
-                      disabled={saving}
-                      style={{
-                        padding: '12px 24px',
-                        borderRadius: 8,
-                        border: 'none',
-                        background: saving ? '#b1b1b1' : 'var(--accent)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: saving ? 'not-allowed' : 'pointer',
-                        fontSize: 15,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8
-                      }}
-                    >
-                      <CheckCircle size={16} />
-                      {saving ? 'Onboarding...' : 'Onboard Employee'}
-                    </button>
-                  </div>
+
                 </div>
+
+                {/* Sticky footer */}
+                <div style={{ padding: '14px 22px', borderTop: '1.5px solid #f1f5f9', background: '#fff', display: 'flex', gap: 10, justifyContent: 'flex-end', flexShrink: 0 }}>
+                  <button onClick={() => { setIsOnboardingEmployee(false); setOnboardingData({ roleIds: [] }) }} style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={handleOnboardEmployee} disabled={saving} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: saving ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, boxShadow: saving ? 'none' : '0 2px 8px rgba(30,41,59,0.25)' }}>
+                    <CheckCircle size={14} />{saving ? 'Onboarding…' : 'Onboard Employee'}
+                  </button>
+                </div>
+
               </div>
             </div>
           )}
-          
+
           {/* Suspend Employee Modal */}
           {suspendingEmployee && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }}>
-              <div className="glass-panel" style={{ width: 'min(500px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, color: '#ff9800' }}>⚠️ Suspend Employee Account</h3>
-                <p style={{ color: '#666', marginBottom: 20 }}>
-                  Suspend <strong>{suspendingEmployee.first_name} {suspendingEmployee.last_name}</strong>? 
-                  Their account will be temporarily disabled.
-                </p>
-                
-                <label style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
-                  <span style={{ fontWeight: 600 }}>Reason for Suspension *</span>
-                  <textarea
-                    value={suspendReason}
-                    onChange={e => setSuspendReason(e.target.value)}
-                    placeholder="Enter reason for suspension..."
-                    rows={4}
-                    style={{ padding: '12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, resize: 'vertical' }}
-                  />
-                </label>
-                
-                <div style={{ background: '#fff3cd', border: '1px solid #ff9800', borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <strong style={{ color: '#856404' }}>ℹ️ Note:</strong>
-                  <p style={{ margin: '8px 0 0', fontSize: 13, color: '#856404' }}>
-                    This action is reversible. The employee can be reactivated later by an admin.
-                  </p>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }}>
+              <div style={{ width: 'min(480px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #9a3412 0%, #ea580c 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <Lock size={15} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Suspend Account</span>
+                  </div>
+                  <button onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
                 </div>
-                
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSuspendEmployee}
-                    disabled={saving || !suspendReason.trim()}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: (!suspendReason.trim() || saving) ? '#ccc' : '#ff9800',
-                      color: '#fff',
-                      fontWeight: 600,
-                      cursor: (!suspendReason.trim() || saving) ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {saving ? 'Suspending...' : 'Suspend Account'}
-                  </button>
+                <div style={{ padding: '18px 22px', display: 'grid', gap: 14 }}>
+                  <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>Suspend <strong style={{ color: '#1e293b' }}>{suspendingEmployee.first_name} {suspendingEmployee.last_name}</strong>? Their account will be temporarily disabled.</p>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Reason for Suspension <span style={{ color: '#ef4444' }}>*</span></span>
+                    <textarea value={suspendReason} onChange={e => setSuspendReason(e.target.value)} placeholder="Enter reason for suspension…" rows={3} style={{ ...SETTINGS_INPUT, resize: 'vertical', lineHeight: 1.5 }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                  </label>
+                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '11px 13px', fontSize: 12.5, color: '#475569' }}>This action is reversible — the employee can be reactivated by an admin.</div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => { setSuspendingEmployee(null); setSuspendReason('') }} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleSuspendEmployee} disabled={saving || !suspendReason.trim()} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: (!suspendReason.trim() || saving) ? '#94a3b8' : '#ea580c', color: '#fff', fontWeight: 700, fontSize: 13, cursor: (!suspendReason.trim() || saving) ? 'not-allowed' : 'pointer' }}>
+                      {saving ? 'Suspending…' : 'Suspend Account'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2287,48 +1806,28 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Reactivate Employee Modal */}
           {reactivatingEmployee && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => setReactivatingEmployee(null)}>
-              <div className="glass-panel" style={{ width: 'min(500px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, color: '#4CAF50' }}>✅ Reactivate Employee Account</h3>
-                <p style={{ color: '#666', marginBottom: 20 }}>
-                  Reactivate <strong>{reactivatingEmployee.first_name} {reactivatingEmployee.last_name}</strong>? 
-                  Their account will be restored and they can log in again.
-                </p>
-                
-                <div style={{ background: '#e8f5e9', border: '1px solid #4CAF50', borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <strong style={{ color: '#2e7d32' }}>ℹ️ Account Status:</strong>
-                  <p style={{ margin: '8px 0 0', fontSize: 13, color: '#2e7d32' }}>
-                    Currently suspended since: {reactivatingEmployee.suspended_at ? new Date(reactivatingEmployee.suspended_at).toLocaleDateString() : 'Unknown'}
-                  </p>
-                  {reactivatingEmployee.suspended_reason && (
-                    <p style={{ margin: '8px 0 0', fontSize: 13, color: '#2e7d32' }}>
-                      Reason: {reactivatingEmployee.suspended_reason}
-                    </p>
-                  )}
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => setReactivatingEmployee(null)}>
+              <div style={{ width: 'min(460px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #14532d 0%, #16a34a 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <RotateCcw size={15} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Reactivate Account</span>
+                  </div>
+                  <button onClick={() => setReactivatingEmployee(null)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
                 </div>
-                
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => setReactivatingEmployee(null)}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleReactivateEmployee}
-                    disabled={saving}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: saving ? '#ccc' : '#4CAF50',
-                      color: '#fff',
-                      fontWeight: 600,
-                      cursor: saving ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {saving ? 'Reactivating...' : 'Reactivate Account'}
-                  </button>
+                <div style={{ padding: '18px 22px', display: 'grid', gap: 14 }}>
+                  <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>Reactivate <strong style={{ color: '#1e293b' }}>{reactivatingEmployee.first_name} {reactivatingEmployee.last_name}</strong>? Their account will be restored and they can log in again.</p>
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#166534' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Account Status</div>
+                    <div>Suspended since: {reactivatingEmployee.suspended_at ? new Date(reactivatingEmployee.suspended_at).toLocaleDateString() : 'Unknown'}</div>
+                    {reactivatingEmployee.suspended_reason && <div style={{ marginTop: 4 }}>Reason: {reactivatingEmployee.suspended_reason}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setReactivatingEmployee(null)} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleReactivateEmployee} disabled={saving} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: saving ? '#94a3b8' : '#16a34a', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
+                      {saving ? 'Reactivating…' : 'Reactivate Account'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2336,69 +1835,35 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Terminate Employee Modal */}
           {terminatingEmployee && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }}>
-              <div className="glass-panel" style={{ width: 'min(550px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, color: '#f44336' }}>🔴 Terminate Employee Account</h3>
-                <p style={{ color: '#666', marginBottom: 20 }}>
-                  <strong>WARNING:</strong> Terminate <strong>{terminatingEmployee.first_name} {terminatingEmployee.last_name}</strong>? 
-                  This action is permanent and <strong>cannot be undone</strong>.
-                </p>
-                
-                <label style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
-                  <span style={{ fontWeight: 600 }}>Reason for Termination *</span>
-                  <textarea
-                    value={terminateReason}
-                    onChange={e => setTerminateReason(e.target.value)}
-                    placeholder="Enter detailed reason for termination..."
-                    rows={4}
-                    style={{ padding: '12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14, resize: 'vertical' }}
-                  />
-                </label>
-                
-                <div style={{ background: '#ffebee', border: '2px solid #f44336', borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <strong style={{ color: '#c62828' }}>⚠️ Important Information:</strong>
-                  <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#c62828', lineHeight: 1.6 }}>
-                    <li>Employee will immediately lose all system access</li>
-                    <li>This action <strong>cannot be reversed</strong></li>
-                    <li>Employee data will be retained for 2 years</li>
-                    <li>Data will be automatically purged after 2 years</li>
-                  </ul>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }}>
+              <div style={{ width: 'min(520px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <AlertTriangle size={15} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Terminate Account</span>
+                  </div>
+                  <button onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
                 </div>
-                
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: '#fff3cd', borderRadius: 8, marginBottom: 20, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={terminateConfirm}
-                    onChange={e => setTerminateConfirm(e.target.checked)}
-                    style={{ width: 20, height: 20, cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 14, fontWeight: 500, color: '#856404' }}>
-                    I understand this employee will be permanently terminated and data will be purged in 2 years
-                  </span>
-                </label>
-                
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }}
-                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ccc', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleTerminateEmployee}
-                    disabled={saving || !terminateReason.trim() || !terminateConfirm}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: (!terminateReason.trim() || !terminateConfirm || saving) ? '#ccc' : '#f44336',
-                      color: '#fff',
-                      fontWeight: 600,
-                      cursor: (!terminateReason.trim() || !terminateConfirm || saving) ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {saving ? 'Terminating...' : 'Terminate Employee'}
-                  </button>
+                <div style={{ padding: '18px 22px', display: 'grid', gap: 14 }}>
+                  <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>You are about to terminate <strong style={{ color: '#1e293b' }}>{terminatingEmployee.first_name} {terminatingEmployee.last_name}</strong>. This action is <strong style={{ color: '#dc2626' }}>permanent and cannot be undone</strong>.</p>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Reason for Termination <span style={{ color: '#ef4444' }}>*</span></span>
+                    <textarea value={terminateReason} onChange={e => setTerminateReason(e.target.value)} placeholder="Enter detailed reason for termination…" rows={3} style={{ ...SETTINGS_INPUT, resize: 'vertical', lineHeight: 1.5 }} onFocus={sFocusIn} onBlur={sFocusOut} />
+                  </label>
+                  <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#991b1b' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>What happens</div>
+                    Employee immediately loses all access. Data retained for 2 years, then auto-purged.
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={terminateConfirm} onChange={e => setTerminateConfirm(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#dc2626' }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#92400e' }}>I understand this employee will be permanently terminated and data purged in 2 years</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => { setTerminatingEmployee(null); setTerminateReason(''); setTerminateConfirm(false) }} style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleTerminateEmployee} disabled={saving || !terminateReason.trim() || !terminateConfirm} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: (!terminateReason.trim() || !terminateConfirm || saving) ? '#94a3b8' : '#dc2626', color: '#fff', fontWeight: 700, fontSize: 13, cursor: (!terminateReason.trim() || !terminateConfirm || saving) ? 'not-allowed' : 'pointer' }}>
+                      {saving ? 'Terminating…' : 'Terminate Employee'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2406,295 +1871,140 @@ export default function Settings({ accessToken }: { accessToken: string }) {
           
           {/* Edit Employee Modal */}
           {editingEmployee && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, overflowY: 'auto', padding: '20px 0' }} onClick={() => { setEditingEmployee(null); setEditFormData({}) }}>
-              <div className="glass-panel" style={{ width: 'min(800px, 92vw)', padding: 24, borderRadius: 16, maxHeight: '90vh', overflow: 'auto', margin: 'auto' }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, marginBottom: 20 }}>Edit Employee: {editingEmployee.first_name} {editingEmployee.last_name}</h3>
-                
-                <div style={{ display: 'grid', gap: 24 }}>
-                  {/* Personal Information */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      👤 Personal Information
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>First Name *</span>
-                        <input
-                          type="text"
-                          value={editFormData.first_name || ''}
-                          onChange={e => setEditFormData({ ...editFormData, first_name: e.target.value })}
-                          placeholder="John"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Last Name *</span>
-                        <input
-                          type="text"
-                          value={editFormData.last_name || ''}
-                          onChange={e => setEditFormData({ ...editFormData, last_name: e.target.value })}
-                          placeholder="Doe"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Email *</span>
-                        <input
-                          type="email"
-                          value={editFormData.email || ''}
-                          onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
-                          placeholder="john.doe@company.com"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Phone *</span>
-                        <input
-                          type="text"
-                          value={editFormData.phone || ''}
-                          onChange={e => setEditFormData({ ...editFormData, phone: e.target.value })}
-                          placeholder="+1234567890"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                    </div>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000, overflowY: 'auto', padding: '20px 0' }} onClick={() => { setEditingEmployee(null); setEditFormData({}) }}>
+              <div style={{ width: 'min(800px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', margin: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Edit2 size={15} color="rgba(255,255,255,0.85)" />
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Edit Employee: {editingEmployee.first_name} {editingEmployee.last_name}</span>
                   </div>
-                  
-                  {/* Employment Details */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      💼 Employment Details
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Employee Number *</span>
-                        <input
-                          type="text"
-                          value={editFormData.employee_number || ''}
-                          onChange={e => setEditFormData({ ...editFormData, employee_number: e.target.value })}
-                          placeholder="EMP00001"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Designation</span>
-                        <input
-                          type="text"
-                          value={editFormData.designation || ''}
-                          onChange={e => setEditFormData({ ...editFormData, designation: e.target.value })}
-                          placeholder="e.g., Senior Accountant"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Department</span>
-                        <input
-                          type="text"
-                          value={editFormData.employee_department || ''}
-                          onChange={e => setEditFormData({ ...editFormData, employee_department: e.target.value })}
-                          placeholder="e.g., Finance"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Hire Date</span>
-                        <input
-                          type="date"
-                          value={editFormData.hire_date || ''}
-                          onChange={e => setEditFormData({ ...editFormData, hire_date: e.target.value })}
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Payroll Configuration */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      💰 Payroll Configuration
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                      <label style={{ display: 'grid', gap: 6 }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#000' }}>Base Salary</span>
-                        <input
-                          type="number"
-                          value={editFormData.base_salary || ''}
-                          onChange={e => setEditFormData({ ...editFormData, base_salary: parseFloat(e.target.value) || undefined })}
-                          placeholder="60000"
-                          style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', fontSize: 14 }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Role Assignment */}
-                  <div style={{ background: '#f5f7fa', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0' }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: 16, color: '#1a237e', fontWeight: 700 }}>
-                      🔐 Access & Permissions
-                    </h4>
-                    <span style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, display: 'block', color: '#000' }}>Assign Roles * (select at least one)</span>
-                    <div style={{ display: 'grid', gap: 10, maxHeight: 300, overflow: 'auto', padding: 8, border: '1px solid #e0e0e0', borderRadius: 8, background: 'var(--surface)' }}>
-                      {roles.map(role => (
-                        <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: editFormData.roleIds?.includes(role.id) ? '#e3f2fd' : 'var(--surface)', border: '1px solid ' + (editFormData.roleIds?.includes(role.id) ? '#2196F3' : '#e0e0e0'), transition: 'all 0.2s' }}>
-                          <input
-                            type="checkbox"
-                            checked={editFormData.roleIds?.includes(role.id) || false}
-                            onChange={e => {
-                              const currentRoles = editFormData.roleIds || []
-                              if (e.target.checked) {
-                                setEditFormData({ ...editFormData, roleIds: [...currentRoles, role.id] })
-                              } else {
-                                setEditFormData({ ...editFormData, roleIds: currentRoles.filter(id => id !== role.id) })
-                              }
-                            }}
-                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                          />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#333', marginBottom: 2 }}>{role.name}</div>
-                            {role.description && <div style={{ fontSize: 12, color: '#666' }}>{role.description}</div>}
-                          </div>
-                          {role.is_system_role && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0', fontSize: 10, fontWeight: 700 }}>
-                              SYSTEM
-                            </span>
-                          )}
+                  <button onClick={() => { setEditingEmployee(null); setEditFormData({}) }} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+                </div>
+                <div style={{ padding: '20px 22px', overflow: 'auto' }}>
+                  <div style={{ display: 'grid', gap: 18 }}>
+                    {/* Personal Information */}
+                    <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: SL, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>Personal Information</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>First Name <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input type="text" value={editFormData.first_name || ''} onChange={e => setEditFormData({ ...editFormData, first_name: e.target.value })} placeholder="John" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
                         </label>
-                      ))}
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input type="text" value={editFormData.last_name || ''} onChange={e => setEditFormData({ ...editFormData, last_name: e.target.value })} placeholder="Doe" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Email <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input type="email" value={editFormData.email || ''} onChange={e => setEditFormData({ ...editFormData, email: e.target.value })} placeholder="john.doe@company.com" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Phone <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input type="text" value={editFormData.phone || ''} onChange={e => setEditFormData({ ...editFormData, phone: e.target.value })} placeholder="+1234567890" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 13, color: '#666', marginTop: 8 }}>
-                      {editFormData.roleIds?.length || 0} role{(editFormData.roleIds?.length || 0) !== 1 ? 's' : ''} selected
+
+                    {/* Employment Details */}
+                    <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: SL, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>Employment Details</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Employee Number <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input type="text" value={editFormData.employee_number || ''} onChange={e => setEditFormData({ ...editFormData, employee_number: e.target.value })} placeholder="EMP00001" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Designation</span>
+                          <input type="text" value={editFormData.designation || ''} onChange={e => setEditFormData({ ...editFormData, designation: e.target.value })} placeholder="e.g., Senior Accountant" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Department</span>
+                          <input type="text" value={editFormData.employee_department || ''} onChange={e => setEditFormData({ ...editFormData, employee_department: e.target.value })} placeholder="e.g., Finance" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Hire Date</span>
+                          <input type="date" value={editFormData.hire_date || ''} onChange={e => setEditFormData({ ...editFormData, hire_date: e.target.value })} style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 8, borderTop: '2px solid #e0e0e0' }}>
-                    <button
-                      onClick={() => {
-                        setEditingEmployee(null)
-                        setEditFormData({})
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        borderRadius: 8,
-                        border: '1px solid #ccc',
-                        background: 'var(--surface)',
-                        cursor: 'pointer',
-                        fontSize: 15,
-                        fontWeight: 600
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveEditedEmployee}
-                      disabled={saving}
-                      style={{
-                        padding: '12px 24px',
-                        borderRadius: 8,
-                        border: 'none',
-                        background: saving ? '#b1b1b1' : 'var(--accent)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: saving ? 'not-allowed' : 'pointer',
-                        fontSize: 15,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8
-                      }}
-                    >
-                      <Save size={16} />
-                      {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+
+                    {/* Payroll Configuration */}
+                    <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: SL, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>Payroll Configuration</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        <label style={{ display: 'grid', gap: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>Base Salary</span>
+                          <input type="number" value={editFormData.base_salary || ''} onChange={e => setEditFormData({ ...editFormData, base_salary: parseFloat(e.target.value) || undefined })} placeholder="60000" style={SETTINGS_INPUT} onFocus={sFocusIn} onBlur={sFocusOut} />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Role Assignment */}
+                    <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 18px', border: '1.5px solid #e2e8f0' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: SL, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Access & Permissions</div>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 10, display: 'block' }}>Assign Roles <span style={{ color: '#ef4444' }}>*</span></span>
+                      <div style={{ display: 'grid', gap: 8, maxHeight: 240, overflow: 'auto', padding: 8, border: '1.5px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
+                        {roles.map(role => (
+                          <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '9px 12px', borderRadius: 8, background: editFormData.roleIds?.includes(role.id) ? 'rgba(51,65,85,0.07)' : '#fff', border: '1.5px solid ' + (editFormData.roleIds?.includes(role.id) ? SL : '#e2e8f0'), transition: 'all 0.15s' }}>
+                            <input type="checkbox" checked={editFormData.roleIds?.includes(role.id) || false} onChange={e => { const cur = editFormData.roleIds || []; if (e.target.checked) setEditFormData({ ...editFormData, roleIds: [...cur, role.id] }); else setEditFormData({ ...editFormData, roleIds: cur.filter(id => id !== role.id) }) }} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: SL }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>{role.name}</div>
+                              {role.description && <div style={{ fontSize: 11.5, color: '#64748b' }}>{role.description}</div>}
+                            </div>
+                            {role.is_system_role && <span style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb', fontSize: 10, fontWeight: 700 }}>SYSTEM</span>}
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 8 }}>{editFormData.roleIds?.length || 0} role{(editFormData.roleIds?.length || 0) !== 1 ? 's' : ''} selected</div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 6, borderTop: '1.5px solid #f1f5f9' }}>
+                      <button onClick={() => { setEditingEmployee(null); setEditFormData({}) }} style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={handleSaveEditedEmployee} disabled={saving} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: saving ? '#94a3b8' : `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Save size={14} />{saving ? 'Saving…' : 'Save Changes'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
           
-          {/* Success Modal */}
+          {/* Onboarding Success Modal */}
           {onboardingResult && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setOnboardingResult(null); setOnboardingCopied(false) }}>
-              <div className="glass-panel" style={{ width: 'min(600px, 92vw)', padding: 32, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-                <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ display: 'inline-block', padding: 16, background: '#4CAF50', borderRadius: '50%', marginBottom: 16 }}>
-                    <CheckCircle size={48} color="#fff" />
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 1001 }} onClick={() => { setOnboardingResult(null); setOnboardingCopied(false) }}>
+              <div style={{ width: 'min(560px, 92vw)', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ background: 'linear-gradient(135deg, #14532d 0%, #16a34a 100%)', padding: '24px 24px 20px', textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <CheckCircle size={26} color="#fff" />
                   </div>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 24, color: '#4CAF50' }}>Employee Onboarded Successfully!</h3>
-                  <p style={{ margin: 0, color: '#666', fontSize: 15 }}>
-                    <strong>{onboardingResult.employee.first_name} {onboardingResult.employee.last_name}</strong> ({onboardingResult.employee.employee_number})
+                  <h3 style={{ margin: '0 0 4px', fontSize: 17, color: '#fff', fontWeight: 700 }}>Employee Onboarded!</h3>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>
+                    {onboardingResult.employee.first_name} {onboardingResult.employee.last_name} ({onboardingResult.employee.employee_number})
                   </p>
-                  {onboardingResult.emailSent ? (
-                    <p style={{ margin: '8px 0 0', color: '#4CAF50', fontSize: 14 }}>✅ Welcome email sent to {onboardingResult.employee.email}</p>
-                  ) : (
-                    <p style={{ margin: '8px 0 0', color: '#ff9800', fontSize: 14 }}>⚠️ Email could not be sent. {onboardingResult.emailError}</p>
-                  )}
+                  {onboardingResult.emailSent
+                    ? <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Welcome email sent to {onboardingResult.employee.email}</p>
+                    : <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Email delivery failed. {onboardingResult.emailError}</p>}
                 </div>
-                
-                <div style={{ background: 'var(--surface)', border: '2px solid #4CAF50', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 15, color: '#333' }}>Temporary Password:</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', padding: 16, borderRadius: 8, border: '1px solid #e0e0e0' }}>
-                    <code style={{ flex: 1, fontSize: 16, fontWeight: 600, color: '#1a237e', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {onboardingResult.temporaryPassword}
-                    </code>
-                    <button
-                      onClick={handleCopyOnboardingPassword}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: onboardingCopied ? '#4CAF50' : '#2196F3',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontWeight: 600,
-                        fontSize: 13,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {onboardingCopied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                <div style={{ padding: '20px 22px', display: 'grid', gap: 14 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>TEMPORARY PASSWORD</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                    <code style={{ flex: 1, fontSize: 15, fontWeight: 700, color: SL_DARK, fontFamily: 'monospace', wordBreak: 'break-all' }}>{onboardingResult.temporaryPassword}</code>
+                    <button onClick={handleCopyOnboardingPassword} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: onboardingCopied ? '#16a34a' : SL, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {onboardingCopied ? <><CheckCircle size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
                     </button>
                   </div>
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#166534' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Created</div>
+                    Employee #{onboardingResult.employee.employee_number} · Account: {onboardingResult.user.email} · {onboardingResult.roleCount} role{onboardingResult.roleCount !== 1 ? 's' : ''}
+                    {onboardingResult.employee.designation && ` · ${onboardingResult.employee.designation}`}
+                  </div>
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 10, padding: '11px 13px', fontSize: 12.5, color: '#92400e' }}>
+                    Save this password — it will not be shown again. The employee should change it after first login.
+                  </div>
+                  <button onClick={() => { setOnboardingResult(null); setOnboardingCopied(false) }} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${SL_DARK} 0%, ${SL} 100%)`, color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Done</button>
                 </div>
-                
-                <div style={{ background: '#e8f5e9', borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 12, fontSize: 15 }}>✅ What Was Created:</div>
-                  <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#2e7d32', lineHeight: 1.8 }}>
-                    <li>Employee record created: <strong>{onboardingResult.employee.employee_number}</strong></li>
-                    <li>User account created: <strong>{onboardingResult.user.email}</strong></li>
-                    <li>Assigned {onboardingResult.roleCount} role{onboardingResult.roleCount !== 1 ? 's' : ''}</li>
-                    <li>{onboardingResult.employee.designation && `Designation: ${onboardingResult.employee.designation}`}</li>
-                    <li>{onboardingResult.employee.employee_department && `Department: ${onboardingResult.employee.employee_department}`}</li>
-                  </ul>
-                </div>
-                
-                <div style={{ background: '#fff3cd', borderLeft: '4px solid #ffc107', padding: 16, borderRadius: 4, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 600, color: '#856404', marginBottom: 8 }}>⚠️ Important</div>
-                  <p style={{ margin: 0, fontSize: 13, color: '#856404', lineHeight: 1.6 }}>
-                    Please save this password. The employee should change this password after their first login. They can access the employee portal immediately.
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setOnboardingResult(null)
-                    setOnboardingCopied(false)
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: 'var(--primary)',
-                    color: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontSize: 15
-                  }}
-                >
-                  Close
-                </button>
               </div>
             </div>
           )}
