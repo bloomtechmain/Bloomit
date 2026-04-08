@@ -97,6 +97,20 @@ async function main() {
   `)
   console.log('✅ RBAC audit log table created')
 
+  // Create active_sessions table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS public.active_sessions (
+      id            SERIAL PRIMARY KEY,
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      session_token UUID NOT NULL DEFAULT gen_random_uuid(),
+      expires_at    TIMESTAMP NOT NULL,
+      ip_address    VARCHAR(100),
+      user_agent    TEXT,
+      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+  console.log('✅ Active sessions table created')
+
   console.log('🎉 All RBAC tables created successfully!')
 }
 
