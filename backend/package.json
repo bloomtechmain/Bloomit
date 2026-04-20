@@ -36,7 +36,11 @@
     "db:create-tenants-example": "ts-node src/scripts/create-tenants-example.ts",
     "migrate:marketing-columns": "ts-node src/scripts/addMarketingColumns.ts",
     "fresh-start": "ts-node src/scripts/freshStart.ts",
-    "setup:bloomtech": "ts-node src/scripts/setupBloomtech.ts"
+    "setup:bloomtech": "ts-node src/scripts/setupBloomtech.ts",
+    "db:create:packages": "ts-node src/scripts/createPackagesTable.ts",
+    "db:add:package-to-users": "ts-node src/scripts/addPackageToUsers.ts",
+    "db:create:packages:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/createPackagesTable.ts dotenv_config_path=.env.production",
+    "db:add:package-to-users:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addPackageToUsers.ts dotenv_config_path=.env.production"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -58,11 +62,12 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^7.0.13",
     "pdfkit": "^0.17.2",
-    "pg": "^8.13.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "cross-env": "^10.1.0",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   }
 }
