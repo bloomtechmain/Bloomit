@@ -2,6 +2,7 @@
 import { pool, query } from '../db';
 import fs from 'fs';
 import path from 'path';
+import logger from '../utils/logger';
 
 const createTenantSchema = async (schemaName: string) => {
   await query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
@@ -17,14 +18,20 @@ const createTenantTables = async (schemaName: string) => {
     await client.query(`SET search_path TO "${schemaName}", public`);
     for (const statement of statements) {
       const cleanedStatement = statement.replace(/CONSTRAINT fk_.* REFERENCES .*\(id\)/g, '');
-      await client.query(cleanedStatement);
+      try {
+        await client.query(cleanedStatement);
+      } catch (err: any) {
+        // Skip "already exists" and "column already exists" — these are safe
+        if (['42P07', '42701', '42710', '42P16', '23505'].includes(err.code)) continue;
+        // Log unexpected errors but keep going so one bad statement
+        // does not abort the entire schema setup
+        logger.error(`[createTenantTables] statement failed (${err.code}): ${err.message}`);
+      }
     }
   } finally {
     // Always reset before returning this connection to the pool.
     // Without this, subsequent pool.query() calls on this connection
-    // would look in the tenant schema instead of public, causing all
-    // unqualified queries against roles/user_roles/etc. to silently
-    // return wrong results.
+    // would look in the tenant schema instead of public.
     try { await client.query('SET search_path TO DEFAULT') } catch (_) { /* ignore */ }
     client.release();
   }
@@ -62,37 +69,45 @@ export const createTenant = async (tenantName: string) => {
  * Schema name is keyed to the user ID so it is always unique.
  * Assigns the "Super Admin" role so the user has full ERP access.
  * Updates users.tenant_id in the same transaction.
+ * Safe to call multiple times — idempotent.
  */
 export const provisionTenantForUser = async (
   userId: number,
   displayName: string
 ): Promise<{ tenantId: number; schemaName: string }> => {
-  // Use user ID in schema name to guarantee uniqueness across tenants
   const schemaName = `tenant_u${userId}`;
-  const tenantName = displayName;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Create tenants row
-    const tenantResult = await client.query(
-      'INSERT INTO public.tenants (name, schema_name) VALUES ($1, $2) RETURNING id',
-      [tenantName, schemaName]
+    // If the tenant row already exists (from a previous partial attempt), reuse it
+    let tenantId: number;
+    const existing = await client.query(
+      'SELECT id FROM public.tenants WHERE schema_name = $1',
+      [schemaName]
     );
-    const tenantId: number = tenantResult.rows[0].id;
+    if (existing.rows.length > 0) {
+      tenantId = existing.rows[0].id;
+    } else {
+      const tenantResult = await client.query(
+        'INSERT INTO public.tenants (name, schema_name) VALUES ($1, $2) RETURNING id',
+        [displayName, schemaName]
+      );
+      tenantId = tenantResult.rows[0].id;
+    }
 
-    // 2. Create schema and tables (uses pool internally — runs outside this tx)
+    // Create schema + tables (runs outside this tx; resilient to partial runs)
     await createTenantSchema(schemaName);
     await createTenantTables(schemaName);
 
-    // 3. Link user to tenant
+    // Link user to tenant
     await client.query(
       'UPDATE public.users SET tenant_id = $1 WHERE id = $2',
       [tenantId, userId]
     );
 
-    // 4. Upsert Super Admin role and assign it — never skip silently
+    // Upsert Super Admin role — never skip silently
     const roleResult = await client.query(`
       INSERT INTO public.roles (name, description, is_system_role)
       VALUES ('Super Admin', 'Full unrestricted system access', TRUE)
@@ -108,7 +123,7 @@ export const provisionTenantForUser = async (
       [userId, superAdminRoleId]
     );
 
-    // 5. Grant every existing permission to Super Admin so the role is fully powered
+    // Grant every existing permission to Super Admin
     const perms = await client.query('SELECT id FROM public.permissions');
     for (const perm of perms.rows) {
       await client.query(
@@ -126,5 +141,40 @@ export const provisionTenantForUser = async (
     throw error;
   } finally {
     client.release();
+  }
+};
+
+/**
+ * Provisions tenants for all website-registered users who don't have one yet.
+ * Runs at server startup so users are ready before they even log in.
+ * Website users are identified by company_type IS NOT NULL (set by the website form).
+ */
+export const provisionPendingWebsiteUsers = async (): Promise<void> => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name
+      FROM public.users
+      WHERE tenant_id IS NULL
+        AND company_type IS NOT NULL
+        AND (account_status IS NULL OR account_status = 'active')
+    `);
+
+    if (result.rows.length === 0) {
+      logger.system('✅ No pending website users to provision');
+      return;
+    }
+
+    logger.system(`🏗️  Provisioning ${result.rows.length} pending website user(s)...`);
+
+    for (const user of result.rows) {
+      try {
+        const { tenantId, schemaName } = await provisionTenantForUser(user.id, user.name);
+        logger.system(`✅ Provisioned user ${user.id} (${user.name}) → ${schemaName} (tenant ${tenantId})`);
+      } catch (err) {
+        logger.error(`❌ Failed to provision user ${user.id} (${user.name}):`, err);
+      }
+    }
+  } catch (err) {
+    logger.error('❌ provisionPendingWebsiteUsers failed:', err);
   }
 };

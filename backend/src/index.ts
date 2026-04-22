@@ -3,7 +3,7 @@ import cors from 'cors'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
-import { provisionTenantForUser } from './services/tenant-service'
+import { provisionTenantForUser, provisionPendingWebsiteUsers } from './services/tenant-service'
 import { requireAuth } from './middleware/auth'
 import { validatePasswordStrength } from './utils/passwordGenerator'
 import { isPasswordRecentlyUsed, addToPasswordHistory } from './utils/passwordHistory'
@@ -558,6 +558,9 @@ async function startServer() {
     
     // Ensure Railway admin user exists (production only)
     await ensureRailwayAdmin()
+
+    // Provision tenants for website-registered users who haven't logged in yet
+    await provisionPendingWebsiteUsers()
     
     // Start background jobs (Railway-compatible)
     logger.system('🔄 Initializing background jobs...')
