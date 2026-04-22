@@ -297,29 +297,34 @@ export const createUser = async (req: Request, res: Response) => {
   }
 
   try {
-    // Enforce plan user limit
+    // Enforce plan user limit from packages table
     if (tenantId) {
       const planResult = await pool.query(
-        `SELECT no_of_users FROM public.users
-         WHERE tenant_id = $1 AND no_of_users IS NOT NULL
+        `SELECT (p.features->>'max_users')::int AS max_users
+         FROM public.users u
+         JOIN public.packages p ON u.package_id = p.id
+         WHERE u.tenant_id = $1
          LIMIT 1`,
         [tenantId]
       )
-      if (planResult.rows.length > 0 && planResult.rows[0].no_of_users !== null) {
-        const userLimit: number = planResult.rows[0].no_of_users
-        const countResult = await pool.query(
-          `SELECT COUNT(*) AS total FROM public.users
-           WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`,
-          [tenantId]
-        )
-        const currentCount = parseInt(countResult.rows[0].total, 10)
-        if (currentCount >= userLimit) {
-          return res.status(403).json({
-            error: 'user_limit_reached',
-            message: `Your plan allows a maximum of ${userLimit} user${userLimit === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
-            limit: userLimit,
-            current: currentCount
-          })
+      if (planResult.rows.length > 0) {
+        const maxUsers: number = planResult.rows[0].max_users
+        // -1 means unlimited (enterprise)
+        if (maxUsers !== null && maxUsers !== -1) {
+          const countResult = await pool.query(
+            `SELECT COUNT(*) AS total FROM public.users
+             WHERE tenant_id = $1 AND (account_status IS NULL OR account_status != 'terminated')`,
+            [tenantId]
+          )
+          const currentCount = parseInt(countResult.rows[0].total, 10)
+          if (currentCount >= maxUsers) {
+            return res.status(403).json({
+              error: 'user_limit_reached',
+              message: `Your plan allows a maximum of ${maxUsers} user${maxUsers === 1 ? '' : 's'}. You have reached this limit. Please upgrade your plan to add more users.`,
+              limit: maxUsers,
+              current: currentCount
+            })
+          }
         }
       }
     }
