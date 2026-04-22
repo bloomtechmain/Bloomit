@@ -45,7 +45,6 @@ export default function Login({ onLoggedIn }: { onLoggedIn?: (user: User, access
       if (isEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)) e.email = 'Invalid email address'
     }
     if (!state.password) e.password = 'Password is required'
-    else if (state.password.length < 6) e.password = 'Minimum 6 characters'
     return e
   }
 

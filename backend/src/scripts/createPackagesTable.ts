@@ -8,11 +8,17 @@ async function main() {
       display_name VARCHAR(100) NOT NULL,
       price_monthly NUMERIC(10,2) DEFAULT 0,
       price_yearly NUMERIC(10,2) DEFAULT 0,
+      max_users INTEGER,
+      description TEXT,
       features JSONB NOT NULL DEFAULT '{}',
       is_active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE packages
+      ADD COLUMN IF NOT EXISTS max_users   INTEGER,
+      ADD COLUMN IF NOT EXISTS description TEXT;
   `)
   console.log('✅ packages table created successfully')
 

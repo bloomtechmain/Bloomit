@@ -114,6 +114,8 @@ async function initRailwayDatabase() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     await runScript('createPackagesTable.ts');
     await runScript('addPackageToUsers.ts');
+    await runScript('createWebAppTables.ts');
+    await runScript('createDashboardAdminTable.ts');
 
     // Step 4: Create Employee and User related tables
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

@@ -40,7 +40,9 @@
     "db:create:packages": "ts-node src/scripts/createPackagesTable.ts",
     "db:add:package-to-users": "ts-node src/scripts/addPackageToUsers.ts",
     "db:create:packages:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/createPackagesTable.ts dotenv_config_path=.env.production",
-    "db:add:package-to-users:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addPackageToUsers.ts dotenv_config_path=.env.production"
+    "db:add:package-to-users:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addPackageToUsers.ts dotenv_config_path=.env.production",
+    "db:create:web-app-tables": "ts-node src/scripts/createWebAppTables.ts",
+    "db:create:dashboard-admin": "ts-node src/scripts/createDashboardAdminTable.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

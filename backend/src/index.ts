@@ -3,6 +3,7 @@ import cors from 'cors'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
+import { provisionTenantForUser } from './services/tenant-service'
 import { requireAuth } from './middleware/auth'
 import { validatePasswordStrength } from './utils/passwordGenerator'
 import { isPasswordRecentlyUsed, addToPasswordHistory } from './utils/passwordHistory'
@@ -127,7 +128,8 @@ app.post('/auth/login', async (req, res) => {
     const r = await query(`
       SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id,
              COALESCE(u.password_must_change, FALSE) as password_must_change,
-             COALESCE(u.source, '') as source
+             COALESCE(u.source, '') as source,
+             COALESCE(u.account_status, 'active') as account_status
       FROM users u
       WHERE u.email = $1 OR u.name = $1
       LIMIT 1
@@ -137,16 +139,34 @@ app.post('/auth/login', async (req, res) => {
 
     const u = r.rows[0] as {
       id: number
-      tenant_id: number
+      tenant_id: number | null
       name: string
       email: string
       password_hash: string
       password_must_change: boolean
       source: string
+      account_status: string
     }
-    
+
+    if (u.account_status !== 'active') {
+      return res.status(403).json({ error: 'account_inactive', message: 'Your account is not active.' })
+    }
+
     const ok = await bcrypt.compare(password, u.password_hash)
     if (!ok) return res.status(401).json({ error: 'invalid_credentials' })
+
+    // Auto-provision tenant schema on first ERP login for website-registered users
+    if (!u.tenant_id) {
+      try {
+        logger.system(`🏗️  Provisioning tenant for new user: ${u.email}`)
+        const provisioned = await provisionTenantForUser(u.id, u.name)
+        u.tenant_id = provisioned.tenantId
+        logger.system(`✅ Tenant provisioned: ${provisioned.schemaName} (id=${provisioned.tenantId}) for ${u.email}`)
+      } catch (provisionErr) {
+        logger.error('Tenant provisioning failed during login', provisionErr)
+        return res.status(500).json({ error: 'tenant_provision_failed', message: 'Could not set up your workspace. Please contact support.' })
+      }
+    }
 
     // Enforce single active session — block if already logged in elsewhere
     await query(

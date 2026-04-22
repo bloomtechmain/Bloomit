@@ -16,6 +16,9 @@ async function main() {
       source               VARCHAR(50) DEFAULT NULL,
       password_must_change BOOLEAN DEFAULT FALSE,
       account_status       VARCHAR(20) DEFAULT 'active',
+      company_type         VARCHAR(50),
+      plan_type            VARCHAR(50),
+      purchase_date        DATE,
       created_at           TIMESTAMP DEFAULT now()
     );
   `)
@@ -26,7 +29,10 @@ async function main() {
       ADD COLUMN IF NOT EXISTS tenant_id            INTEGER,
       ADD COLUMN IF NOT EXISTS source               VARCHAR(50) DEFAULT NULL,
       ADD COLUMN IF NOT EXISTS password_must_change BOOLEAN DEFAULT FALSE,
-      ADD COLUMN IF NOT EXISTS account_status       VARCHAR(20) DEFAULT 'active';
+      ADD COLUMN IF NOT EXISTS account_status       VARCHAR(20) DEFAULT 'active',
+      ADD COLUMN IF NOT EXISTS company_type         VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS plan_type            VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS purchase_date        DATE;
   `)
   console.log('✅ Users table ready')
 
