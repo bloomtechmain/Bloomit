@@ -86,17 +86,30 @@ export const provisionTenantForUser = async (
       [tenantId, userId]
     );
 
-    // 4. Assign Super Admin role
-    const roleResult = await client.query(
-      "SELECT id FROM public.roles WHERE name = 'Super Admin' LIMIT 1"
+    // 4. Upsert Super Admin role and assign it — never skip silently
+    const roleResult = await client.query(`
+      INSERT INTO public.roles (name, description, is_system_role)
+      VALUES ('Super Admin', 'Full unrestricted system access', TRUE)
+      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id
+    `);
+    const superAdminRoleId: number = roleResult.rows[0].id;
+
+    await client.query(
+      `INSERT INTO public.user_roles (user_id, role_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, role_id) DO NOTHING`,
+      [userId, superAdminRoleId]
     );
-    if (roleResult.rows.length > 0) {
-      const superAdminRoleId: number = roleResult.rows[0].id;
+
+    // 5. Grant every existing permission to Super Admin so the role is fully powered
+    const perms = await client.query('SELECT id FROM public.permissions');
+    for (const perm of perms.rows) {
       await client.query(
-        `INSERT INTO public.user_roles (user_id, role_id)
+        `INSERT INTO public.role_permissions (role_id, permission_id)
          VALUES ($1, $2)
-         ON CONFLICT (user_id, role_id) DO NOTHING`,
-        [userId, superAdminRoleId]
+         ON CONFLICT (role_id, permission_id) DO NOTHING`,
+        [superAdminRoleId, perm.id]
       );
     }
 
