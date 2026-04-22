@@ -13,13 +13,19 @@ const createTenantTables = async (schemaName: string) => {
 
   const client = await pool.connect();
   try {
-    await client.query(`SET search_path TO "${schemaName}"`);
+    // Include public so any cross-schema refs still resolve
+    await client.query(`SET search_path TO "${schemaName}", public`);
     for (const statement of statements) {
-      // We need to remove foreign key constraints to public tables from this script
       const cleanedStatement = statement.replace(/CONSTRAINT fk_.* REFERENCES .*\(id\)/g, '');
       await client.query(cleanedStatement);
     }
   } finally {
+    // Always reset before returning this connection to the pool.
+    // Without this, subsequent pool.query() calls on this connection
+    // would look in the tenant schema instead of public, causing all
+    // unqualified queries against roles/user_roles/etc. to silently
+    // return wrong results.
+    try { await client.query('SET search_path TO DEFAULT') } catch (_) { /* ignore */ }
     client.release();
   }
 };
