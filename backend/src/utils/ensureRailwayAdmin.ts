@@ -78,7 +78,22 @@ export async function ensureRailwayAdmin(): Promise<void> {
 
     logger.system(`✅ Assigned Super Admin role to user ${adminEmail}`);
 
-    // Grant all permissions to Super Admin role
+    // Ensure critical permissions exist before granting them
+    const criticalPermissions = [
+      { resource: 'settings',  action: 'manage',    description: 'Manage roles, permissions, and system settings' },
+      { resource: 'settings',  action: 'view',      description: 'View system settings' },
+      { resource: 'settings',  action: 'configure', description: 'Configure application-wide settings' },
+    ];
+    for (const p of criticalPermissions) {
+      await pool.query(
+        `INSERT INTO permissions (resource, action, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (resource, action) DO NOTHING`,
+        [p.resource, p.action, p.description]
+      );
+    }
+
+    // Grant ALL permissions to Super Admin role (runs every startup — idempotent)
     const permissionsResult = await pool.query('SELECT id FROM permissions');
 
     if (permissionsResult.rows.length > 0) {
