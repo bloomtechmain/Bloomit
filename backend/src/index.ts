@@ -3,7 +3,7 @@ import cors from 'cors'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
-import { provisionTenantForUser, provisionPendingWebsiteUsers } from './services/tenant-service'
+import { provisionTenantForUser, provisionPendingWebsiteUsers, ensureWebsiteUsersHaveSuperAdmin } from './services/tenant-service'
 import { requireAuth } from './middleware/auth'
 import { validatePasswordStrength } from './utils/passwordGenerator'
 import { isPasswordRecentlyUsed, addToPasswordHistory } from './utils/passwordHistory'
@@ -561,6 +561,9 @@ async function startServer() {
 
     // Provision tenants for website-registered users who haven't logged in yet
     await provisionPendingWebsiteUsers()
+
+    // Ensure every website user has Super Admin role (catches partial/missed provisioning)
+    await ensureWebsiteUsersHaveSuperAdmin()
     
     // Start background jobs (Railway-compatible)
     logger.system('🔄 Initializing background jobs...')

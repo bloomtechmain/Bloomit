@@ -161,6 +161,52 @@ export const provisionTenantForUser = async (
 };
 
 /**
+ * Ensures every website-registered user has the Super Admin role in user_roles.
+ * Runs at every server startup — catches users whose tenant was provisioned
+ * but whose role assignment was missed (e.g. partial previous runs).
+ */
+export const ensureWebsiteUsersHaveSuperAdmin = async (): Promise<void> => {
+  try {
+    // Find website users who have no role assigned at all
+    const missing = await pool.query(`
+      SELECT u.id, u.name
+      FROM public.users u
+      LEFT JOIN public.user_roles ur ON ur.user_id = u.id
+      WHERE u.company_type IS NOT NULL
+        AND ur.user_id IS NULL
+    `);
+
+    if (missing.rows.length === 0) {
+      logger.system('✅ All website users already have roles assigned');
+      return;
+    }
+
+    logger.system(`🔑 Assigning Super Admin role to ${missing.rows.length} website user(s) missing a role...`);
+
+    // Upsert Super Admin role
+    const roleResult = await pool.query(`
+      INSERT INTO public.roles (name, description, is_system_role)
+      VALUES ('Super Admin', 'Full unrestricted system access', TRUE)
+      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id
+    `);
+    const superAdminRoleId: number = roleResult.rows[0].id;
+
+    for (const user of missing.rows) {
+      await pool.query(
+        `INSERT INTO public.user_roles (user_id, role_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, role_id) DO NOTHING`,
+        [user.id, superAdminRoleId]
+      );
+      logger.system(`✅ Assigned Super Admin to user ${user.id} (${user.name})`);
+    }
+  } catch (err) {
+    logger.error('❌ ensureWebsiteUsersHaveSuperAdmin failed:', err);
+  }
+};
+
+/**
  * Provisions tenants for all website-registered users who don't have one yet.
  * Runs at server startup so users are ready before they even log in.
  * Website users are identified by company_type IS NOT NULL (set by the website form).
