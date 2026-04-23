@@ -1611,7 +1611,7 @@ export default function Dashboard({
                 {user.name}
               </div>
               <div style={{ fontSize: 10, color: '#4a6fa5', fontWeight: 500 }}>
-                {user.roleName || 'No Role'}
+                {(user.roleNames && user.roleNames.length > 0 ? user.roleNames.join(', ') : user.roleName) || 'No Role'}
               </div>
             </div>}
           </div>
@@ -2425,7 +2425,7 @@ export default function Dashboard({
                     { key: 'timer' as const,    label: 'Live Timer' },
                     { key: 'manual' as const,   label: 'Manual Entry' },
                     { key: 'entries' as const,  label: 'My Entries' },
-                    ...(user.roleName === 'Admin' || user.roleName === 'Manager' ? [{ key: 'approval' as const, label: 'Approval' }] : []),
+                    ...((user.roleNames?.some(r => r === 'Admin' || r === 'Manager') || user.roleName === 'Admin' || user.roleName === 'Manager') ? [{ key: 'approval' as const, label: 'Approval' }] : []),
                   ] as { key: ProjectTimeTabType; label: string }[]).map(({ key, label }) => (
                     <button
                       key={key}
@@ -2447,7 +2447,7 @@ export default function Dashboard({
               </div>
               <ProjectTime
                 userId={user.id}
-                isManager={user.roleName === 'Admin' || user.roleName === 'Manager' || false}
+                isManager={user.roleNames?.some(r => r === 'Admin' || r === 'Manager' || r === 'Super Admin') || user.roleName === 'Admin' || user.roleName === 'Manager' || false}
                 activeTab={projectTimeTab}
                 setActiveTab={setProjectTimeTab}
               />
@@ -3399,7 +3399,7 @@ export default function Dashboard({
                     <span className="btn-icon"><FileText size={13} /></span>
                     <span>My Requests</span>
                   </button>
-                  {(user.roleName === 'Admin' || user.roleName === 'Manager') && (
+                  {(user.roleNames?.some(r => r === 'Admin' || r === 'Manager' || r === 'Super Admin') || user.roleName === 'Admin' || user.roleName === 'Manager') && (
                     <button
                       onClick={() => setPtoActiveTab('approvals')}
                       className="add-emp-btn"
@@ -3420,7 +3420,7 @@ export default function Dashboard({
               </div>
               <PTORequests
                 userId={user.id}
-                isManager={user.roleName === 'Admin' || user.roleName === 'Manager' || false}
+                isManager={user.roleNames?.some(r => r === 'Admin' || r === 'Manager' || r === 'Super Admin') || user.roleName === 'Admin' || user.roleName === 'Manager' || false}
                 accessToken={accessToken}
                 activeTab={ptoActiveTab}
                 setActiveTab={setPtoActiveTab}
