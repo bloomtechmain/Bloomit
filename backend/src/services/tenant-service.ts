@@ -123,6 +123,22 @@ export const provisionTenantForUser = async (
       [userId, superAdminRoleId]
     );
 
+    // Ensure all critical permissions exist — Super Admin must always get settings:manage
+    // regardless of whether the seed script has run on this deployment.
+    const criticalPermissions = [
+      { resource: 'settings',  action: 'manage',    description: 'Manage roles, permissions, and system settings' },
+      { resource: 'settings',  action: 'view',      description: 'View system settings' },
+      { resource: 'settings',  action: 'configure', description: 'Configure application-wide settings' },
+    ];
+    for (const p of criticalPermissions) {
+      await client.query(
+        `INSERT INTO public.permissions (resource, action, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (resource, action) DO NOTHING`,
+        [p.resource, p.action, p.description]
+      );
+    }
+
     // Grant every existing permission to Super Admin
     const perms = await client.query('SELECT id FROM public.permissions');
     for (const perm of perms.rows) {
