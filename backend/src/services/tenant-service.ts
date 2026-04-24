@@ -207,6 +207,48 @@ export const ensureWebsiteUsersHaveSuperAdmin = async (): Promise<void> => {
 };
 
 /**
+ * Creates (or replaces) a PostgreSQL trigger on public.users that immediately
+ * assigns the Super Admin role whenever a website-registered user is inserted
+ * (company_type IS NOT NULL). Runs at every startup — idempotent.
+ */
+export const ensureSuperAdminTrigger = async (): Promise<void> => {
+  try {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION public.assign_super_admin_on_register()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_role_id INTEGER;
+      BEGIN
+        IF NEW.company_type IS NOT NULL THEN
+          SELECT id INTO v_role_id FROM public.roles WHERE name = 'Super Admin';
+          IF v_role_id IS NOT NULL THEN
+            INSERT INTO public.user_roles (user_id, role_id)
+            VALUES (NEW.id, v_role_id)
+            ON CONFLICT (user_id, role_id) DO NOTHING;
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await pool.query(`
+      DROP TRIGGER IF EXISTS trg_assign_super_admin ON public.users;
+    `);
+
+    await pool.query(`
+      CREATE TRIGGER trg_assign_super_admin
+        AFTER INSERT ON public.users
+        FOR EACH ROW EXECUTE FUNCTION public.assign_super_admin_on_register();
+    `);
+
+    logger.system('✅ Super Admin trigger installed on public.users');
+  } catch (err) {
+    logger.error('❌ ensureSuperAdminTrigger failed:', err);
+  }
+};
+
+/**
  * Provisions tenants for all website-registered users who don't have one yet.
  * Runs at server startup so users are ready before they even log in.
  * Website users are identified by company_type IS NOT NULL (set by the website form).
