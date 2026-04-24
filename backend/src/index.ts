@@ -225,7 +225,29 @@ app.post('/auth/login', async (req, res) => {
       
       permissions.push(...permResult.rows.map((p: any) => `${p.resource}:${p.action}`))
     }
-    
+
+    // Safety net: Super Admin must always have settings:manage
+    if (roleNames.includes('Super Admin') && !permissions.includes('settings:manage')) {
+      logger.system(`⚠️ Super Admin ${u.email} missing settings:manage — granting now`)
+      await query(`
+        DO $$
+        DECLARE v_role_id INTEGER; v_perm_id INTEGER;
+        BEGIN
+          SELECT id INTO v_role_id FROM public.roles WHERE name = 'Super Admin';
+          SELECT id INTO v_perm_id FROM public.permissions WHERE resource = 'settings' AND action = 'manage' LIMIT 1;
+          IF v_perm_id IS NULL THEN
+            INSERT INTO public.permissions (resource, action, description)
+            VALUES ('settings', 'manage', 'Manage roles, permissions, and system settings')
+            RETURNING id INTO v_perm_id;
+          END IF;
+          IF v_role_id IS NOT NULL THEN
+            INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
+          END IF;
+        END $$;
+      `, [], req.dbClient)
+      permissions.push('settings:manage')
+    }
+
     // Generate JWT tokens (session token embedded so middleware can validate it)
     const payload = {
       userId: u.id,

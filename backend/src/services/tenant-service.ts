@@ -231,35 +231,38 @@ export const ensureSuperAdminHasAllPermissions = async (): Promise<void> => {
     await pool.query(`
       DO $$
       DECLARE
-        v_role_id  INTEGER;
-        v_perm_id  INTEGER;
-        critical   TEXT[][] := ARRAY[
-          ARRAY['settings', 'manage',    'Manage roles, permissions, and system settings'],
-          ARRAY['settings', 'view',      'View system settings'],
-          ARRAY['settings', 'configure', 'Configure application-wide settings']
-        ];
-        rec        TEXT[];
+        v_role_id INTEGER;
+        v_perm_id INTEGER;
       BEGIN
         SELECT id INTO v_role_id FROM public.roles WHERE name = 'Super Admin';
         IF v_role_id IS NULL THEN RETURN; END IF;
 
-        -- Ensure each critical permission exists, then grant it
-        FOREACH rec SLICE 1 IN ARRAY critical LOOP
-          SELECT id INTO v_perm_id
-          FROM public.permissions
-          WHERE resource = rec[1] AND action = rec[2]
-          LIMIT 1;
+        -- settings:manage
+        SELECT id INTO v_perm_id FROM public.permissions WHERE resource = 'settings' AND action = 'manage' LIMIT 1;
+        IF v_perm_id IS NULL THEN
+          INSERT INTO public.permissions (resource, action, description)
+          VALUES ('settings', 'manage', 'Manage roles, permissions, and system settings')
+          RETURNING id INTO v_perm_id;
+        END IF;
+        INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
 
-          IF v_perm_id IS NULL THEN
-            INSERT INTO public.permissions (resource, action, description)
-            VALUES (rec[1], rec[2], rec[3])
-            RETURNING id INTO v_perm_id;
-          END IF;
+        -- settings:view
+        SELECT id INTO v_perm_id FROM public.permissions WHERE resource = 'settings' AND action = 'view' LIMIT 1;
+        IF v_perm_id IS NULL THEN
+          INSERT INTO public.permissions (resource, action, description)
+          VALUES ('settings', 'view', 'View system settings')
+          RETURNING id INTO v_perm_id;
+        END IF;
+        INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
 
-          INSERT INTO public.role_permissions (role_id, permission_id)
-          VALUES (v_role_id, v_perm_id)
-          ON CONFLICT (role_id, permission_id) DO NOTHING;
-        END LOOP;
+        -- settings:configure
+        SELECT id INTO v_perm_id FROM public.permissions WHERE resource = 'settings' AND action = 'configure' LIMIT 1;
+        IF v_perm_id IS NULL THEN
+          INSERT INTO public.permissions (resource, action, description)
+          VALUES ('settings', 'configure', 'Configure application-wide settings')
+          RETURNING id INTO v_perm_id;
+        END IF;
+        INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
 
         -- Bulk-grant every other permission already in the table
         INSERT INTO public.role_permissions (role_id, permission_id)
