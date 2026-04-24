@@ -207,6 +207,55 @@ export const ensureWebsiteUsersHaveSuperAdmin = async (): Promise<void> => {
 };
 
 /**
+ * Ensures the Super Admin role has every permission in the permissions table.
+ * Also guarantees critical permissions (settings:manage etc.) exist first.
+ * Runs at every startup — idempotent. Fixes users who have the role assigned
+ * but whose role_permissions were never populated.
+ */
+export const ensureSuperAdminHasAllPermissions = async (): Promise<void> => {
+  try {
+    const roleResult = await pool.query(
+      `SELECT id FROM public.roles WHERE name = 'Super Admin'`
+    );
+    if (roleResult.rows.length === 0) {
+      logger.system('⚠️ Super Admin role not found, skipping permission sync');
+      return;
+    }
+    const superAdminRoleId: number = roleResult.rows[0].id;
+
+    // Ensure critical permissions exist before granting
+    const criticalPermissions = [
+      { resource: 'settings',  action: 'manage',    description: 'Manage roles, permissions, and system settings' },
+      { resource: 'settings',  action: 'view',      description: 'View system settings' },
+      { resource: 'settings',  action: 'configure', description: 'Configure application-wide settings' },
+    ];
+    for (const p of criticalPermissions) {
+      await pool.query(
+        `INSERT INTO public.permissions (resource, action, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (resource, action) DO NOTHING`,
+        [p.resource, p.action, p.description]
+      );
+    }
+
+    // Grant every permission in the table to Super Admin
+    const perms = await pool.query('SELECT id FROM public.permissions');
+    for (const perm of perms.rows) {
+      await pool.query(
+        `INSERT INTO public.role_permissions (role_id, permission_id)
+         VALUES ($1, $2)
+         ON CONFLICT (role_id, permission_id) DO NOTHING`,
+        [superAdminRoleId, perm.id]
+      );
+    }
+
+    logger.system(`✅ Super Admin permissions synced (${perms.rows.length} permissions)`);
+  } catch (err) {
+    logger.error('❌ ensureSuperAdminHasAllPermissions failed:', err);
+  }
+};
+
+/**
  * Creates (or replaces) a PostgreSQL trigger on public.users that immediately
  * assigns the Super Admin role whenever a website-registered user is inserted
  * (company_type IS NOT NULL). Runs at every startup — idempotent.
