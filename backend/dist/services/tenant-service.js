@@ -12,7 +12,7 @@ const createTenantSchema = async (schemaName) => {
     await (0, db_1.query)(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
 };
 const createTenantTables = async (schemaName) => {
-    const databaseSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../databasse.sql'), 'utf-8');
+    const databaseSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../src/databasse.sql'), 'utf-8');
     const statements = databaseSql.split(';').filter(s => s.trim().length > 0);
     const client = await db_1.pool.connect();
     try {
