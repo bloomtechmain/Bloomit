@@ -30,36 +30,35 @@ async function seedRailwayAdmin() {
        RETURNING id`, [adminName, adminEmail, passwordHash]);
         const userId = userResult.rows[0].id;
         console.log(`✅ Created admin user: ${adminEmail} (ID: ${userId})`);
-        // Get or create Admin role
-        let roleResult = await db_1.pool.query('SELECT id FROM roles WHERE name = $1', ['Admin']);
-        let adminRoleId;
+        // Get or create Super Admin role
+        let roleResult = await db_1.pool.query('SELECT id FROM roles WHERE name = $1', ['Super Admin']);
+        let superAdminRoleId;
         if (roleResult.rows.length === 0) {
-            // Create Admin role if it doesn't exist
-            console.log('Creating Admin role...');
-            const newRole = await db_1.pool.query(`INSERT INTO roles (name, description)
-         VALUES ($1, $2)
-         RETURNING id`, ['Admin', 'Full system administrator with all permissions']);
-            adminRoleId = newRole.rows[0].id;
-            console.log(`✅ Created Admin role (ID: ${adminRoleId})`);
+            console.log('Creating Super Admin role...');
+            const newRole = await db_1.pool.query(`INSERT INTO roles (name, description, is_system_role)
+         VALUES ($1, $2, TRUE)
+         RETURNING id`, ['Super Admin', 'Full unrestricted system access']);
+            superAdminRoleId = newRole.rows[0].id;
+            console.log(`✅ Created Super Admin role (ID: ${superAdminRoleId})`);
         }
         else {
-            adminRoleId = roleResult.rows[0].id;
-            console.log(`✅ Found existing Admin role (ID: ${adminRoleId})`);
+            superAdminRoleId = roleResult.rows[0].id;
+            console.log(`✅ Found existing Super Admin role (ID: ${superAdminRoleId})`);
         }
-        // Assign Admin role to user
+        // Assign Super Admin role to user
         await db_1.pool.query(`INSERT INTO user_roles (user_id, role_id)
        VALUES ($1, $2)
-       ON CONFLICT (user_id, role_id) DO NOTHING`, [userId, adminRoleId]);
-        console.log(`✅ Assigned Admin role to user ${adminEmail}`);
-        // Grant all permissions to Admin role (if permissions exist)
+       ON CONFLICT (user_id, role_id) DO NOTHING`, [userId, superAdminRoleId]);
+        console.log(`✅ Assigned Super Admin role to user ${adminEmail}`);
+        // Grant all permissions to Super Admin role (if permissions exist)
         const permissionsResult = await db_1.pool.query('SELECT id FROM permissions');
         if (permissionsResult.rows.length > 0) {
             for (const perm of permissionsResult.rows) {
                 await db_1.pool.query(`INSERT INTO role_permissions (role_id, permission_id)
            VALUES ($1, $2)
-           ON CONFLICT (role_id, permission_id) DO NOTHING`, [adminRoleId, perm.id]);
+           ON CONFLICT (role_id, permission_id) DO NOTHING`, [superAdminRoleId, perm.id]);
             }
-            console.log(`✅ Granted ${permissionsResult.rows.length} permissions to Admin role`);
+            console.log(`✅ Granted ${permissionsResult.rows.length} permissions to Super Admin role`);
         }
         console.log('\n✅ Railway admin user seeded successfully!');
         console.log('\n📝 Login Credentials:');

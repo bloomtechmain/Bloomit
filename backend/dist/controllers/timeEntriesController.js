@@ -433,7 +433,7 @@ exports.rejectTimeEntry = rejectTimeEntry;
 const getTimeSummary = async (req, res) => {
     try {
         const { employee_id, project_id, start_date, end_date } = req.query;
-        let whereClause = "WHERE te.status = 'approved'";
+        let whereClause = "WHERE te.status != 'rejected'";
         const params = [];
         let paramCount = 0;
         if (employee_id) {

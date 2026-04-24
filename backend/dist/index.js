@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const db_1 = require("./db");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jwt_1 = require("./utils/jwt");
+const tenant_service_1 = require("./services/tenant-service");
 const auth_1 = require("./middleware/auth");
 const passwordGenerator_1 = require("./utils/passwordGenerator");
 const passwordHistory_1 = require("./utils/passwordHistory");
@@ -123,7 +124,8 @@ app.post('/auth/login', async (req, res) => {
         const r = await (0, db_1.query)(`
       SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id,
              COALESCE(u.password_must_change, FALSE) as password_must_change,
-             COALESCE(u.source, '') as source
+             COALESCE(u.source, '') as source,
+             COALESCE(u.account_status, 'active') as account_status
       FROM users u
       WHERE u.email = $1 OR u.name = $1
       LIMIT 1
@@ -131,9 +133,25 @@ app.post('/auth/login', async (req, res) => {
         if (!r.rows.length)
             return res.status(401).json({ error: 'invalid_credentials' });
         const u = r.rows[0];
+        if (u.account_status !== 'active') {
+            return res.status(403).json({ error: 'account_inactive', message: 'Your account is not active.' });
+        }
         const ok = await bcryptjs_1.default.compare(password, u.password_hash);
         if (!ok)
             return res.status(401).json({ error: 'invalid_credentials' });
+        // Auto-provision tenant schema on first ERP login for website-registered users
+        if (!u.tenant_id) {
+            try {
+                logger_1.default.system(`🏗️  Provisioning tenant for new user: ${u.email}`);
+                const provisioned = await (0, tenant_service_1.provisionTenantForUser)(u.id, u.name);
+                u.tenant_id = provisioned.tenantId;
+                logger_1.default.system(`✅ Tenant provisioned: ${provisioned.schemaName} (id=${provisioned.tenantId}) for ${u.email}`);
+            }
+            catch (provisionErr) {
+                logger_1.default.error('Tenant provisioning failed during login', provisionErr);
+                return res.status(500).json({ error: 'tenant_provision_failed', message: 'Could not set up your workspace. Please contact support.' });
+            }
+        }
         // Enforce single active session — block if already logged in elsewhere
         await (0, db_1.query)(`DELETE FROM public.active_sessions WHERE user_id = $1 AND expires_at <= NOW()`, [u.id], req.dbClient);
         const existingSession = await (0, db_1.query)(`SELECT id FROM public.active_sessions WHERE user_id = $1 AND expires_at > NOW() LIMIT 1`, [u.id], req.dbClient);
@@ -172,6 +190,27 @@ app.post('/auth/login', async (req, res) => {
         WHERE rp.role_id = ANY($1::int[])
       `, [roleIds], req.dbClient);
             permissions.push(...permResult.rows.map((p) => `${p.resource}:${p.action}`));
+        }
+        // Safety net: Super Admin must always have settings:manage
+        if (roleNames.includes('Super Admin') && !permissions.includes('settings:manage')) {
+            logger_1.default.system(`⚠️ Super Admin ${u.email} missing settings:manage — granting now`);
+            await (0, db_1.query)(`
+        DO $$
+        DECLARE v_role_id INTEGER; v_perm_id INTEGER;
+        BEGIN
+          SELECT id INTO v_role_id FROM public.roles WHERE name = 'Super Admin';
+          SELECT id INTO v_perm_id FROM public.permissions WHERE resource = 'settings' AND action = 'manage' LIMIT 1;
+          IF v_perm_id IS NULL THEN
+            INSERT INTO public.permissions (resource, action, description)
+            VALUES ('settings', 'manage', 'Manage roles, permissions, and system settings')
+            RETURNING id INTO v_perm_id;
+          END IF;
+          IF v_role_id IS NOT NULL THEN
+            INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
+          END IF;
+        END $$;
+      `, [], req.dbClient);
+            permissions.push('settings:manage');
         }
         // Generate JWT tokens (session token embedded so middleware can validate it)
         const payload = {
@@ -449,6 +488,14 @@ async function startServer() {
         logger_1.default.system('✅ Database connected successfully');
         // Ensure Railway admin user exists (production only)
         await (0, ensureRailwayAdmin_1.ensureRailwayAdmin)();
+        // Install DB trigger so new website users get Super Admin role immediately on INSERT
+        await (0, tenant_service_1.ensureSuperAdminTrigger)();
+        // Provision tenants for website-registered users who haven't logged in yet
+        await (0, tenant_service_1.provisionPendingWebsiteUsers)();
+        // Ensure every website user has Super Admin role (catches partial/missed provisioning)
+        await (0, tenant_service_1.ensureWebsiteUsersHaveSuperAdmin)();
+        // Ensure Super Admin role has all permissions (fixes users with role but empty role_permissions)
+        await (0, tenant_service_1.ensureSuperAdminHasAllPermissions)();
         // Start background jobs (Railway-compatible)
         logger_1.default.system('🔄 Initializing background jobs...');
         (0, reminderCron_1.startReminderCron)();

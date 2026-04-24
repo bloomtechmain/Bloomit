@@ -45,6 +45,12 @@ const path_1 = __importDefault(require("path"));
  * Initializes an empty database structure for Railway deployment
  * Does NOT import any data - only creates tables and schema
  */
+// Prevent individual scripts from closing the shared pool during init
+;
+db_1.pool.end = () => Promise.resolve();
+// Prevent individual scripts from killing the process during init
+const _originalExit = process.exit.bind(process);
+process.exit = () => { };
 async function runSqlFile(filePath) {
     console.log(`\n📄 Executing SQL file: ${path_1.default.basename(filePath)}`);
     const sql = fs_1.default.readFileSync(filePath, 'utf8');
@@ -131,17 +137,25 @@ async function initRailwayDatabase() {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createRBACTables.ts');
         await runScript('seedRBAC.ts'); // Seeds roles and permissions
-        // Step 3: Create Employee and User related tables
+        // Step 3: Create Package/Plan System (must be before users are seeded)
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('👥 STEP 3: Creating Employee & User Tables');
+        console.log('📦 STEP 3: Creating Package & Plan System');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        await runScript('createPackagesTable.ts');
+        await runScript('addPackageToUsers.ts');
+        await runScript('createWebAppTables.ts');
+        await runScript('createDashboardAdminTable.ts');
+        // Step 4: Create Employee and User related tables
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('👥 STEP 4: Creating Employee & User Tables');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('alterEmployeesTableForPayroll.ts');
         await runScript('addMissingEmployeeColumns.ts');
         await runScript('createEmployeePortalTables.ts');
         await runScript('createEmployeeDocumentsTable.ts');
-        // Step 4: Create Financial Tables
+        // Step 5: Create Financial Tables
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('💰 STEP 4: Creating Financial Tables');
+        console.log('💰 STEP 5: Creating Financial Tables');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createVendorsTable.ts');
         await runScript('createProjectItemsTable.ts');
@@ -153,30 +167,30 @@ async function initRailwayDatabase() {
         await runScript('createBankTransactionsTable.ts');
         await runScript('createDebitCardTable.ts');
         await runScript('createSubscriptionsTable.ts');
-        // Step 5: Create Purchase Orders and Quotes
+        // Step 6: Create Purchase Orders and Quotes
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📦 STEP 5: Creating Purchase Orders & Quotes');
+        console.log('📦 STEP 6: Creating Purchase Orders & Quotes');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createPurchaseOrdersTable.ts');
         await runScript('createQuotesTables.ts');
         await runScript('createQuoteRemindersTable.ts');
-        // Step 6: Create Payroll System
+        // Step 7: Create Payroll System
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('💵 STEP 6: Creating Payroll System');
+        console.log('💵 STEP 7: Creating Payroll System');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createPayrollTables.ts');
         await runScript('createPayslipSignatureTokensTable.ts');
         await runScript('addPayrollIndexes.ts');
-        // Step 7: Create Time & PTO Tables
+        // Step 8: Create Time & PTO Tables
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('⏰ STEP 7: Creating Time Tracking & PTO');
+        console.log('⏰ STEP 8: Creating Time Tracking & PTO');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createTimeEntriesTable.ts');
         await runScript('createPTORequestsTable.ts');
         await runScript('addPtoAllowanceColumn.ts');
-        // Step 8: Create Supporting Tables
+        // Step 9: Create Supporting Tables
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🔧 STEP 8: Creating Supporting Tables');
+        console.log('🔧 STEP 9: Creating Supporting Tables');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('createDocumentsTable.ts');
         await runScript('createNotesTable.ts');
@@ -184,25 +198,25 @@ async function initRailwayDatabase() {
         await runScript('createNotificationsTable.ts');
         await runScript('createEmailLogTable.ts');
         await runScript('createApplicationSettingsTable.ts');
-        // Step 9: Grant Permissions
+        // Step 10: Grant Permissions
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🔑 STEP 9: Granting Permissions');
+        console.log('🔑 STEP 10: Granting Permissions');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('grantPurchaseOrderPermissions.ts');
         await runScript('grantQuotesPermissions.ts');
         await runScript('grantPayrollPermissions.ts');
         await runScript('grantEmployeePortalPermissions.ts');
-        // Step 10: Settings and Migrations
+        // Step 11: Settings and Migrations
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('⚙️  STEP 10: Applying Settings & Migrations');
+        console.log('⚙️  STEP 11: Applying Settings & Migrations');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         await runScript('addEmailPreferencesToSettings.ts');
         await runScript('addEmployeeDirectorySettings.ts');
         await runScript('createReminderEmailSetting.ts');
         await runScript('addPasswordManagementFeatures.ts');
-        // Step 11: Verify Database Structure
+        // Step 12: Verify Database Structure
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🔍 STEP 11: Verifying Database Structure');
+        console.log('🔍 STEP 12: Verifying Database Structure');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         const tablesResult = await db_1.pool.query(`
       SELECT schemaname, tablename 
@@ -234,10 +248,10 @@ if (require.main === module) {
     initRailwayDatabase()
         .then(() => {
         console.log('✅ Done!');
-        process.exit(0);
+        _originalExit(0);
     })
         .catch((err) => {
         console.error('❌ Failed:', err);
-        process.exit(1);
+        _originalExit(1);
     });
 }

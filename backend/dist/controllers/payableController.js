@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createPayable = exports.getAllPayables = void 0;
+exports.createPayable = exports.deletePayable = exports.updatePayable = exports.getAllPayables = void 0;
 const getAllPayables = async (req, res) => {
     try {
         const query = `
@@ -19,6 +19,52 @@ const getAllPayables = async (req, res) => {
     }
 };
 exports.getAllPayables = getAllPayables;
+const updatePayable = async (req, res) => {
+    const { id } = req.params;
+    const { vendor_id, payable_name, description, payable_type, amount, frequency, start_date, end_date, contract_id, is_active, bank_account_id, payment_method, reference_number } = req.body;
+    if (!payable_name || !payable_type || !amount) {
+        return res.status(400).json({ error: 'missing_fields' });
+    }
+    try {
+        const query = `
+      UPDATE payables SET
+        vendor_id = $1, payable_name = $2, description = $3, payable_type = $4,
+        amount = $5, frequency = $6, start_date = $7, end_date = $8,
+        contract_id = $9, is_active = $10, bank_account_id = $11,
+        payment_method = $12, reference_number = $13
+      WHERE payable_id = $14
+      RETURNING *
+    `;
+        const result = await req.dbClient.query(query, [
+            vendor_id || null, payable_name, description || null, payable_type,
+            amount, frequency || null, start_date || null, end_date || null,
+            contract_id || null, is_active ?? true, bank_account_id || null,
+            payment_method || null, reference_number || null, id
+        ]);
+        if (result.rows.length === 0)
+            return res.status(404).json({ error: 'not_found' });
+        return res.status(200).json({ payable: result.rows[0] });
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : 'server_error';
+        return res.status(500).json({ error: message });
+    }
+};
+exports.updatePayable = updatePayable;
+const deletePayable = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await req.dbClient.query('DELETE FROM payables WHERE payable_id = $1 RETURNING payable_id', [id]);
+        if (result.rows.length === 0)
+            return res.status(404).json({ error: 'not_found' });
+        return res.status(200).json({ success: true });
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : 'server_error';
+        return res.status(500).json({ error: message });
+    }
+};
+exports.deletePayable = deletePayable;
 const createPayable = async (req, res) => {
     const { vendor_id, payable_name, description, payable_type, amount, frequency, start_date, end_date, contract_id, is_active, bank_account_id, payment_method, reference_number } = req.body;
     // For PETTY_CASH, vendor_id is optional. payable_name defaults if missing.
