@@ -106,40 +106,30 @@ const provisionTenantForUser = async (userId, displayName) => {
         // Ensure critical permissions exist and grant all permissions to Super Admin.
         // Uses SELECT-first-then-INSERT to avoid relying on ON CONFLICT (resource, action)
         // which requires a unique constraint that may be absent on older deployments.
-        await client.query(`
-      DO $$
-      DECLARE
-        v_perm_id  INTEGER;
-        v_role_id  INTEGER := ${superAdminRoleId};
-        critical   TEXT[][] := ARRAY[
-          ARRAY['settings', 'manage',    'Manage roles, permissions, and system settings'],
-          ARRAY['settings', 'view',      'View system settings'],
-          ARRAY['settings', 'configure', 'Configure application-wide settings']
+        // Grant critical permissions using simple sequential SELECT-then-INSERT
+        // (avoids ON CONFLICT on permissions table which needs a unique constraint)
+        const criticalPerms = [
+            { resource: 'settings', action: 'manage', description: 'Manage roles, permissions, and system settings' },
+            { resource: 'settings', action: 'view', description: 'View system settings' },
+            { resource: 'settings', action: 'configure', description: 'Configure application-wide settings' },
         ];
-        rec        TEXT[];
-      BEGIN
-        FOREACH rec SLICE 1 IN ARRAY critical LOOP
-          SELECT id INTO v_perm_id
-          FROM public.permissions
-          WHERE resource = rec[1] AND action = rec[2]
-          LIMIT 1;
-
-          IF v_perm_id IS NULL THEN
-            INSERT INTO public.permissions (resource, action, description)
-            VALUES (rec[1], rec[2], rec[3])
-            RETURNING id INTO v_perm_id;
-          END IF;
-
-          INSERT INTO public.role_permissions (role_id, permission_id)
-          VALUES (v_role_id, v_perm_id)
-          ON CONFLICT (role_id, permission_id) DO NOTHING;
-        END LOOP;
-
-        INSERT INTO public.role_permissions (role_id, permission_id)
-        SELECT v_role_id, p.id FROM public.permissions p
-        ON CONFLICT (role_id, permission_id) DO NOTHING;
-      END $$;
-    `);
+        for (const p of criticalPerms) {
+            const existing = await client.query(`SELECT id FROM public.permissions WHERE resource = $1 AND action = $2 LIMIT 1`, [p.resource, p.action]);
+            let permId;
+            if (existing.rows.length > 0) {
+                permId = existing.rows[0].id;
+            }
+            else {
+                const inserted = await client.query(`INSERT INTO public.permissions (resource, action, description) VALUES ($1, $2, $3) RETURNING id`, [p.resource, p.action, p.description]);
+                permId = inserted.rows[0].id;
+            }
+            await client.query(`INSERT INTO public.role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT (role_id, permission_id) DO NOTHING`, [superAdminRoleId, permId]);
+        }
+        // Grant every existing permission to Super Admin
+        const perms = await client.query('SELECT id FROM public.permissions');
+        for (const perm of perms.rows) {
+            await client.query(`INSERT INTO public.role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT (role_id, permission_id) DO NOTHING`, [superAdminRoleId, perm.id]);
+        }
         await client.query('COMMIT');
         return { tenantId, schemaName };
     }
