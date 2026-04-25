@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "test": "cross-env NODE_ENV=test dotenv -e .env.test jest --runInBand",
+    "test:watch": "cross-env NODE_ENV=test dotenv -e .env.test jest --watch --runInBand",
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -42,7 +44,13 @@
     "db:create:packages:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/createPackagesTable.ts dotenv_config_path=.env.production",
     "db:add:package-to-users:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addPackageToUsers.ts dotenv_config_path=.env.production",
     "db:create:web-app-tables": "ts-node src/scripts/createWebAppTables.ts",
-    "db:create:dashboard-admin": "ts-node src/scripts/createDashboardAdminTable.ts"
+    "db:create:dashboard-admin": "ts-node src/scripts/createDashboardAdminTable.ts",
+    "migrate:timer-columns": "ts-node src/scripts/addTimerColumnsToTimeEntries.ts",
+    "migrate:timer-columns:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addTimerColumnsToTimeEntries.ts dotenv_config_path=.env.production",
+    "migrate:reminder-assigned-to": "ts-node src/scripts/addAssignedToQuoteReminders.ts",
+    "migrate:reminder-assigned-to:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/addAssignedToQuoteReminders.ts dotenv_config_path=.env.production",
+    "migrate:debit-cards-tenants": "ts-node src/scripts/migrateDebitCardsTenants.ts",
+    "migrate:debit-cards-tenants:railway": "cross-env NODE_ENV=production ts-node -r dotenv/config src/scripts/migrateDebitCardsTenants.ts dotenv_config_path=.env.production"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -67,8 +75,14 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.0",
     "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0",
+    "jest": "^30.3.0",
     "nodemon": "^3.1.7",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   }

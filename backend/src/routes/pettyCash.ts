@@ -9,9 +9,9 @@ const router = Router()
 router.use(requireAuth)
 
 // Petty cash routes with permission-based authorization
-router.post('/replenish', requirePermission('petty_cash', 'replenish'), replenishPettyCash)
+router.post('/replenish', requirePermission('petty_cash', 'create'), replenishPettyCash)
 router.get('/balance', requirePermission('petty_cash', 'read'), getPettyCashBalance)
-router.post('/bill', requirePermission('petty_cash', 'create_bill'), addPettyCashBill)
+router.post('/bill', requirePermission('petty_cash', 'create'), addPettyCashBill)
 router.get('/transactions', requirePermission('petty_cash', 'read'), getPettyCashTransactions)
 
 export default router

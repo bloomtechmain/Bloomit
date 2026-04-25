@@ -15,7 +15,7 @@ const QuoteEditModal: React.FC<QuoteEditModalProps> = ({ quoteId, onClose, onSuc
   const { toast } = useToast()
 
   // Form state
-  const [templateType, setTemplateType] = useState<TemplateType>('RESTAURANT')
+  const [templateType, setTemplateType] = useState<TemplateType>('SERVICES')
   const [companyName, setCompanyName] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [dateOfIssue, setDateOfIssue] = useState('')

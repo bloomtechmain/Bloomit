@@ -4,6 +4,7 @@ import PayslipForm from './PayslipForm'
 import { getAllEmployeesWithPayroll, createPayslip, submitForReview, getAllPayslips, updatePayslip } from '../services/payrollService'
 import type { EmployeePayrollData, Payslip } from '../types/payroll'
 import { useToast } from '../context/ToastContext'
+import { getStoredPreset } from '../config/payrollPresets'
 
 const card: React.CSSProperties = {
   background: '#fff',
@@ -125,6 +126,7 @@ export default function PayslipGenerator() {
     return (emp.name || '').toLowerCase().includes(s) || (emp.email || '').toLowerCase().includes(s)
   })
 
+  const preset = getStoredPreset()
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
@@ -248,7 +250,7 @@ export default function PayslipGenerator() {
                     <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{emp.employee_department || emp.department || 'No Department'}</div>
                     {emp.base_salary && (
                       <div style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', marginTop: 6 }}>
-                        Base: LKR {emp.base_salary.toLocaleString()}
+                        Base: {preset.currencySymbol || 'LKR'} {Number(emp.base_salary).toLocaleString()}
                       </div>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-export type TemplateType = 'RESTAURANT' | 'RETAIL' | 'CUSTOM'
+export type TemplateType = 'SERVICES' | 'PRODUCTS' | 'CONSULTING' | 'CONSTRUCTION' | 'CUSTOM'
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'FOLLOW_UP'
 
 export interface QuoteItem {

@@ -14,11 +14,11 @@ async function addCustomQuoteType() {
       DROP CONSTRAINT IF EXISTS quotes_template_type_check
     `)
 
-    // Add new constraint with CUSTOM included
+    // Add new constraint with all supported template types
     await client.query(`
-      ALTER TABLE quotes 
-      ADD CONSTRAINT quotes_template_type_check 
-      CHECK (template_type IN ('RESTAURANT', 'RETAIL', 'CUSTOM'))
+      ALTER TABLE quotes
+      ADD CONSTRAINT quotes_template_type_check
+      CHECK (template_type IN ('SERVICES', 'PRODUCTS', 'CONSULTING', 'CONSTRUCTION', 'CUSTOM'))
     `)
 
     await client.query('COMMIT')

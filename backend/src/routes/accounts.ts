@@ -13,7 +13,7 @@ router.use(requireAuth)
 router.post('/open-account', requirePermission('accounts', 'create'), openAccount)
 router.get('/', requirePermission('accounts', 'read'), getAccounts)
 router.delete('/:id', requirePermission('accounts', 'delete'), deleteAccount)
-router.post('/debit-cards', requirePermission('accounts', 'manage_cards'), createDebitCard)
-router.get('/debit-cards', requirePermission('accounts', 'read'), getDebitCards)
+router.post('/debit-cards', requirePermission('debit_cards', 'create'), createDebitCard)
+router.get('/debit-cards', requirePermission('debit_cards', 'read'), getDebitCards)
 
 export default router

@@ -612,8 +612,11 @@ async function startServer() {
   }
 }
 
-// Start the server
-startServer().catch(err => {
-  logger.error('❌ Fatal error during startup:', err)
-  process.exit(1)
-})
+export default app
+
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch(err => {
+    logger.error('❌ Fatal error during startup:', err)
+    process.exit(1)
+  })
+}

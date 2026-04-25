@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 
 type QuotePayload = {
-  template_type?: 'RESTAURANT' | 'RETAIL' | 'CUSTOM'
+  template_type?: 'SERVICES' | 'PRODUCTS' | 'CONSULTING' | 'CONSTRUCTION' | 'CUSTOM'
   company_name?: string
   company_address?: string
   date_of_issue?: string
@@ -116,8 +116,14 @@ export const createQuote = async (req: Request, res: Response) => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0)
     const total_due = subtotal
 
-    // Generate quote number
-    const quoteNumberResult = await client.query('SELECT generate_quote_number() as quote_number')
+    // Generate quote number inline — avoids dependency on a DB function
+    const quoteNumberResult = await client.query(`
+      SELECT LPAD(
+        (COALESCE(MAX(CAST(SUBSTRING(quote_number FROM '[0-9]+') AS INT)), 0) + 1)::TEXT,
+        7, '0'
+      ) AS quote_number
+      FROM quotes
+    `)
     const quote_number = quoteNumberResult.rows[0].quote_number
 
     // Insert quote

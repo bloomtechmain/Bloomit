@@ -12,27 +12,22 @@ import { useToast } from '../context/ToastContext'
 
 type ViewMode = 'list' | 'create' | 'edit' | 'view'
 
-const TEMPLATE_FIXED_ITEMS: Record<TemplateType, QuoteItem[]> = {
-  RESTAURANT: [
-    { description: 'PC System Full Set Up (1 Year Warranty)',  quantity: 1, unit_price: 0, total: 0 },
-    { description: 'Printer',                                   quantity: 1, unit_price: 0, total: 0 },
-    { description: 'POS software',                              quantity: 1, unit_price: 0, total: 0 },
-    { description: 'Delivery Fee & Setup and Maintenance',      quantity: 1, unit_price: 0, total: 0 },
-  ],
-  RETAIL: [
-    { description: 'PC System Set up  (1 Year Warranty)',       quantity: 1, unit_price: 0, total: 0 },
-    { description: 'Printer (1 Year Warranty)',                  quantity: 1, unit_price: 0, total: 0 },
-    { description: 'Barcode Scanner',                           quantity: 1, unit_price: 0, total: 0 },
-    { description: 'POS software',                              quantity: 1, unit_price: 0, total: 0 },
-    { description: 'Delivery Fee & Setup and Maintenance',      quantity: 1, unit_price: 0, total: 0 },
-  ],
-  CUSTOM: [],
+const BLANK_ITEM = (): QuoteItem => ({ description: '', quantity: 1, unit_price: 0, total: 0 })
+
+const TEMPLATE_STARTER_ITEMS: Record<TemplateType, QuoteItem[]> = {
+  SERVICES:     [BLANK_ITEM(), BLANK_ITEM()],
+  PRODUCTS:     [BLANK_ITEM(), BLANK_ITEM(), BLANK_ITEM()],
+  CONSULTING:   [BLANK_ITEM(), BLANK_ITEM()],
+  CONSTRUCTION: [BLANK_ITEM(), BLANK_ITEM(), BLANK_ITEM()],
+  CUSTOM:       [BLANK_ITEM()],
 }
 
 const TEMPLATE_META: Record<TemplateType, { icon: string; label: string; desc: string }> = {
-  RESTAURANT: { icon: '🍽️', label: 'Restaurant', desc: 'POS + PC + printer setup' },
-  RETAIL:     { icon: '🏪', label: 'Retail',     desc: 'POS + scanner + barcode'  },
-  CUSTOM:     { icon: '✏️', label: 'Custom',     desc: 'Build from scratch'        },
+  SERVICES:     { icon: '🛠️', label: 'Services',     desc: 'Agencies, freelancers, maintenance' },
+  PRODUCTS:     { icon: '📦', label: 'Products',     desc: 'Retailers, manufacturers, suppliers' },
+  CONSULTING:   { icon: '💼', label: 'Consulting',   desc: 'Advisors, analysts, strategists'    },
+  CONSTRUCTION: { icon: '🏗️', label: 'Construction', desc: 'Contractors, builders, engineers'   },
+  CUSTOM:       { icon: '✏️', label: 'Custom',       desc: 'Start completely from scratch'      },
 }
 
 // ── Shared input / label styles ───────────────────────────────────────────────
@@ -66,7 +61,7 @@ const QuoteGenerator: React.FC = () => {
   const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null)
 
   // Form state
-  const [templateType,   setTemplateType]   = useState<TemplateType>('RESTAURANT')
+  const [templateType,   setTemplateType]   = useState<TemplateType>('SERVICES')
   const [companyName,    setCompanyName]    = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [dateOfIssue,    setDateOfIssue]    = useState(new Date().toISOString().split('T')[0])
@@ -91,16 +86,13 @@ const QuoteGenerator: React.FC = () => {
   useEffect(() => { loadServiceSuggestions() }, [])
 
   useEffect(() => {
-    const fixed = TEMPLATE_FIXED_ITEMS[templateType]
-    setItems(fixed.length > 0 ? [...fixed] : [{ description: '', quantity: 1, unit_price: 0, total: 0 }])
+    setItems(TEMPLATE_STARTER_ITEMS[templateType].map(BLANK_ITEM))
   }, [templateType])
 
   const loadServiceSuggestions = async () => {
     try { setServiceSuggestions(await getServiceSuggestions()) }
     catch (err) { console.error('Failed to load service suggestions:', err) }
   }
-
-  const isFixed = (desc: string) => TEMPLATE_FIXED_ITEMS[templateType].some(i => i.description === desc)
 
   const calcTotal = (qty: number, price: number) => qty * price
 
@@ -274,7 +266,7 @@ const QuoteGenerator: React.FC = () => {
           {/* Title */}
           <div>
             <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f6ff' }}>Quote Setup</div>
-            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Choose a template to begin</div>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Select a category and fill in your items</div>
           </div>
 
           {/* Template cards */}
@@ -380,7 +372,7 @@ const QuoteGenerator: React.FC = () => {
               }}>
                 <div>
                   <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.2em' }}>QUOTATION</div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#fff', letterSpacing: '0.04em', marginTop: 1 }}>Bloomtech Systems</div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#fff', letterSpacing: '0.04em', marginTop: 1 }}>Your Company</div>
                 </div>
                 <span style={{
                   background: 'rgba(255,255,255,0.15)', borderRadius: 6,
@@ -527,22 +519,19 @@ const QuoteGenerator: React.FC = () => {
 
               {/* Item rows */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.map((item, idx) => {
-                  const fixed = isFixed(item.description)
-                  return (
+                {items.map((item, idx) => (
                     <div key={idx} style={{
                       display: 'grid', gridTemplateColumns: '1fr 72px 108px 110px 32px',
                       gap: 6, alignItems: 'center',
-                      background: fixed ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)',
+                      background: 'rgba(255,255,255,0.05)',
                       padding: '8px 10px', borderRadius: 8,
-                      border: fixed ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.08)',
                     }}>
                       <input
                         type="text" value={item.description}
                         onChange={e => handleItemChange(idx, 'description', e.target.value)}
-                        placeholder="Item description"
-                        readOnly={fixed}
-                        style={{ ...inputStyle, opacity: fixed ? 0.6 : 1, cursor: fixed ? 'not-allowed' : 'text' }}
+                        placeholder="Item / service description"
+                        style={inputStyle}
                         className="timer-panel-input"
                       />
                       <input
@@ -575,8 +564,7 @@ const QuoteGenerator: React.FC = () => {
                         </button>
                       ) : <div style={{ width: 28 }} />}
                     </div>
-                  )
-                })}
+                ))}
               </div>
             </div>
 

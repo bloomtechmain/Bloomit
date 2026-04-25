@@ -24,7 +24,7 @@ const QuoteDetail: React.FC<QuoteDetailProps> = ({ quoteId, onBack, onEditMode, 
   
   // Edit mode state
   const [editMode, setEditMode] = useState(isEditMode)
-  const [templateType, setTemplateType] = useState<TemplateType>('RESTAURANT')
+  const [templateType, setTemplateType] = useState<TemplateType>('SERVICES')
   const [companyName, setCompanyName] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [dateOfIssue, setDateOfIssue] = useState('')
@@ -334,14 +334,21 @@ const QuoteDetail: React.FC<QuoteDetailProps> = ({ quoteId, onBack, onEditMode, 
       <div className="glass-panel" style={{ padding: 24 }}>
         {/* Template Type - View Only */}
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Template Type</label>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <span style={{ padding: '8px 16px', borderRadius: 8, background: templateType === 'RESTAURANT' ? 'var(--accent)' : 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 600 }}>
-              🍽️ Restaurant
-            </span>
-            <span style={{ padding: '8px 16px', borderRadius: 8, background: templateType === 'RETAIL' ? 'var(--accent)' : 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 600 }}>
-              🏪 Retail
-            </span>
+          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Category</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(['SERVICES', 'PRODUCTS', 'CONSULTING', 'CONSTRUCTION', 'CUSTOM'] as const).map(t => {
+              const icons: Record<string, string> = { SERVICES: '🛠️', PRODUCTS: '📦', CONSULTING: '💼', CONSTRUCTION: '🏗️', CUSTOM: '✏️' }
+              return (
+                <span key={t} style={{
+                  padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 13,
+                  background: templateType === t ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+                  color: templateType === t ? '#fff' : 'rgba(255,255,255,0.45)',
+                  border: templateType === t ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
+                }}>
+                  {icons[t]} {t.charAt(0) + t.slice(1).toLowerCase()}
+                </span>
+              )
+            })}
           </div>
         </div>
 

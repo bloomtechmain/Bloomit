@@ -254,6 +254,8 @@ export default function Dashboard({
   const [bankDropdownOpen, setBankDropdownOpen] = useState(false)
   const [bankLogoLocalFailed, setBankLogoLocalFailed] = useState<Record<string, boolean>>({})
   const [bankLogoRemoteFailed, setBankLogoRemoteFailed] = useState<Record<string, boolean>>({})
+  const [customBankMode, setCustomBankMode] = useState(false)
+  const [customBankLogoUrl, setCustomBankLogoUrl] = useState('')
   // const [newCardHolder, setNewCardHolder] = useState('John Doe')
   // const [newCardNumber, setNewCardNumber] = useState('4242 4242 4242 4242')
   const [cardSaveConfirmVisible, setCardSaveConfirmVisible] = useState(false)
@@ -604,7 +606,7 @@ export default function Dashboard({
         }
       })
       if (!r.ok) {
-        console.error('Failed to fetch cards')
+        console.error('Failed to fetch cards', r.status)
         return
       }
       const data = await r.json()
@@ -612,7 +614,7 @@ export default function Dashboard({
     } catch (err) {
       console.error('Error fetching cards:', err)
     }
-  }, [])
+  }, [accessToken])
 
   const fetchAssets = useCallback(async () => {
     setAssetsLoading(true)
@@ -742,6 +744,11 @@ export default function Dashboard({
       fetchAccounts()
     }
   }, [cardModalOpen, fetchAccounts])
+  useEffect(() => {
+    if (selectedAccountForCards) {
+      fetchCards()
+    }
+  }, [selectedAccountForCards, fetchCards])
   const resetCardForm = () => {
     setCardBankAccountId('')
     setCardSelectedAccountLabel('')
@@ -773,19 +780,16 @@ export default function Dashboard({
         }),
       })
       if (!r.ok) {
-        await r.json().catch(() => ({}))
-        setCardSaveConfirmVisible(true)
-        setTimeout(() => setCardSaveConfirmVisible(false), 950)
+        const errData = await r.json().catch(() => ({}))
+        toast.error(errData.error || 'Failed to save card')
         return
       }
-      fetchCards()
+      await fetchCards()
       setCardModalOpen(false)
       resetCardForm()
-      setCardSaveConfirmVisible(true)
-      setTimeout(() => setCardSaveConfirmVisible(false), 950)
+      toast.success('Card saved successfully')
     } catch {
-      setCardSaveConfirmVisible(true)
-      setTimeout(() => setCardSaveConfirmVisible(false), 950)
+      toast.error('Failed to save card')
     }
   }
 
@@ -1186,6 +1190,9 @@ export default function Dashboard({
     setAccountNumber('')
     setAccountName('')
     setOpeningBalance('')
+    setCustomBankMode(false)
+    setCustomBankLogoUrl('')
+    setBankDropdownOpen(false)
   }
 
   const saveOpenAccount = async () => {
@@ -1472,6 +1479,8 @@ export default function Dashboard({
       setReplenishSourceAccountId('')
       setReplenishReference('')
       fetchPettyCashBalance()
+      fetchPettyCashTransactions()
+      fetchAccounts()
     } catch (err) {
       console.error('Error replenishing:', err)
       toast.error('Error replenishing petty cash')
@@ -4588,91 +4597,151 @@ export default function Dashboard({
         </div>
       )}
 
-      {openAccountModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: '20px' }} onClick={() => { setOpenAccountModalOpen(false); resetOpenAccountForm() }}>
-          <div className="glass-panel" style={{ width: 'min(1000px, 96vw)', padding: 24, borderRadius: 16 }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0 }}>Open Account</h2>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label style={{ display: 'grid', gap: 6, position: 'relative' }}>
-                  <span style={{ fontWeight: 500 }}>Bank Name *</span>
-                  <input
-                    value={bankName}
-                    readOnly
-                    onClick={() => setBankDropdownOpen(o => !o)}
-                    placeholder="Select bank"
-                    onBlur={() => setBankDropdownOpen(false)}
-                    onKeyDown={e => { if (e.key === 'Escape') setBankDropdownOpen(false) }}
-                    ref={bankInputRef}
-                    style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
-                    required
-                  />
-                  {bankDropdownOpen && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', color: '#111', border: '1px solid #ccc', borderRadius: 8, marginTop: 6, maxHeight: 240, overflowY: 'auto', zIndex: 2000, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-                      {bankOptions.map(opt => (
-                        <button
-                          key={opt.slug}
-                          onMouseDown={() => { setBankName(opt.name); setBankDropdownOpen(false); bankInputRef.current?.blur() }}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid #eee', cursor: 'pointer', textAlign: 'left' }}
-                          title={opt.name}
+      {openAccountModalOpen && (() => {
+        const close = () => { setOpenAccountModalOpen(false); resetOpenAccountForm() }
+        const fi: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }
+        const lb: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }
+        const selectedBank = bankOptions.find(o => o.name === bankName)
+        return (
+          <>
+            <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(4,15,37,0.45)', backdropFilter: 'blur(3px)', zIndex: 1000 }} />
+            <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(480px, 100vw)', background: '#fff', zIndex: 1001, display: 'flex', flexDirection: 'column', boxShadow: '-16px 0 56px rgba(4,15,37,0.22)', animation: 'slideInFromRight 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
+
+              {/* Header */}
+              <div style={{ padding: '20px 24px 18px', borderBottom: '1px solid #f1f5f9', background: 'linear-gradient(135deg, #063062 0%, #1e40af 100%)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>Open Bank Account</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Add a new bank account to your workspace</div>
+                </div>
+                <button onClick={close} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                <div style={{ display: 'grid', gap: 18 }}>
+
+                  {/* Bank selection */}
+                  <div>
+                    <span style={lb}>Bank <span style={{ color: '#ef4444' }}>*</span></span>
+                    {!customBankMode ? (
+                      <div style={{ position: 'relative' }}>
+                        <div
+                          onClick={() => setBankDropdownOpen(o => !o)}
+                          style={{ ...fi, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, userSelect: 'none' }}
                         >
-                          {bankLogoRemoteFailed[opt.slug] ? (
-                            <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                              {opt.name.replace(/\(|\)/g, '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 3).join('').toUpperCase()}
-                            </span>
+                          {selectedBank ? (
+                            <>
+                              {!bankLogoRemoteFailed[selectedBank.slug] ? (
+                                <img src={bankLogoLocalFailed[selectedBank.slug] ? selectedBank.logoRemote : selectedBank.logoLocal} alt="" style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }} referrerPolicy="no-referrer"
+                                  onError={() => { if (!bankLogoLocalFailed[selectedBank.slug]) setBankLogoLocalFailed(p => ({ ...p, [selectedBank.slug]: true })); else setBankLogoRemoteFailed(p => ({ ...p, [selectedBank.slug]: true })) }} />
+                              ) : (
+                                <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#1e40af', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {selectedBank.name.replace(/[()]/g, '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('')}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', flex: 1 }}>{selectedBank.name}</span>
+                            </>
                           ) : (
-                            <img
-                              src={bankLogoLocalFailed[opt.slug] ? opt.logoRemote : opt.logoLocal}
-                              alt={opt.name}
-                              style={{ width: 36, height: 36, objectFit: 'contain' }}
-                              referrerPolicy="no-referrer"
-                              onError={() => {
-                                if (!bankLogoLocalFailed[opt.slug]) {
-                                  setBankLogoLocalFailed(prev => ({ ...prev, [opt.slug]: true }))
-                                } else {
-                                  setBankLogoRemoteFailed(prev => ({ ...prev, [opt.slug]: true }))
-                                }
-                              }}
-                            />
+                            <span style={{ fontSize: 14, color: '#94a3b8', flex: 1 }}>Select a bank…</span>
                           )}
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{opt.name}</span>
-                        </button>
-                      ))}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 8px' }}>
-                        <button onClick={() => setBankDropdownOpen(false)} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '13px' }}>Close</button>
+                          <span style={{ color: '#94a3b8', fontSize: 12 }}>▾</span>
+                        </div>
+
+                        {bankDropdownOpen && (
+                          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 2000, overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
+                            {bankOptions.map(opt => (
+                              <button key={opt.slug} type="button"
+                                onMouseDown={() => { setBankName(opt.name); setCustomBankMode(false); setBankDropdownOpen(false) }}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: bankName === opt.name ? '#eff6ff' : 'transparent', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left' }}
+                              >
+                                {!bankLogoRemoteFailed[opt.slug] ? (
+                                  <img src={bankLogoLocalFailed[opt.slug] ? opt.logoRemote : opt.logoLocal} alt="" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} referrerPolicy="no-referrer"
+                                    onError={() => { if (!bankLogoLocalFailed[opt.slug]) setBankLogoLocalFailed(p => ({ ...p, [opt.slug]: true })); else setBankLogoRemoteFailed(p => ({ ...p, [opt.slug]: true })) }} />
+                                ) : (
+                                  <span style={{ width: 32, height: 32, borderRadius: '50%', background: '#1e40af', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                    {opt.name.replace(/[()]/g, '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('')}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{opt.name}</span>
+                                {bankName === opt.name && <span style={{ marginLeft: 'auto', color: '#2563eb', fontSize: 16 }}>✓</span>}
+                              </button>
+                            ))}
+                            {/* Other Bank option */}
+                            <button type="button"
+                              onMouseDown={() => { setBankName(''); setCustomBankMode(true); setBankDropdownOpen(false) }}
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                            >
+                              <span style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>+</span>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: '#2563eb' }}>Other / Add Custom Bank</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      /* Custom bank inputs */
+                      <div style={{ display: 'grid', gap: 10, padding: '14px', background: '#f8fafc', borderRadius: 10, border: '1.5px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb' }}>Custom Bank</span>
+                          <button type="button" onClick={() => { setCustomBankMode(false); setBankName('') }} style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>← Back to list</button>
+                        </div>
+                        <div>
+                          <span style={{ ...lb, marginBottom: 4 }}>Bank Name <span style={{ color: '#ef4444' }}>*</span></span>
+                          <input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Standard Chartered" style={fi} />
+                        </div>
+                        <div>
+                          <span style={{ ...lb, marginBottom: 4 }}>Logo URL <span style={{ color: '#94a3b8', fontWeight: 400, textTransform: 'none' }}>(optional)</span></span>
+                          <input value={customBankLogoUrl} onChange={e => setCustomBankLogoUrl(e.target.value)} placeholder="https://example.com/bank-logo.png" style={fi} />
+                          {customBankLogoUrl && (
+                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <img src={customBankLogoUrl} alt="preview" style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 6, border: '1px solid #e2e8f0' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                              <span style={{ fontSize: 12, color: '#64748b' }}>Logo preview</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Branch */}
+                  <div>
+                    <label style={lb}>Branch <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. Colombo 03" style={fi} />
+                  </div>
+
+                  {/* Account Number & Account Name */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={lb}>Account Number <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="0000-0000-0000" style={fi} />
                     </div>
-                  )}
-                </label>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Branch *</span>
-                  <input value={branch} onChange={e => setBranch(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-                </label>
+                    <div>
+                      <label style={lb}>Account Name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="e.g. Operating Account" style={fi} />
+                    </div>
+                  </div>
+
+                  {/* Opening Balance */}
+                  <div>
+                    <label style={lb}>Opening Balance <span style={{ color: '#ef4444' }}>*</span></label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 700, color: '#64748b' }}>LKR</span>
+                      <input type="number" min="0" step="0.01" value={openingBalance} onChange={e => setOpeningBalance(e.target.value)} placeholder="0.00" style={{ ...fi, paddingLeft: 48 }} />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Account Number *</span>
-                  <input value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-                </label>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Account Name *</span>
-                  <input value={accountName} onChange={e => setAccountName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-                </label>
-              </div>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontWeight: 500 }}>Opening Balance *</span>
-                  <input type="number" value={openingBalance} onChange={e => setOpeningBalance(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc' }} required />
-                </label>
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-                <button onClick={() => { setOpenAccountModalOpen(false); resetOpenAccountForm() }} className="btn-secondary">Cancel</button>
-                <button disabled={saving} onClick={saveOpenAccount} className="btn-primary">{saving ? 'Saving...' : 'Save'}</button>
+
+              {/* Footer */}
+              <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 10, flexShrink: 0, background: '#fff' }}>
+                <button onClick={saveOpenAccount} disabled={saving} style={{ flex: 1, padding: '11px 0', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg, #063062 0%, #1e40af 100%)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  {saving ? 'Saving…' : 'Open Account'}
+                </button>
+                <button onClick={close} style={{ padding: '11px 20px', borderRadius: 9, border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )
+      })()}
       {cardModalOpen && (() => {
         const di = { padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#1e293b', outline: 'none', fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' as const, transition: 'all 0.2s' }
         const dF = e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }

@@ -11,7 +11,7 @@ async function createQuotesTables() {
       CREATE TABLE IF NOT EXISTS quotes (
         quote_id SERIAL PRIMARY KEY,
         quote_number VARCHAR(20) UNIQUE NOT NULL,
-        template_type VARCHAR(20) CHECK (template_type IN ('RESTAURANT', 'RETAIL')),
+        template_type VARCHAR(20) CHECK (template_type IN ('SERVICES', 'PRODUCTS', 'CONSULTING', 'CONSTRUCTION', 'CUSTOM')),
         company_name VARCHAR(200) NOT NULL,
         company_address TEXT,
         date_of_issue DATE NOT NULL,

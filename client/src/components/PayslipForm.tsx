@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Settings, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import type { EmployeePayrollData } from '../types/payroll'
 import EmployeePayrollSettingsModal from './EmployeePayrollSettingsModal'
+import { getStoredPreset, getCustomEmployerRates } from '../config/payrollPresets'
 
 type PayslipFormProps = {
   employee: EmployeePayrollData | null
@@ -26,6 +27,11 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [allowancesExpanded, setAllowancesExpanded] = useState(true)
   const [deductionsExpanded, setDeductionsExpanded] = useState(true)
+  const preset = getStoredPreset()
+  const { rate1: customEr1, rate2: customEr2 } = getCustomEmployerRates()
+  const scheme1EmployerRate = preset.code === 'custom' ? customEr1 : preset.scheme1.employerRate
+  const scheme2EmployerRate = preset.code === 'custom' ? customEr2 : (preset.scheme2?.employerRate ?? 0)
+  const currencyLabel = preset.currencySymbol || 'LKR'
   const [newAllowanceName, setNewAllowanceName] = useState('')
   const [newAllowanceAmount, setNewAllowanceAmount] = useState('')
   const [newDeductionName, setNewDeductionName] = useState('')
@@ -44,7 +50,7 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
   useEffect(() => {
     if (!employee) return
 
-    const basicSalary = employee.base_salary || 0
+    const basicSalary = Number(employee.base_salary) || 0
     const totalAllowances = Object.values(allowances).reduce((sum, val) => sum + Number(val || 0), 0)
     const grossSalary = basicSalary + totalAllowances
 
@@ -56,9 +62,9 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
 
     const totalDeductions = epfEmployeeDeduction + totalOtherDeductions
 
-    // Employer contributions
-    const epfEmployerContribution = employee.epf_enabled ? (grossSalary * 0.12) : 0 // 12% employer
-    const etfEmployerContribution = employee.etf_enabled ? (grossSalary * 0.03) : 0 // 3% employer
+    // Employer contributions — rates from country preset
+    const epfEmployerContribution = employee.epf_enabled ? (grossSalary * (scheme1EmployerRate / 100)) : 0
+    const etfEmployerContribution = employee.etf_enabled && preset.scheme2 ? (grossSalary * (scheme2EmployerRate / 100)) : 0
 
     const netSalary = grossSalary - totalDeductions
 
@@ -85,13 +91,15 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
     )
   }
 
-  const basicSalary = employee.base_salary || 0
+  const basicSalary = Number(employee.base_salary) || 0
   const totalAllowances = Object.values(allowances).reduce((sum, val) => sum + Number(val || 0), 0)
   const grossSalary = basicSalary + totalAllowances
   const epfEmployeeDeduction = employee.epf_enabled ? (grossSalary * (epfRate / 100)) : 0
   const totalOtherDeductions = Object.values(otherDeductions).reduce((sum, val) => sum + Number(val || 0), 0)
   const totalDeductions = epfEmployeeDeduction + totalOtherDeductions
   const netSalary = grossSalary - totalDeductions
+  const epfEmployerAmt = employee.epf_enabled ? grossSalary * (scheme1EmployerRate / 100) : 0
+  const etfEmployerAmt = employee.etf_enabled && preset.scheme2 ? grossSalary * (scheme2EmployerRate / 100) : 0
 
   const handleAddAllowance = () => {
     if (newAllowanceName.trim() && newAllowanceAmount) {
@@ -171,8 +179,8 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
           <div><strong>Role:</strong> {employee.role}</div>
           <div><strong>Department:</strong> {employee.employee_department || 'N/A'}</div>
           <div><strong>Email:</strong> {employee.email}</div>
-          <div><strong>EPF Enabled:</strong> {employee.epf_enabled ? 'Yes' : 'No'}</div>
-          <div><strong>ETF Enabled:</strong> {employee.etf_enabled ? 'Yes' : 'No'}</div>
+          <div><strong>{preset.scheme1.name} Enabled:</strong> {employee.epf_enabled ? 'Yes' : 'No'}</div>
+          {preset.scheme2 && <div><strong>{preset.scheme2.name} Enabled:</strong> {employee.etf_enabled ? 'Yes' : 'No'}</div>}
         </div>
       </div>
 
@@ -182,46 +190,54 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
         <div style={{ display: 'grid', gap: 12, fontSize: 15 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
             <span>Basic Salary:</span>
-            <span style={{ fontWeight: 700 }}>LKR {basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 700 }}>{currencyLabel} {basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
             <span>Total Allowances:</span>
-            <span style={{ fontWeight: 700 }}>LKR {totalAllowances.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 700 }}>{currencyLabel} {totalAllowances.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '2px solid rgba(255,255,255,0.5)', fontSize: 17 }}>
             <span style={{ fontWeight: 700 }}>Gross Salary:</span>
-            <span style={{ fontWeight: 800 }}>LKR {grossSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 800 }}>{currencyLabel} {grossSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
-            <span>EPF Employee ({epfRate}%):</span>
-            <span style={{ fontWeight: 700 }}>LKR {epfEmployeeDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          </div>
+
+          {employee.epf_enabled && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
+              <span>{preset.scheme1.name} Employee ({epfRate}%):</span>
+              <span style={{ fontWeight: 700 }}>{currencyLabel} {epfEmployeeDeduction.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
             <span>Other Deductions:</span>
-            <span style={{ fontWeight: 700 }}>LKR {totalOtherDeductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 700 }}>{currencyLabel} {totalOtherDeductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '2px solid rgba(255,255,255,0.5)' }}>
             <span style={{ fontWeight: 700 }}>Total Deductions:</span>
-            <span style={{ fontWeight: 800 }}>LKR {totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 800 }}>{currencyLabel} {totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, marginTop: 8 }}>
             <span style={{ fontWeight: 800 }}>NET SALARY:</span>
-            <span style={{ fontWeight: 900 }}>LKR {netSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span style={{ fontWeight: 900 }}>{currencyLabel} {netSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
-          
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed rgba(255,255,255,0.4)' }}>
-            <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 6 }}>Employer Contributions:</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span>EPF Employer (12%):</span>
-              <span style={{ fontWeight: 700 }}>LKR {(employee.epf_enabled ? grossSalary * 0.12 : 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+
+          {(epfEmployerAmt > 0 || etfEmployerAmt > 0) && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed rgba(255,255,255,0.4)' }}>
+              <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 6 }}>Employer Contributions:</div>
+              {epfEmployerAmt > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span>{preset.scheme1.name} Employer ({scheme1EmployerRate}%):</span>
+                  <span style={{ fontWeight: 700 }}>{currencyLabel} {epfEmployerAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              {etfEmployerAmt > 0 && preset.scheme2 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span>{preset.scheme2.name} Employer ({scheme2EmployerRate}%):</span>
+                  <span style={{ fontWeight: 700 }}>{currencyLabel} {etfEmployerAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span>ETF Employer (3%):</span>
-              <span style={{ fontWeight: 700 }}>LKR {(employee.etf_enabled ? grossSalary * 0.03 : 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -334,7 +350,7 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
               </div>
               <div style={{ width: 140 }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600 }}>
-                  Amount (LKR)
+                  Amount {currencyLabel ? `(${currencyLabel})` : ''}
                 </label>
                 <input
                   type="number"
@@ -485,7 +501,7 @@ export default function PayslipForm({ employee, onCalculate }: PayslipFormProps)
               </div>
               <div style={{ width: 140 }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600 }}>
-                  Amount (LKR)
+                  Amount {currencyLabel ? `(${currencyLabel})` : ''}
                 </label>
                 <input
                   type="number"
