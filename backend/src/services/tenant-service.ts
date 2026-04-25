@@ -9,8 +9,9 @@ const createTenantSchema = async (schemaName: string) => {
 };
 
 const createTenantTables = async (schemaName: string) => {
-  const databaseSql = fs.readFileSync(path.join(__dirname, '../../src/databasse.sql'), 'utf-8');
-  const statements = databaseSql.split(';').filter(s => s.trim().length > 0);
+  const fullSql = fs.readFileSync(path.join(__dirname, '../../src/databasse.sql'), 'utf-8');
+  const tenantSql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql;
+  const statements = tenantSql.split(';').filter(s => s.trim().length > 0);
 
   const client = await pool.connect();
   try {

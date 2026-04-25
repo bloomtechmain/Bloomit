@@ -48,10 +48,15 @@ async function runTsScript(scriptPath: string) {
 
 async function main() {
   try {
-    // 1. Run databasse.sql (Base tables)
+    // 1. Run databasse.sql (public schema tables only)
     // Note: Typo in filename 'databasse.sql' is intentional as per file on disk
     const databaseSqlPath = path.resolve(__dirname, '../databasse.sql');
-    await runSqlFile(databaseSqlPath);
+    const fullDbSql = fs.readFileSync(databaseSqlPath, 'utf8');
+    const publicOnlyDbSql = fullDbSql.split('-- TENANT SCHEMA TEMPLATE')[0];
+    const tmpPublicDbPath = path.resolve(__dirname, '../databasse_public_only.tmp.sql');
+    fs.writeFileSync(tmpPublicDbPath, publicOnlyDbSql);
+    await runSqlFile(tmpPublicDbPath);
+    fs.unlinkSync(tmpPublicDbPath);
 
     // 2. Run create...Table.ts scripts
     // Order matters to some extent (dependencies)

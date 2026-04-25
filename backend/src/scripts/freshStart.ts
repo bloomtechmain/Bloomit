@@ -138,7 +138,8 @@ const ALL_PERMISSIONS = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function runTenantSQL(schemaName: string) {
-  const sql = fs.readFileSync(path.join(__dirname, '../databasse.sql'), 'utf-8')
+  const fullSql = fs.readFileSync(path.join(__dirname, '../databasse.sql'), 'utf-8')
+  const sql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql
   const statements = sql.split(';').filter(s => s.trim().length > 0)
   const client = await pool.connect()
   try {

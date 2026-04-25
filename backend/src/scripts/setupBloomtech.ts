@@ -133,14 +133,15 @@ const ALL_PERMISSIONS = [
 async function runTenantSQL(client: any, schemaName: string) {
   const sqlPath = path.join(__dirname, '../databasse.sql')
   const sql = fs.readFileSync(sqlPath, 'utf-8')
-  const statements = sql.split(';').filter(s => s.trim().length > 0)
+  // Only run the tenant schema section — everything after the TENANT SCHEMA TEMPLATE marker
+  const tenantSection = sql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? sql
+  const statements = tenantSection.split(';').filter(s => s.trim().length > 0)
   await client.query(`SET search_path TO "${schemaName}"`)
   for (const stmt of statements) {
     try {
       await client.query(stmt)
     } catch (e: any) {
       if (e.code !== '42P07' && e.code !== '42701') {
-        // ignore "already exists" errors only
         console.warn(`   ⚠️  Skipped: ${e.message.split('\n')[0]}`)
       }
     }
