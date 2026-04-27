@@ -1,23 +1,32 @@
-
 import { Request, Response, NextFunction } from 'express';
 
 export const tenantSchemaMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || !req.user.tenantId) {
-    // This should not happen if the middleware is placed after requireAuth
     return next();
   }
 
   if (!req.dbClient) {
-    // This should not happen if the middleware is placed after dbClientMiddleware
     return next(new Error('Database client not available on request.'));
   }
 
   try {
-    const { rows } = await req.dbClient.query('SELECT schema_name FROM public.tenants WHERE id = $1', [req.user.tenantId]);
+    const { rows } = await req.dbClient.query(
+      'SELECT schema_name FROM public.tenants WHERE id = $1',
+      [req.user.tenantId]
+    );
 
     if (rows.length === 0) {
-      // This might happen if the tenant is deleted but the user still has a valid token
-      return res.status(404).json({ error: 'tenant_not_found', message: 'Tenant not found.' });
+      return res.status(404).json({ error: 'tenant_not_found' });
+    }
+
+    // Verify the requesting user actually belongs to this tenant
+    const userCheck = await req.dbClient.query(
+      'SELECT id FROM public.users WHERE id = $1 AND tenant_id = $2',
+      [req.user.userId, req.user.tenantId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'forbidden' });
     }
 
     const schemaName = rows[0].schema_name;

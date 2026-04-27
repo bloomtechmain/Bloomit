@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
@@ -37,7 +39,7 @@ import employeeOnboardingRoutes from './routes/employeeOnboarding'
 import loansRoutes from './routes/loans'
 
 // Validate required environment variables
-const requiredEnvVars = ['DATABASE_URL']
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'FRONTEND_URL']
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar])
 
 if (missingEnvVars.length > 0) {
@@ -47,34 +49,31 @@ if (missingEnvVars.length > 0) {
 
 const app = express()
 
-// Configure CORS
-let corsOrigin: string | string[];
-if (process.env.NODE_ENV === 'production') {
-  corsOrigin = [
-    process.env.FRONTEND_URL || '',
-    'https://erpbloom.com',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ].filter((url) => url !== '')
-} else {
-  corsOrigin = '*'
-}
+// Security headers
+app.use(helmet())
+app.use(helmet.crossOriginResourcePolicy({ policy: 'cross-origin' }))
 
-const corsOptions = {
-  origin: corsOrigin,
-  credentials: true
-}
+// Configure CORS — never use wildcard; always require explicit allowed origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://erpbloom.com',
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://localhost:3000'] : [])
+].filter(Boolean) as string[]
 
-logger.system('🔐 CORS Configuration:', {
-  env: process.env.NODE_ENV,
-  origin: corsOrigin,
-  frontend_url: process.env.FRONTEND_URL || 'NOT_SET'
-})
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 
-app.use(cors(corsOptions))
 import { tenantSchemaMiddleware } from './middleware/tenant-schema';
 import { dbClientMiddleware } from './middleware/db-client';
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+
+// Rate limiting — auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests', message: 'Too many attempts. Try again in 15 minutes.' }
+})
 
 // Health check endpoints — must be before dbClientMiddleware so they don't require a DB connection
 app.get('/', (req, res) => {
@@ -121,7 +120,7 @@ app.use('/api/employee-portal', requireAuth, tenantSchemaMiddleware, employeePor
 app.use('/api/employee-onboarding', requireAuth, tenantSchemaMiddleware, employeeOnboardingRoutes)
 app.use('/loans', requireAuth, tenantSchemaMiddleware, loansRoutes)
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authLimiter, async (req, res) => {
   const { email, password, force } = req.body as { email?: string; password?: string; force?: boolean }
   if (!email || !password) return res.status(400).json({ error: 'missing_fields' })
   try {
@@ -533,12 +532,13 @@ app.post('/auth/change-password', requireAuth, async (req, res) => {
   }
 })
 
-if (process.env.NODE_ENV !== 'production') {
+// Dev-only endpoints — only active when explicitly enabled via env flag, never in production
+if (process.env.ENABLE_DEV_ENDPOINTS === 'true' && process.env.NODE_ENV !== 'production') {
   app.post('/dev/seed-user', async (req, res) => {
     const { name, email, password, role } = req.body as { name?: string; email?: string; password?: string; role?: string }
     if (!name || !email || !password) return res.status(400).json({ error: 'missing_fields' })
     try {
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const r = await pool.query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) ON CONFLICT(email) DO NOTHING RETURNING id', [name, email, hash, role ?? 'user'])
       return res.json({ inserted: r.rowCount })
     } catch (e) {
@@ -550,7 +550,7 @@ if (process.env.NODE_ENV !== 'production') {
     const { name, email, password, role } = req.body as { name?: string; email?: string; password?: string; role?: string }
     if (!name || !email || !password) return res.status(400).json({ error: 'missing_fields' })
     try {
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const r = await pool.query(
         `INSERT INTO users(name,email,password_hash,role)
          VALUES($1,$2,$3,$4)
