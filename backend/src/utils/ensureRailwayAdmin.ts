@@ -34,7 +34,7 @@ export async function ensureRailwayAdmin(): Promise<void> {
       logger.system(`✅ Admin user ${adminEmail} exists (ID: ${userId})`);
     } else {
       logger.system('🔄 Admin user not found, creating...');
-      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
       const userResult = await pool.query(
         `INSERT INTO users (name, email, password_hash, password_must_change)
          VALUES ($1, $2, $3, FALSE)

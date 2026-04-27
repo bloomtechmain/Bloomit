@@ -163,7 +163,7 @@ export const onboardEmployee = async (req: Request, res: Response) => {
 
     // Generate secure temporary password
     const temporaryPassword = generateSecurePassword(12)
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10)
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12)
 
     // 1. Create user account
     const userResult = await client.query(

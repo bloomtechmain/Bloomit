@@ -354,7 +354,7 @@ export const createUser = async (req: Request, res: Response) => {
     
     // Generate secure temporary password
     const temporaryPassword = generateSecurePassword(12)
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10)
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12)
     
     // Create user
     const userResult = await pool.query(
@@ -548,7 +548,7 @@ export const resetUserPassword = async (req: Request, res: Response) => {
       // Continue with the generated password even if history check fails
     }
     
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10)
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12)
     
     // Update user password and set password_must_change flag
     await pool.query(
