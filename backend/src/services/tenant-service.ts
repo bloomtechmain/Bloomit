@@ -10,7 +10,10 @@ const createTenantSchema = async (schemaName: string) => {
 
 export const createTenantTables = async (schemaName: string) => {
   const fullSql = fs.readFileSync(path.join(__dirname, '../../src/databasse.sql'), 'utf-8');
-  const tenantSql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql;
+  // Split on the marker, then strip the rest of that comment line (e.g. ": business tables (34 tables)")
+  // so the first CREATE TABLE statement isn't bundled with non-SQL header text and skipped by the filter.
+  const rawTenantSql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql;
+  const tenantSql = rawTenantSql.replace(/^[^\n]*\n/, '');
   const statements = tenantSql.split(';').filter(s => {
     const stripped = s.replace(/--[^\n]*/g, '').trim();
     if (!/^(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|SET|DO|SELECT)/i.test(stripped)) return false;
