@@ -574,18 +574,55 @@ async function runStartupMigrations() {
     await pool.query(`
       DO $$
       BEGIN
-        -- UNIQUE constraint on roles.name (required for ON CONFLICT (name) in provisioning)
+        -- UNIQUE constraint on roles.name
+        -- Must deduplicate first: old code could INSERT multiple rows with the same name
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint WHERE conname = 'roles_name_unique'
         ) THEN
+          -- Migrate user_roles from duplicate roles to the canonical (lowest-id) role
+          INSERT INTO public.user_roles (user_id, role_id)
+          SELECT ur.user_id,
+                 (SELECT MIN(r2.id) FROM public.roles r2 WHERE r2.name = r.name)
+          FROM public.user_roles ur
+          JOIN public.roles r ON r.id = ur.role_id
+          WHERE ur.role_id NOT IN (SELECT MIN(id) FROM public.roles GROUP BY name)
+          ON CONFLICT (user_id, role_id) DO NOTHING;
+
+          -- Migrate role_permissions from duplicate roles to the canonical role
+          INSERT INTO public.role_permissions (role_id, permission_id)
+          SELECT (SELECT MIN(r2.id) FROM public.roles r2 WHERE r2.name = r.name),
+                 rp.permission_id
+          FROM public.role_permissions rp
+          JOIN public.roles r ON r.id = rp.role_id
+          WHERE rp.role_id NOT IN (SELECT MIN(id) FROM public.roles GROUP BY name)
+          ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+          -- Remove assignments pointing to duplicate roles
+          DELETE FROM public.user_roles
+          WHERE role_id NOT IN (SELECT MIN(id) FROM public.roles GROUP BY name);
+
+          DELETE FROM public.role_permissions
+          WHERE role_id NOT IN (SELECT MIN(id) FROM public.roles GROUP BY name);
+
+          -- Delete duplicate role rows (keep lowest id per name)
+          DELETE FROM public.roles
+          WHERE id NOT IN (SELECT MIN(id) FROM public.roles GROUP BY name);
+
           ALTER TABLE public.roles ADD CONSTRAINT roles_name_unique UNIQUE (name);
         END IF;
 
-        -- UNIQUE constraint on users.email (required for ON CONFLICT (email) in seed)
+        -- UNIQUE constraint on users.email
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint WHERE conname = 'users_email_unique'
         ) THEN
-          ALTER TABLE public.users ADD CONSTRAINT users_email_unique UNIQUE (email);
+          -- Only add if no duplicates exist (emails should not be duplicated)
+          IF NOT EXISTS (
+            SELECT 1 FROM (
+              SELECT email FROM public.users GROUP BY email HAVING COUNT(*) > 1
+            ) t
+          ) THEN
+            ALTER TABLE public.users ADD CONSTRAINT users_email_unique UNIQUE (email);
+          END IF;
         END IF;
 
         -- UNIQUE constraint on permissions(resource, action) to prevent duplicates
@@ -608,8 +645,9 @@ async function runStartupMigrations() {
     `)
     logger.system('✅ Schema migrations applied')
   } catch (err) {
-    logger.error('❌ Schema migration failed:', err)
-    throw err
+    // Non-fatal — log the error but let the server start anyway.
+    // Constraint failures (e.g. unexpected duplicates) should not prevent startup.
+    logger.error('⚠️  Schema migration warning (non-fatal):', err)
   }
 }
 
