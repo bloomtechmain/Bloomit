@@ -3,7 +3,7 @@ import cors from 'cors'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
-import { provisionTenantForUser, provisionPendingWebsiteUsers, ensureWebsiteUsersHaveSuperAdmin, ensureSuperAdminTrigger, ensureSuperAdminHasAllPermissions } from './services/tenant-service'
+import { provisionTenantForUser, provisionPendingWebsiteUsers, ensureWebsiteUsersHaveSuperAdmin, ensureSuperAdminTrigger, ensureSuperAdminHasAllPermissions, syncAllTenantSchemas } from './services/tenant-service'
 import { requireAuth } from './middleware/auth'
 import { validatePasswordStrength } from './utils/passwordGenerator'
 import { isPasswordRecentlyUsed, addToPasswordHistory } from './utils/passwordHistory'
@@ -680,6 +680,7 @@ async function startServer() {
         await provisionPendingWebsiteUsers()
         await ensureWebsiteUsersHaveSuperAdmin()
         await ensureSuperAdminHasAllPermissions()
+        await syncAllTenantSchemas()
         logger.system('🔄 Initializing background jobs...')
         startReminderCron()
         startPurgeTerminatedEmployeesJob()

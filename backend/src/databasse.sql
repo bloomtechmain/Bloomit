@@ -140,3 +140,18 @@ ALTER TABLE time_entries ADD PRIMARY KEY (id);
 ALTER TABLE todo_shares ADD PRIMARY KEY (id);
 ALTER TABLE todos ADD PRIMARY KEY (id);
 ALTER TABLE vendors ADD PRIMARY KEY (vendor_id);
+
+-- Column backfills: idempotent ADD COLUMN IF NOT EXISTS for columns added after initial schema creation.
+-- These run for every tenant on startup via syncAllTenantSchemas so older schemas stay up to date.
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS depreciation_method TEXT;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS salvage_value NUMERIC;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS useful_life INTEGER;
+ALTER TABLE payables ADD COLUMN IF NOT EXISTS contract_id INTEGER;
+ALTER TABLE payables ADD COLUMN IF NOT EXISTS bank_account_id INTEGER;
+ALTER TABLE payables ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
+ALTER TABLE payables ADD COLUMN IF NOT EXISTS reference_number VARCHAR(100);
+ALTER TABLE receivables ADD COLUMN IF NOT EXISTS contract_id INTEGER;
+ALTER TABLE petty_cash_transactions ADD COLUMN IF NOT EXISTS transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE petty_cash_transactions ADD COLUMN IF NOT EXISTS petty_cash_account_id INTEGER;
+ALTER TABLE petty_cash_transactions ADD COLUMN IF NOT EXISTS source_bank_account_id INTEGER;
+ALTER TABLE petty_cash_transactions ADD COLUMN IF NOT EXISTS payable_id INTEGER;

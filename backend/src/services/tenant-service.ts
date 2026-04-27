@@ -8,7 +8,7 @@ const createTenantSchema = async (schemaName: string) => {
   await query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
 };
 
-const createTenantTables = async (schemaName: string) => {
+export const createTenantTables = async (schemaName: string) => {
   const fullSql = fs.readFileSync(path.join(__dirname, '../../src/databasse.sql'), 'utf-8');
   const tenantSql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql;
   const statements = tenantSql.split(';').filter(s => {
@@ -354,6 +354,56 @@ export const ensureSuperAdminTrigger = async (): Promise<void> => {
     logger.system('✅ Super Admin trigger installed on public.users');
   } catch (err) {
     logger.error('❌ ensureSuperAdminTrigger failed:', err);
+  }
+};
+
+/**
+ * Runs createTenantTables for every existing tenant so that any tables or columns
+ * added to databasse.sql after the tenant was provisioned get applied automatically.
+ * All statements use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS so this is idempotent.
+ */
+export const syncAllTenantSchemas = async (): Promise<void> => {
+  try {
+    const tenants = await pool.query('SELECT schema_name FROM public.tenants');
+    logger.system(`🔄 Syncing schema for ${tenants.rows.length} tenant(s)...`);
+    for (const row of tenants.rows) {
+      await createTenantTables(row.schema_name);
+    }
+    logger.system('✅ All tenant schemas synced');
+  } catch (err) {
+    logger.error('❌ syncAllTenantSchemas failed:', err);
+  }
+};
+
+/**
+ * Ensures all tenant schemas have the depreciation columns added to the assets table.
+ * Tenants provisioned before these columns were added to databasse.sql won't have them,
+ * causing INSERT failures. Safe to run multiple times — ADD COLUMN IF NOT EXISTS is idempotent.
+ */
+export const ensureTenantAssetColumns = async (): Promise<void> => {
+  try {
+    const tenants = await pool.query('SELECT schema_name FROM public.tenants');
+    for (const row of tenants.rows) {
+      const schema = row.schema_name;
+      const client = await pool.connect();
+      try {
+        await client.query(`SET search_path TO "${schema}", public`);
+        await client.query(`
+          ALTER TABLE assets
+            ADD COLUMN IF NOT EXISTS depreciation_method TEXT,
+            ADD COLUMN IF NOT EXISTS salvage_value NUMERIC,
+            ADD COLUMN IF NOT EXISTS useful_life INTEGER
+        `);
+      } catch (err: any) {
+        logger.error(`[ensureTenantAssetColumns] failed for schema ${schema}: ${err.message}`);
+      } finally {
+        try { await client.query('SET search_path TO DEFAULT') } catch (_) {}
+        client.release();
+      }
+    }
+    logger.system('✅ Asset depreciation columns ensured for all tenant schemas');
+  } catch (err) {
+    logger.error('❌ ensureTenantAssetColumns failed:', err);
   }
 };
 
