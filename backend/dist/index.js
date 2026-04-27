@@ -74,8 +74,7 @@ app.use((0, cors_1.default)(corsOptions));
 const tenant_schema_1 = require("./middleware/tenant-schema");
 const db_client_1 = require("./middleware/db-client");
 app.use(express_1.default.json());
-app.use(db_client_1.dbClientMiddleware);
-// Root endpoint for Railway health checks
+// Health check endpoints — must be before dbClientMiddleware so they don't require a DB connection
 app.get('/', (req, res) => {
     res.status(200).json({
         message: 'Bloomtech ERP API',
@@ -83,7 +82,6 @@ app.get('/', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'healthy',
@@ -91,6 +89,7 @@ app.get('/health', (req, res) => {
         environment: process.env.NODE_ENV
     });
 });
+app.use(db_client_1.dbClientMiddleware);
 app.use('/employees', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, employees_1.default);
 app.use('/projects-old', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, projects_1.default); // Legacy endpoint for backward compatibility
 app.use('/projects', auth_1.requireAuth, tenant_schema_1.tenantSchemaMiddleware, newProjects_1.default); // New 3-level hierarchy
@@ -565,32 +564,35 @@ async function runStartupMigrations() {
 async function startServer() {
     const port = process.env.PORT ? Number(process.env.PORT) : 3000;
     try {
-        // First, test database connection
+        // Critical path: must complete before the server binds to the port
         logger_1.default.system('🔄 Testing database connection...');
-        await db_1.pool.connect();
+        const testClient = await db_1.pool.connect();
+        testClient.release();
         logger_1.default.system('✅ Database connected successfully');
-        // Apply idempotent schema migrations (adds missing constraints, deduplicates)
         await runStartupMigrations();
-        // Ensure Railway admin user exists (production only)
         await (0, ensureRailwayAdmin_1.ensureRailwayAdmin)();
-        // Install DB trigger so new website users get Super Admin role immediately on INSERT
         await (0, tenant_service_1.ensureSuperAdminTrigger)();
-        // Provision tenants for website-registered users who haven't logged in yet
-        await (0, tenant_service_1.provisionPendingWebsiteUsers)();
-        // Ensure every website user has Super Admin role (catches partial/missed provisioning)
-        await (0, tenant_service_1.ensureWebsiteUsersHaveSuperAdmin)();
-        // Ensure Super Admin role has all permissions (fixes users with role but empty role_permissions)
-        await (0, tenant_service_1.ensureSuperAdminHasAllPermissions)();
-        // Start background jobs (Railway-compatible)
-        logger_1.default.system('🔄 Initializing background jobs...');
-        (0, reminderCron_1.startReminderCron)();
-        (0, purgeTerminatedEmployees_1.startPurgeTerminatedEmployeesJob)();
-        // Then start the HTTP server
+        // Bind the port now so Railway health checks pass immediately
         logger_1.default.system(`🔄 Starting HTTP server on port ${port}...`);
         app.listen(port, '0.0.0.0', () => {
             logger_1.default.system(`✅ Server is ready and accepting connections`);
             logger_1.default.system(`🌐 API available at http://localhost:${port}`);
-            logger_1.default.system(`🎯 Health check endpoint: http://localhost:${port}/`);
+        });
+        // Non-critical provisioning runs in the background after the port is bound.
+        // These are all idempotent — safe to run concurrently with live traffic.
+        setImmediate(async () => {
+            try {
+                await (0, tenant_service_1.provisionPendingWebsiteUsers)();
+                await (0, tenant_service_1.ensureWebsiteUsersHaveSuperAdmin)();
+                await (0, tenant_service_1.ensureSuperAdminHasAllPermissions)();
+                logger_1.default.system('🔄 Initializing background jobs...');
+                (0, reminderCron_1.startReminderCron)();
+                (0, purgeTerminatedEmployees_1.startPurgeTerminatedEmployeesJob)();
+                logger_1.default.system('✅ Background provisioning complete');
+            }
+            catch (err) {
+                logger_1.default.error('❌ Background provisioning error (non-fatal):', err);
+            }
         });
     }
     catch (err) {
