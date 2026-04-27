@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
-import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
+import { generateAccessToken, generateRefreshToken, verifyToken, verifyRefreshToken } from './utils/jwt'
 import { provisionTenantForUser, provisionPendingWebsiteUsers, ensureWebsiteUsersHaveSuperAdmin, ensureSuperAdminTrigger, ensureSuperAdminHasAllPermissions, syncAllTenantSchemas } from './services/tenant-service'
 import { requireAuth } from './middleware/auth'
 import { validatePasswordStrength } from './utils/passwordGenerator'
@@ -394,7 +394,7 @@ app.post('/auth/refresh', async (req, res) => {
   }
   
   try {
-    const decoded = verifyToken(refreshToken)
+    const decoded = verifyRefreshToken(refreshToken)
 
     if (!decoded) {
       return res.status(401).json({ error: 'invalid_refresh_token' })
