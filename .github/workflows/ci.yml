@@ -45,6 +45,9 @@ jobs:
         working-directory: backend
         run: npx tsc --noEmit
 
+      - name: Verify PostgreSQL is reachable
+        run: pg_isready -h localhost -p 5432 -U postgres
+
       - name: Run tests
         working-directory: backend
         env:
