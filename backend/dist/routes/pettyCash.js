@@ -8,8 +8,8 @@ const router = (0, express_1.Router)();
 // All routes require authentication
 router.use(auth_1.requireAuth);
 // Petty cash routes with permission-based authorization
-router.post('/replenish', (0, authorize_1.requirePermission)('petty_cash', 'replenish'), pettyCashController_1.replenishPettyCash);
+router.post('/replenish', (0, authorize_1.requirePermission)('petty_cash', 'create'), pettyCashController_1.replenishPettyCash);
 router.get('/balance', (0, authorize_1.requirePermission)('petty_cash', 'read'), pettyCashController_1.getPettyCashBalance);
-router.post('/bill', (0, authorize_1.requirePermission)('petty_cash', 'create_bill'), pettyCashController_1.addPettyCashBill);
+router.post('/bill', (0, authorize_1.requirePermission)('petty_cash', 'create'), pettyCashController_1.addPettyCashBill);
 router.get('/transactions', (0, authorize_1.requirePermission)('petty_cash', 'read'), pettyCashController_1.getPettyCashTransactions);
 exports.default = router;

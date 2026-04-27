@@ -53,7 +53,7 @@ const getAllEmployeesWithPayroll = async (req, res) => {
         const query = `
       SELECT
         id as employee_id, CONCAT(first_name, ' ', last_name) as name, email, phone,
-        role, employee_department as department, hire_date, salary, is_active,
+        role, employee_department as department, hire_date, base_salary as salary, is_active,
         base_salary, allowances, epf_enabled, epf_contribution_rate, etf_enabled,
         employee_department, created_at, updated_at
       FROM employees

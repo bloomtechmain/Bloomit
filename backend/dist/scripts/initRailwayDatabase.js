@@ -125,12 +125,17 @@ async function initRailwayDatabase() {
         console.log('🔌 Testing database connection...');
         const result = await db_1.pool.query('SELECT NOW()');
         console.log(`✅ Connected to database at ${result.rows[0].now}`);
-        // Step 1: Base schema from databasse.sql
+        // Step 1: Base schema from databasse.sql (public tables only)
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📋 STEP 1: Creating Base Tables');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         const baseSqlPath = path_1.default.resolve(__dirname, '../databasse.sql');
-        await runSqlFile(baseSqlPath);
+        const fullBaseSql = fs_1.default.readFileSync(baseSqlPath, 'utf8');
+        const publicOnlySql = fullBaseSql.split('-- TENANT SCHEMA TEMPLATE')[0];
+        const tmpPublicPath = path_1.default.resolve(__dirname, '../databasse_public_only.tmp.sql');
+        fs_1.default.writeFileSync(tmpPublicPath, publicOnlySql);
+        await runSqlFile(tmpPublicPath);
+        fs_1.default.unlinkSync(tmpPublicPath);
         // Step 2: Create RBAC Tables (must be early - other tables depend on users/roles)
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('🔐 STEP 2: Creating RBAC System');

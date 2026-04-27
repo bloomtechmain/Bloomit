@@ -12,8 +12,18 @@ const createTenantSchema = async (schemaName) => {
     await (0, db_1.query)(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
 };
 const createTenantTables = async (schemaName) => {
-    const databaseSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../src/databasse.sql'), 'utf-8');
-    const statements = databaseSql.split(';').filter(s => s.trim().length > 0);
+    const fullSql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../src/databasse.sql'), 'utf-8');
+    const tenantSql = fullSql.split('-- TENANT SCHEMA TEMPLATE')[1] ?? fullSql;
+    const statements = tenantSql.split(';').filter(s => {
+        const stripped = s.replace(/--[^\n]*/g, '').trim();
+        if (!/^(CREATE|ALTER|INSERT|UPDATE|DELETE|DROP|SET|DO|SELECT)/i.test(stripped))
+            return false;
+        // Skip ALTER TABLE statements targeting public schema — they conflict with
+        // the outer transaction's locks and the public schema is already set up.
+        if (/^ALTER\s+TABLE\s+public\./i.test(stripped))
+            return false;
+        return true;
+    });
     const client = await db_1.pool.connect();
     try {
         // Include public so any cross-schema refs still resolve
@@ -229,7 +239,34 @@ const ensureSuperAdminHasAllPermissions = async () => {
         END IF;
         INSERT INTO public.role_permissions (role_id, permission_id) VALUES (v_role_id, v_perm_id) ON CONFLICT (role_id, permission_id) DO NOTHING;
 
-        -- Bulk-grant every other permission already in the table
+        -- Seed all application permissions (idempotent)
+        INSERT INTO public.permissions (resource, action, description) VALUES
+          ('projects','read','View all projects'),('projects','create','Create projects'),('projects','update','Edit projects'),('projects','delete','Delete projects'),
+          ('contracts','read','View contracts'),('contracts','create','Create contracts'),('contracts','update','Edit contracts'),('contracts','delete','Delete contracts'),
+          ('time_entries','read','View time entries'),('time_entries','create','Log time'),('time_entries','update','Edit time entries'),('time_entries','delete','Delete time entries'),
+          ('time_entries','edit_own','Edit own time'),('time_entries','view_all','View all time'),('time_entries','read_all','View all time entries'),('time_entries','read_own','View own entries'),('time_entries','manage','Manage time entries'),
+          ('quotes','read','View quotes'),('quotes','create','Create quotes'),('quotes','update','Edit quotes'),('quotes','delete','Delete quotes'),('quotes','send','Send quotes'),
+          ('payables','read','View payables'),('payables','create','Create payables'),('payables','update','Edit payables'),('payables','delete','Delete payables'),('payables','approve','Approve payments'),
+          ('receivables','read','View receivables'),('receivables','create','Create receivables'),('receivables','update','Edit receivables'),('receivables','delete','Delete receivables'),
+          ('assets','read','View assets'),('assets','create','Register assets'),('assets','update','Edit assets'),('assets','delete','Delete assets'),
+          ('petty_cash','read','View petty cash'),('petty_cash','create','Record transactions'),('petty_cash','update','Edit transactions'),('petty_cash','delete','Delete transactions'),
+          ('debit_cards','read','View card transactions'),('debit_cards','create','Add transactions'),('debit_cards','update','Edit transactions'),('debit_cards','delete','Delete transactions'),
+          ('accounts','read','View bank accounts'),('accounts','create','Add bank accounts'),('accounts','update','Edit bank accounts'),('accounts','delete','Delete bank accounts'),
+          ('loans','read','View loans'),('loans','create','Create loans'),('loans','update','Edit loans'),('loans','delete','Delete loans'),
+          ('purchase_orders','read','View POs'),('purchase_orders','create','Create POs'),('purchase_orders','update','Edit POs'),('purchase_orders','delete','Delete POs'),('purchase_orders','approve','Approve POs'),
+          ('subscriptions','read','View subscriptions'),('subscriptions','create','Add subscriptions'),('subscriptions','update','Edit subscriptions'),('subscriptions','delete','Delete subscriptions'),
+          ('employees','read','View employees'),('employees','read_sensitive','View sensitive info'),('employees','create','Add employees'),('employees','update','Edit employees'),('employees','delete','Delete employees'),
+          ('employee_onboarding','manage','Manage onboarding'),('employee_onboarding','view','View onboarding'),
+          ('payroll','read','View payroll'),('payroll','create','Create payroll'),('payroll','update','Edit payroll'),('payroll','process','Process payroll'),('payroll','approve','Approve payroll'),
+          ('pto','read_all','View all PTO'),('pto','read_own','View own PTO'),('pto','create','Request PTO'),('pto','approve','Approve PTO'),('pto','delete','Delete PTO'),
+          ('vendors','read','View vendors'),('vendors','create','Add vendors'),('vendors','update','Edit vendors'),('vendors','delete','Delete vendors'),
+          ('notes','read','View notes'),('notes','create','Create notes'),('notes','update','Edit notes'),('notes','delete','Delete notes'),
+          ('todos','read','View todos'),('todos','create','Create todos'),('todos','update','Edit todos'),('todos','delete','Delete todos'),
+          ('analytics','view','View analytics'),('analytics','read','View reports'),('analytics','manage','Manage analytics'),
+          ('documents','read','View documents'),('documents','upload','Upload documents'),('documents','update','Edit documents'),('documents','delete','Delete documents'),('documents','download','Download documents')
+        ON CONFLICT DO NOTHING;
+
+        -- Bulk-grant every permission to Super Admin
         INSERT INTO public.role_permissions (role_id, permission_id)
         SELECT v_role_id, p.id FROM public.permissions p
         ON CONFLICT (role_id, permission_id) DO NOTHING;

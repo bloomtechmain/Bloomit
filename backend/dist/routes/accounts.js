@@ -12,6 +12,6 @@ router.use(auth_1.requireAuth);
 router.post('/open-account', (0, authorize_1.requirePermission)('accounts', 'create'), accountsController_1.openAccount);
 router.get('/', (0, authorize_1.requirePermission)('accounts', 'read'), accountsController_1.getAccounts);
 router.delete('/:id', (0, authorize_1.requirePermission)('accounts', 'delete'), accountsController_1.deleteAccount);
-router.post('/debit-cards', (0, authorize_1.requirePermission)('accounts', 'manage_cards'), debitCardController_1.createDebitCard);
-router.get('/debit-cards', (0, authorize_1.requirePermission)('accounts', 'read'), debitCardController_1.getDebitCards);
+router.post('/debit-cards', (0, authorize_1.requirePermission)('debit_cards', 'create'), debitCardController_1.createDebitCard);
+router.get('/debit-cards', (0, authorize_1.requirePermission)('debit_cards', 'read'), debitCardController_1.getDebitCards);
 exports.default = router;

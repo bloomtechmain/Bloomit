@@ -893,11 +893,12 @@ async function createPtoRequest(req, res) {
         absence_type,
         from_date,
         to_date,
+        total_hours,
         description,
         status,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NOW(), NOW())
       RETURNING *
     `;
         const insertResult = await (0, db_1.query)(insertQuery, [
@@ -906,6 +907,7 @@ async function createPtoRequest(req, res) {
             absenceType,
             fromDate,
             toDate,
+            totalDays * 8,
             description
         ], req.dbClient);
         const newRequest = insertResult.rows[0];

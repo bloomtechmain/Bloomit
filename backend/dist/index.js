@@ -478,6 +478,51 @@ if (process.env.NODE_ENV !== 'production') {
         }
     });
 }
+// Idempotent schema migrations — safe to run on every startup
+async function runStartupMigrations() {
+    try {
+        await db_1.pool.query(`
+      DO $$
+      BEGIN
+        -- UNIQUE constraint on roles.name (required for ON CONFLICT (name) in provisioning)
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'roles_name_unique'
+        ) THEN
+          ALTER TABLE public.roles ADD CONSTRAINT roles_name_unique UNIQUE (name);
+        END IF;
+
+        -- UNIQUE constraint on users.email (required for ON CONFLICT (email) in seed)
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'users_email_unique'
+        ) THEN
+          ALTER TABLE public.users ADD CONSTRAINT users_email_unique UNIQUE (email);
+        END IF;
+
+        -- UNIQUE constraint on permissions(resource, action) to prevent duplicates
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'permissions_resource_action_unique'
+        ) THEN
+          -- Remove any duplicates first (keep lowest id)
+          DELETE FROM public.role_permissions
+          WHERE permission_id NOT IN (
+            SELECT MIN(id) FROM public.permissions GROUP BY resource, action
+          );
+          DELETE FROM public.permissions
+          WHERE id NOT IN (
+            SELECT MIN(id) FROM public.permissions GROUP BY resource, action
+          );
+          ALTER TABLE public.permissions
+            ADD CONSTRAINT permissions_resource_action_unique UNIQUE (resource, action);
+        END IF;
+      END $$;
+    `);
+        logger_1.default.system('✅ Schema migrations applied');
+    }
+    catch (err) {
+        logger_1.default.error('❌ Schema migration failed:', err);
+        throw err;
+    }
+}
 // Async startup function to ensure proper initialization order
 async function startServer() {
     const port = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -486,6 +531,8 @@ async function startServer() {
         logger_1.default.system('🔄 Testing database connection...');
         await db_1.pool.connect();
         logger_1.default.system('✅ Database connected successfully');
+        // Apply idempotent schema migrations (adds missing constraints, deduplicates)
+        await runStartupMigrations();
         // Ensure Railway admin user exists (production only)
         await (0, ensureRailwayAdmin_1.ensureRailwayAdmin)();
         // Install DB trigger so new website users get Super Admin role immediately on INSERT
@@ -514,8 +561,10 @@ async function startServer() {
         process.exit(1);
     }
 }
-// Start the server
-startServer().catch(err => {
-    logger_1.default.error('❌ Fatal error during startup:', err);
-    process.exit(1);
-});
+exports.default = app;
+if (process.env.NODE_ENV !== 'test') {
+    startServer().catch(err => {
+        logger_1.default.error('❌ Fatal error during startup:', err);
+        process.exit(1);
+    });
+}
