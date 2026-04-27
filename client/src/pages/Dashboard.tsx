@@ -1513,7 +1513,7 @@ export default function Dashboard({
       
       const r = await fetch(`${API_URL}/assets`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`
         },
@@ -1530,7 +1530,12 @@ export default function Dashboard({
         setUsefulLife('')
         fetchAssets()
       } else {
-        toast.error('Failed to save asset')
+        const data = await r.json().catch(() => ({}))
+        if (r.status === 403) {
+          toast.error('Permission denied — try logging out and back in')
+        } else {
+          toast.error(data.error || data.message || 'Failed to save asset')
+        }
       }
     } catch (e) {
       console.error(e)
