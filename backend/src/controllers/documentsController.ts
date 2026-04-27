@@ -2,7 +2,6 @@ import { Request, Response } from 'express'
 
 // Get all documents (metadata only, not the file data)
 export async function getAllDocuments(req: Request, res: Response) {
-  const { tenantId } = req.user!;
   try {
     const result = await req.dbClient!.query(`
       SELECT
@@ -16,10 +15,9 @@ export async function getAllDocuments(req: Request, res: Response) {
         d.description,
         u.name as uploaded_by_name
       FROM documents d
-      LEFT JOIN users u ON d.uploaded_by = u.id
-      WHERE d.tenant_id = $1
+      LEFT JOIN public.users u ON d.uploaded_by = u.id
       ORDER BY d.upload_date DESC
-    `, [tenantId])
+    `)
 
     return res.json({ documents: result.rows })
   } catch (error) {
@@ -30,13 +28,12 @@ export async function getAllDocuments(req: Request, res: Response) {
 
 // Get single document for download
 export async function downloadDocument(req: Request, res: Response) {
-  const { tenantId } = req.user!;
   try {
     const { id } = req.params
 
     const result = await req.dbClient!.query(
-      'SELECT original_filename, file_type, file_data FROM documents WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
+      'SELECT original_filename, file_type, file_data FROM documents WHERE id = $1',
+      [id]
     )
 
     if (result.rows.length === 0) {
@@ -121,13 +118,12 @@ export async function uploadDocument(req: Request, res: Response) {
 
 // Delete document
 export async function deleteDocument(req: Request, res: Response) {
-  const { tenantId } = req.user!;
   try {
     const { id } = req.params
 
     const result = await req.dbClient!.query(
-      'DELETE FROM documents WHERE id = $1 AND tenant_id = $2 RETURNING id',
-      [id, tenantId]
+      'DELETE FROM documents WHERE id = $1 RETURNING id',
+      [id]
     )
 
     if (result.rows.length === 0) {
