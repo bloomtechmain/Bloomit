@@ -656,41 +656,37 @@ async function startServer() {
   const port = process.env.PORT ? Number(process.env.PORT) : 3000
 
   try {
-    // First, test database connection
+    // Critical path: must complete before the server binds to the port
     logger.system('🔄 Testing database connection...')
     const testClient = await pool.connect()
     testClient.release()
     logger.system('✅ Database connected successfully')
 
-    // Apply idempotent schema migrations (adds missing constraints, deduplicates)
     await runStartupMigrations()
-
-    // Ensure Railway admin user exists (production only)
     await ensureRailwayAdmin()
-
-    // Install DB trigger so new website users get Super Admin role immediately on INSERT
     await ensureSuperAdminTrigger()
 
-    // Provision tenants for website-registered users who haven't logged in yet
-    await provisionPendingWebsiteUsers()
-
-    // Ensure every website user has Super Admin role (catches partial/missed provisioning)
-    await ensureWebsiteUsersHaveSuperAdmin()
-
-    // Ensure Super Admin role has all permissions (fixes users with role but empty role_permissions)
-    await ensureSuperAdminHasAllPermissions()
-    
-    // Start background jobs (Railway-compatible)
-    logger.system('🔄 Initializing background jobs...')
-    startReminderCron()
-    startPurgeTerminatedEmployeesJob()
-    
-    // Then start the HTTP server
+    // Bind the port now so Railway health checks pass immediately
     logger.system(`🔄 Starting HTTP server on port ${port}...`)
     app.listen(port, '0.0.0.0', () => {
       logger.system(`✅ Server is ready and accepting connections`)
       logger.system(`🌐 API available at http://localhost:${port}`)
-      logger.system(`🎯 Health check endpoint: http://localhost:${port}/`)
+    })
+
+    // Non-critical provisioning runs in the background after the port is bound.
+    // These are all idempotent — safe to run concurrently with live traffic.
+    setImmediate(async () => {
+      try {
+        await provisionPendingWebsiteUsers()
+        await ensureWebsiteUsersHaveSuperAdmin()
+        await ensureSuperAdminHasAllPermissions()
+        logger.system('🔄 Initializing background jobs...')
+        startReminderCron()
+        startPurgeTerminatedEmployeesJob()
+        logger.system('✅ Background provisioning complete')
+      } catch (err) {
+        logger.error('❌ Background provisioning error (non-fatal):', err)
+      }
     })
   } catch (err) {
     logger.error('❌ Startup error:', err)
