@@ -75,25 +75,25 @@ app.use(cors(corsOptions))
 import { tenantSchemaMiddleware } from './middleware/tenant-schema';
 import { dbClientMiddleware } from './middleware/db-client';
 app.use(express.json())
-app.use(dbClientMiddleware);
 
-// Root endpoint for Railway health checks
+// Health check endpoints — must be before dbClientMiddleware so they don't require a DB connection
 app.get('/', (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'Bloomtech ERP API',
     status: 'running',
     timestamp: new Date().toISOString()
   })
 })
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
+  res.status(200).json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV
   })
 })
+
+app.use(dbClientMiddleware);
 
 app.use('/employees', requireAuth, tenantSchemaMiddleware, employeeRoutes)
 app.use('/projects-old', requireAuth, tenantSchemaMiddleware, projectRoutes) // Legacy endpoint for backward compatibility
@@ -658,7 +658,8 @@ async function startServer() {
   try {
     // First, test database connection
     logger.system('🔄 Testing database connection...')
-    await pool.connect()
+    const testClient = await pool.connect()
+    testClient.release()
     logger.system('✅ Database connected successfully')
 
     // Apply idempotent schema migrations (adds missing constraints, deduplicates)
