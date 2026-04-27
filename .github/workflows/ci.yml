@@ -58,7 +58,7 @@ jobs:
           JWT_REFRESH_SECRET: test-refresh-secret-not-for-production
           SMTP_HOST: localhost
           SMTP_PORT: 1025
-        run: npx cross-env NODE_ENV=test npx dotenv -e .env.test -- npx jest --runInBand --verbose 2>&1
+        run: npm test
 
   frontend-typecheck:
     name: Frontend — Typecheck
