@@ -522,7 +522,7 @@ app.post('/auth/change-password', requireAuth, async (req, res) => {
     }
     
     // Hash new password
-    const newPasswordHash = await bcrypt.hash(newPassword, 10)
+    const newPasswordHash = await bcrypt.hash(newPassword, 12)
     
     // Update password and clear password_must_change flag
     await pool.query(
