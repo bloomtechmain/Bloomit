@@ -108,6 +108,7 @@ app.use('/analytics', requireAuth, tenantSchemaMiddleware, analyticsRoutes)
 app.use('/notes', requireAuth, tenantSchemaMiddleware, notesRoutes)
 app.use('/todos', requireAuth, tenantSchemaMiddleware, todosRoutes)
 app.use('/rbac', rbacRoutes)
+app.use('/settings', settingsRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/time-entries', requireAuth, tenantSchemaMiddleware, timeEntriesRoutes)
 app.use('/pto-requests', requireAuth, tenantSchemaMiddleware, ptoRequestsRoutes)
@@ -651,6 +652,22 @@ async function runStartupMigrations() {
   }
 }
 
+async function ensureDefaultSettings() {
+  const defaults = [
+    { key: 'international_timezone', value: 'America/New_York', description: 'Timezone for international clock display' },
+    { key: 'reminder_email_address', value: '', description: 'Email address for reminder notifications' },
+  ]
+  for (const s of defaults) {
+    await pool.query(
+      `INSERT INTO application_settings (setting_key, setting_value, description)
+       SELECT $1, $2, $3
+       WHERE NOT EXISTS (SELECT 1 FROM application_settings WHERE setting_key = $1)`,
+      [s.key, s.value, s.description]
+    )
+  }
+  logger.system('✅ Default settings ensured')
+}
+
 // Async startup function to ensure proper initialization order
 async function startServer() {
   const port = process.env.PORT ? Number(process.env.PORT) : 3000
@@ -681,6 +698,7 @@ async function startServer() {
         await ensureWebsiteUsersHaveSuperAdmin()
         await ensureSuperAdminHasAllPermissions()
         await syncAllTenantSchemas()
+        await ensureDefaultSettings()
         logger.system('🔄 Initializing background jobs...')
         startReminderCron()
         startPurgeTerminatedEmployeesJob()
