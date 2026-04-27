@@ -121,9 +121,9 @@ export const createAsset = async (req: Request, res: Response) => {
       ]
     )
     res.status(201).json({ asset: result.rows[0] })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error creating asset:', err)
-    res.status(500).json({ error: 'Failed to create asset' })
+    res.status(500).json({ error: err?.message || 'Failed to create asset' })
   }
 }
 

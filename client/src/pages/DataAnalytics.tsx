@@ -142,7 +142,12 @@ export default function DataAnalytics() {
     setLoading(true)
     try {
       const res = await fetchWithAuth(`${API_URL}/analytics/summary?period=${period}`)
-      if (res.ok) setData(await res.json())
+      if (res.ok) {
+        setData(await res.json())
+      } else {
+        const errBody = await res.json().catch(() => ({}))
+        console.error('Analytics summary failed:', res.status, errBody)
+      }
     } catch (err) {
       console.error('Error fetching analytics:', err)
     } finally {
