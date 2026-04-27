@@ -64,7 +64,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     // Validate active session — ensures only one device is logged in at a time
     if (decoded.sessionToken) {
       const sessionResult = await query(
-        `SELECT id FROM public.active_sessions
+        `SELECT id, last_activity_at FROM public.active_sessions
          WHERE user_id = $1 AND session_token = $2 AND expires_at > NOW()`,
         [decoded.userId, decoded.sessionToken],
         req.dbClient
@@ -76,6 +76,31 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
           message: 'Your session is no longer valid. Another device may have logged into this account. Please log in again.'
         })
       }
+
+      // Idle session timeout: 8 hours
+      const lastActivity: Date | null = sessionResult.rows[0].last_activity_at
+      if (lastActivity) {
+        const idleMs = Date.now() - new Date(lastActivity).getTime()
+        if (idleMs > 8 * 60 * 60 * 1000) {
+          await query(
+            `DELETE FROM public.active_sessions WHERE user_id = $1 AND session_token = $2`,
+            [decoded.userId, decoded.sessionToken],
+            req.dbClient
+          )
+          return res.status(401).json({
+            error: 'session_expired',
+            message: 'Your session has expired due to inactivity. Please log in again.'
+          })
+        }
+      }
+
+      // Refresh last activity timestamp
+      await query(
+        `UPDATE public.active_sessions SET last_activity_at = NOW()
+         WHERE user_id = $1 AND session_token = $2`,
+        [decoded.userId, decoded.sessionToken],
+        req.dbClient
+      )
     }
 
     // Attach user data to request
