@@ -32,8 +32,7 @@ export function startReminderCron() {
     
     logger.system('='.repeat(60) + '\n')
   }, {
-    scheduled: true,
-    timezone: process.env.TZ || 'America/Chicago' // Configurable via environment variable
+    timezone: process.env.TZ || 'America/Chicago'
   })
   
   logger.system('✅ Quote Reminder Cron Job started successfully')
