@@ -1,17 +1,11 @@
-import { Pool } from 'pg'
 import { pool as testPool } from './helpers'
+import { pool as appPool } from '../db'
 
 async function globalTeardown() {
-  // Close the test pool cleanly first to prevent unhandled connection errors
-  await testPool.end()
-
-  const adminPool = new Pool({
-    connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres'
-  })
-  // WITH (FORCE) terminates remaining connections internally — no race condition
-  await adminPool.query('DROP DATABASE IF EXISTS bloomtech_test WITH (FORCE)')
-  await adminPool.end()
-  console.log('\n✅ Test database dropped\n')
+  // Close all pools cleanly. The test database is left in place and will be
+  // dropped and recreated by globalSetup at the start of the next test run.
+  await Promise.allSettled([testPool.end(), appPool.end()])
+  console.log('\n✅ Test pools closed\n')
 }
 
 export default globalTeardown
