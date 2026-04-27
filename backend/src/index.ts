@@ -1,5 +1,8 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import { z } from 'zod'
 import { pool, query } from './db';
 import bcrypt from 'bcryptjs'
 import { generateAccessToken, generateRefreshToken, verifyToken } from './utils/jwt'
@@ -37,7 +40,7 @@ import employeeOnboardingRoutes from './routes/employeeOnboarding'
 import loansRoutes from './routes/loans'
 
 // Validate required environment variables
-const requiredEnvVars = ['DATABASE_URL']
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'FRONTEND_URL']
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar])
 
 if (missingEnvVars.length > 0) {
@@ -47,34 +50,31 @@ if (missingEnvVars.length > 0) {
 
 const app = express()
 
-// Configure CORS
-let corsOrigin: string | string[];
-if (process.env.NODE_ENV === 'production') {
-  corsOrigin = [
-    process.env.FRONTEND_URL || '',
-    'https://erpbloom.com',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ].filter((url) => url !== '')
-} else {
-  corsOrigin = '*'
-}
+// Security headers
+app.use(helmet())
+app.use(helmet.crossOriginResourcePolicy({ policy: 'cross-origin' }))
 
-const corsOptions = {
-  origin: corsOrigin,
-  credentials: true
-}
+// Configure CORS — never use wildcard; always require explicit allowed origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://erpbloom.com',
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://localhost:3000'] : [])
+].filter(Boolean) as string[]
 
-logger.system('🔐 CORS Configuration:', {
-  env: process.env.NODE_ENV,
-  origin: corsOrigin,
-  frontend_url: process.env.FRONTEND_URL || 'NOT_SET'
-})
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 
-app.use(cors(corsOptions))
 import { tenantSchemaMiddleware } from './middleware/tenant-schema';
 import { dbClientMiddleware } from './middleware/db-client';
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+
+// Rate limiting — auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests', message: 'Too many attempts. Try again in 15 minutes.' }
+})
 
 // Health check endpoints — must be before dbClientMiddleware so they don't require a DB connection
 app.get('/', (req, res) => {
@@ -121,9 +121,18 @@ app.use('/api/employee-portal', requireAuth, tenantSchemaMiddleware, employeePor
 app.use('/api/employee-onboarding', requireAuth, tenantSchemaMiddleware, employeeOnboardingRoutes)
 app.use('/loans', requireAuth, tenantSchemaMiddleware, loansRoutes)
 
-app.post('/auth/login', async (req, res) => {
-  const { email, password, force } = req.body as { email?: string; password?: string; force?: boolean }
-  if (!email || !password) return res.status(400).json({ error: 'missing_fields' })
+const loginSchema = z.object({
+  email: z.string().min(1, 'Email is required'),
+  password: z.string().min(1, 'Password is required'),
+  force: z.boolean().optional()
+})
+
+app.post('/auth/login', authLimiter, async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'missing_fields', message: parsed.error.issues[0]?.message })
+  }
+  const { email, password, force } = parsed.data
   try {
     // Get user
     const r = await query(`
@@ -260,13 +269,18 @@ app.post('/auth/login', async (req, res) => {
       sessionToken
     }
     
-    console.log('🔐 LOGIN DEBUG - User:', u.email)
-    console.log('📋 LOGIN DEBUG - Permissions count:', permissions.length)
-    console.log('📋 LOGIN DEBUG - First 10 permissions:', permissions.slice(0, 10))
-    
     const accessToken = generateAccessToken(payload)
     const refreshToken = generateRefreshToken(payload)
-    
+
+    // Audit: login event
+    try {
+      await query(
+        `INSERT INTO rbac_audit_log (user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+        [u.id, 'LOGIN', JSON.stringify({ email: u.email, roleNames }), req.ip],
+        req.dbClient
+      )
+    } catch (_) { /* audit failure must not block login */ }
+
     return res.json({
       user: {
         id: u.id,
@@ -291,11 +305,18 @@ app.post('/auth/login', async (req, res) => {
 // Logout — invalidates the active session
 app.post('/auth/logout', requireAuth, async (req, res) => {
   try {
-    const { userId, sessionToken } = req.user!
+    const { userId, email, sessionToken } = req.user!
     await pool.query(
       `DELETE FROM public.active_sessions WHERE user_id = $1 AND session_token = $2`,
       [userId, sessionToken]
     )
+    // Audit: logout event
+    try {
+      await pool.query(
+        `INSERT INTO rbac_audit_log (user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+        [userId, 'LOGOUT', JSON.stringify({ email }), req.ip]
+      )
+    } catch (_) { /* audit failure must not block logout */ }
     return res.json({ success: true, message: 'Logged out successfully' })
   } catch (e) {
     logger.error('/auth/logout error', e)
@@ -533,12 +554,13 @@ app.post('/auth/change-password', requireAuth, async (req, res) => {
   }
 })
 
-if (process.env.NODE_ENV !== 'production') {
+// Dev-only endpoints — only active when explicitly enabled via env flag, never in production
+if (process.env.ENABLE_DEV_ENDPOINTS === 'true' && process.env.NODE_ENV !== 'production') {
   app.post('/dev/seed-user', async (req, res) => {
     const { name, email, password, role } = req.body as { name?: string; email?: string; password?: string; role?: string }
     if (!name || !email || !password) return res.status(400).json({ error: 'missing_fields' })
     try {
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const r = await pool.query('INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4) ON CONFLICT(email) DO NOTHING RETURNING id', [name, email, hash, role ?? 'user'])
       return res.json({ inserted: r.rowCount })
     } catch (e) {
@@ -550,7 +572,7 @@ if (process.env.NODE_ENV !== 'production') {
     const { name, email, password, role } = req.body as { name?: string; email?: string; password?: string; role?: string }
     if (!name || !email || !password) return res.status(400).json({ error: 'missing_fields' })
     try {
-      const hash = await bcrypt.hash(password, 10)
+      const hash = await bcrypt.hash(password, 12)
       const r = await pool.query(
         `INSERT INTO users(name,email,password_hash,role)
          VALUES($1,$2,$3,$4)
@@ -644,6 +666,12 @@ async function runStartupMigrations() {
         END IF;
       END $$;
     `)
+    // Add last_activity_at to active_sessions for idle timeout support
+    await pool.query(`
+      ALTER TABLE public.active_sessions
+        ADD COLUMN IF NOT EXISTS last_activity_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    `)
+
     logger.system('✅ Schema migrations applied')
   } catch (err) {
     // Non-fatal — log the error but let the server start anyway.

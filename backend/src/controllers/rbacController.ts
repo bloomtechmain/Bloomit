@@ -1,10 +1,25 @@
 import { Request, Response } from 'express'
 import { pool } from '../db'
 import bcrypt from 'bcryptjs'
+import { z } from 'zod'
 import { generateSecurePassword } from '../utils/passwordGenerator'
 import { sendWelcomeEmail, sendPasswordResetEmail } from '../utils/emailService'
 import { isPasswordRecentlyUsed, addToPasswordHistory } from '../utils/passwordHistory'
 import { checkMigrationStatus, previewMigration, executeMigration } from '../scripts/migrateToGranularPermissions'
+
+const createRoleSchema = z.object({
+  name: z.string().min(1, 'Role name is required').max(50),
+  description: z.string().max(500).optional()
+})
+
+const createUserSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  roleIds: z.array(z.number().int().positive()).min(1, 'At least one role must be assigned')
+})
+
+const assignPermissionsSchema = z.object({
+  permissionIds: z.array(z.number().int().nonnegative())
+})
 
 // ===== ROLES =====
 
@@ -60,12 +75,12 @@ export const getRoleById = async (req: Request, res: Response) => {
 }
 
 export const createRole = async (req: Request, res: Response) => {
-  const { name, description } = req.body
-  
-  if (!name) {
-    return res.status(400).json({ error: 'validation_error', message: 'Role name is required' })
+  const parsed = createRoleSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'validation_error', message: parsed.error.issues[0]?.message })
   }
-  
+  const { name, description } = parsed.data
+
   try {
     const result = await pool.query(
       `INSERT INTO roles (name, description, is_system_role) 
@@ -224,12 +239,12 @@ export const getPermissionsByRole = async (req: Request, res: Response) => {
 
 export const assignPermissionsToRole = async (req: Request, res: Response) => {
   const { roleId } = req.params
-  const { permissionIds } = req.body
-  
-  if (!Array.isArray(permissionIds)) {
-    return res.status(400).json({ error: 'validation_error', message: 'permissionIds must be an array' })
+  const parsed = assignPermissionsSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'validation_error', message: parsed.error.issues[0]?.message })
   }
-  
+  const { permissionIds } = parsed.data
+
   try {
     // Check if role is a system role
     const checkResult = await pool.query('SELECT is_system_role, name FROM roles WHERE id = $1', [roleId])
@@ -278,23 +293,12 @@ export const assignPermissionsToRole = async (req: Request, res: Response) => {
 // ===== USERS =====
 
 export const createUser = async (req: Request, res: Response) => {
-  const { email, roleIds } = req.body
+  const parsed = createUserSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'validation_error', message: parsed.error.issues[0]?.message })
+  }
+  const { email, roleIds } = parsed.data
   const tenantId = req.user?.tenantId
-
-  // Validation
-  if (!email) {
-    return res.status(400).json({ error: 'validation_error', message: 'Email is required' })
-  }
-
-  if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) {
-    return res.status(400).json({ error: 'validation_error', message: 'At least one role must be assigned' })
-  }
-
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ error: 'validation_error', message: 'Invalid email format' })
-  }
 
   try {
     // Enforce plan user limit from packages table
