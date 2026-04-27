@@ -4,6 +4,43 @@ This guide covers how to develop new features safely, how the automated CI pipel
 
 ---
 
+## GitHub Branch Protection Setup (One-Time)
+
+Before using this workflow, you must protect the `main` branch on GitHub so no one can push to it directly.
+
+### Steps
+
+1. Go to: `https://github.com/bloomtechmain/Bloomit/settings/branches`
+2. Click **"Add branch ruleset"**
+3. Fill in:
+   - **Ruleset name:** `Protect main`
+   - **Enforcement status:** `Active`
+4. Under **Target branches** → click **"Add target"** → **"Include by pattern"** → type `main` → click **"Add"**
+5. Under **Rules**, check:
+   - [x] **Require a pull request before merging**
+     - Set **Required approvals** to `0` (if working solo)
+   - [x] **Require status checks to pass**
+     - Click **"Add checks"** and add:
+       - `Backend — Typecheck & Tests`
+       - `Frontend — Typecheck`
+6. Click **"Create"**
+
+> **Note:** The CI status checks only appear in the search after the workflow has run at least once. If they don't show up, save the ruleset without them first, then follow the steps below to trigger the first CI run, and come back to add them.
+
+### Triggering the First CI Run
+
+Run these commands once to create a test PR that triggers CI:
+
+```bash
+git checkout -b test/trigger-ci
+git commit --allow-empty -m "chore: trigger first CI run"
+git push origin test/trigger-ci
+```
+
+Open a PR from `test/trigger-ci` to `main` on GitHub. Wait ~2–3 minutes for CI to finish. Once it's green, go back to the ruleset, edit it, search for the checks — they will now appear. Add them and save. Then close the test PR without merging and delete the branch.
+
+---
+
 ## The Golden Rule
 
 > **Never commit directly to `main`.** Every change — no matter how small — goes through a branch and a Pull Request.
