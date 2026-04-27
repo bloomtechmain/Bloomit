@@ -1,17 +1,16 @@
 import { Pool } from 'pg'
+import { pool as testPool } from './helpers'
 
 async function globalTeardown() {
-  const pool = new Pool({
+  // Close the test pool cleanly first to prevent unhandled connection errors
+  await testPool.end()
+
+  const adminPool = new Pool({
     connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres'
   })
-  // Terminate all other connections before dropping
-  await pool.query(`
-    SELECT pg_terminate_backend(pid)
-    FROM pg_stat_activity
-    WHERE datname = 'bloomtech_test' AND pid <> pg_backend_pid()
-  `)
-  await pool.query('DROP DATABASE IF EXISTS bloomtech_test')
-  await pool.end()
+  // WITH (FORCE) terminates remaining connections internally — no race condition
+  await adminPool.query('DROP DATABASE IF EXISTS bloomtech_test WITH (FORCE)')
+  await adminPool.end()
   console.log('\n✅ Test database dropped\n')
 }
 
