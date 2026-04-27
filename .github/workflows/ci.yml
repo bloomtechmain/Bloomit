@@ -45,6 +45,9 @@ jobs:
         working-directory: backend
         run: npx tsc --noEmit
 
+      - name: Verify PostgreSQL is reachable
+        run: pg_isready -h localhost -p 5432 -U postgres
+
       - name: Run tests
         working-directory: backend
         env:
@@ -55,7 +58,7 @@ jobs:
           JWT_REFRESH_SECRET: test-refresh-secret-not-for-production
           SMTP_HOST: localhost
           SMTP_PORT: 1025
-        run: npm test
+        run: npx cross-env NODE_ENV=test npx dotenv -e .env.test -- npx jest --runInBand --verbose 2>&1
 
   frontend-typecheck:
     name: Frontend — Typecheck
